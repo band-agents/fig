@@ -1,0 +1,118 @@
+{%- comment -%}
+  The self-service returns portal.
+
+  The portal itself is one page served by Relay, the order and returns console, because the rules it
+  applies — what is still inside its return window, what is final sale, how much comes back and
+  whether the extra 5% for store credit is owed — live there with the orders. Every shop embeds that
+  same page, so a change to the policy reaches all of them at once and no two storefronts can
+  disagree about what a customer is owed.
+
+  Set both settings on the section:
+    Portal address — where Relay is served, e.g. https://relay.figeg.com (no trailing slash)
+    Store         — this storefront's channel id in Relay: fig-web, fig-app, fig-woo,
+                    labesny-web, labesny-app, ws-eg, ws-kw, ws-jo
+{%- endcomment -%}
+
+{%- liquid
+  assign base = section.settings.portal_url | strip | remove_last: '/'
+  assign store = section.settings.store_id | strip
+  assign src = base | append: '/return?embed=1&store=' | append: store
+-%}
+
+<div class="wrap page-body">
+  <div class="plp-hero" style="padding-top:40px">
+    <h1 class="display">{{ page.title | default: section.settings.heading }}</h1>
+    {%- if section.settings.intro != blank -%}
+      <div class="rte returns-intro">{{ section.settings.intro }}</div>
+    {%- endif -%}
+  </div>
+
+  {%- if base == blank or store == blank -%}
+    {%- comment -%} Only the merchant sees this: an unconfigured section says so rather than
+      showing a customer an empty frame. {%- endcomment -%}
+    <p class="rte">
+      The returns portal is not connected yet. Open this section in the theme editor and fill in the
+      portal address and the store.
+    </p>
+  {%- else -%}
+    <iframe
+      id="returns-portal"
+      class="returns-portal"
+      title="{{ 'Start a return' }}"
+      src="{{ src }}"
+      height="720"
+      loading="eager"
+      referrerpolicy="strict-origin"
+    ></iframe>
+    <noscript>
+      <p class="rte">
+        <a class="link" href="{{ src | replace: '&embed=1', '' | replace: '?embed=1&', '?' }}">Start a return</a>
+      </p>
+    </noscript>
+  {%- endif -%}
+</div>
+
+<style>
+  .returns-portal {
+    display: block;
+    width: 100%;
+    border: 0;
+    margin: 8px 0 64px;
+    /* Until the portal reports its own height. Tall enough that the first step is whole. */
+    min-height: 620px;
+    transition: height 0.2s;
+  }
+  .returns-intro {
+    margin-top: 14px;
+    max-width: 60ch;
+    color: var(--grey);
+  }
+</style>
+
+<script>
+  (function () {
+    var frame = document.getElementById('returns-portal');
+    if (!frame) return;
+    var origin = new URL(frame.src, window.location.href).origin;
+    window.addEventListener('message', function (e) {
+      /* The portal is the only page allowed to resize this frame, and it only ever sends a number. */
+      if (e.origin !== origin || e.source !== frame.contentWindow) return;
+      var m = e.data;
+      if (!m || m.type !== 'relay:returns:height') return;
+      var h = Number(m.height);
+      if (h > 0 && h < 20000) {
+        /* The placeholder height was only there until this message arrived. */
+        frame.style.minHeight = '0';
+        frame.style.height = h + 'px';
+      }
+    });
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Returns portal",
+  "settings": [
+    {
+      "type": "text",
+      "id": "portal_url",
+      "label": "Portal address",
+      "info": "Where Relay is served, with no trailing slash — for example https://relay.figeg.com"
+    },
+    {
+      "type": "text",
+      "id": "store_id",
+      "label": "Store",
+      "info": "This storefront's id in Relay: fig-web, fig-woo, labesny-web, ws-eg, ws-kw or ws-jo"
+    },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Returns" },
+    {
+      "type": "richtext",
+      "id": "intro",
+      "label": "Intro",
+      "default": "<p>Enter your order number and the email or phone you ordered with. Choose what is going back, tell us why, and pick how you would like the money.</p>"
+    }
+  ],
+  "presets": [{ "name": "Returns portal" }]
+}
+{% endschema %}

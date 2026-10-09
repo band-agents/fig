@@ -1,0 +1,592 @@
+/* The returns portal wears the storefront, not the console.
+   Everything here is the FIG Couture / Labesny stylesheet in miniature: paper white, ink black,
+   hairlines, Italiana for display and Jost for the rest, uppercase letter-spaced labels, and a
+   4px radius on the few things that have one. Taken from labesny-couture/assets/fig.css so the
+   page a customer reaches from either storefront does not look like it belongs to someone else.
+
+   Scoped to `.sf` on purpose: the console around it is dark and keeps its own tokens. */
+
+.sf {
+  --paper: #ffffff;
+  --ink: #0f0f10;
+  --ink-2: #2a3743;
+  --stone: #f6f1eb;
+  --line: #e8e2da;
+  --line-2: #d8cfc3;
+  --grey: #6b665f;
+  --mute: #a8a29a;
+  --accent: #a33c41;
+  --accent-soft: #f6f1eb;
+  --ok: #1f7a4d;
+  --ok-bg: #eef7f2;
+
+  color-scheme: light;
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 15px/1.55 var(--sf-sans), "Futura", "Avenir Next", system-ui, sans-serif;
+}
+
+/* Labesny's blush is a fill and never ink, so it tints the chosen row rather than the text. */
+.sf[data-brand='Labesny'] {
+  --accent: #a33c41;
+  --accent-soft: #fdeded;
+}
+
+.sf input,
+.sf textarea,
+.sf button {
+  font: inherit;
+  color: inherit;
+}
+.sf :focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ── type ─────────────────────────────────────────── */
+.sf-display {
+  font-family: var(--sf-display), "Didot", "Bodoni 72", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  margin: 0;
+  text-wrap: balance;
+  font-size: clamp(30px, 5.2vw, 46px);
+}
+.sf-eyebrow {
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+.sf-sub {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: var(--grey);
+}
+.sf-mark {
+  font-family: var(--sf-display), Georgia, serif;
+  /* Women'secret is a long word at .36em: the mark gives tracking back as the screen narrows. */
+  font-size: clamp(15px, 4.4vw, 26px);
+  line-height: 1;
+  letter-spacing: clamp(0.18em, 1.2vw, 0.36em);
+  padding-left: 0.36em;
+  text-transform: uppercase;
+}
+.sf-money {
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── chrome ───────────────────────────────────────── */
+.sf-hdr {
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.sf-hdr-in,
+.sf-main,
+.sf-foot {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 680px;
+  padding-inline: clamp(16px, 2.6vw, 40px);
+}
+.sf-hdr-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 72px;
+}
+.sf-main {
+  padding-block: clamp(32px, 6vw, 64px) 48px;
+}
+.sf-foot {
+  padding-bottom: 64px;
+  font-size: 12px;
+  color: var(--mute);
+}
+.sf-foot a {
+  color: var(--grey);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── progress rail ────────────────────────────────── */
+.sf-steps {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 36px;
+  padding: 0;
+  list-style: none;
+}
+.sf-steps li {
+  flex: 1;
+  display: grid;
+  gap: 8px;
+}
+.sf-steps i {
+  height: 1px;
+  background: var(--line-2);
+  transition: background 0.25s;
+}
+.sf-steps li[data-on] i {
+  background: var(--ink);
+}
+.sf-steps span {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.sf-steps li[data-on] span {
+  color: var(--ink);
+}
+
+/* ── fields ───────────────────────────────────────── */
+.sf-label {
+  display: block;
+}
+.sf-label > span:first-child {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+.sf .sf-field {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  font-size: 16px;
+  transition: border-color 0.15s;
+}
+.sf .sf-field:hover {
+  border-color: var(--grey);
+}
+.sf .sf-field:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+.sf textarea.sf-field {
+  height: auto;
+  padding: 12px 14px;
+  resize: none;
+  line-height: 1.5;
+}
+.sf-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--mute);
+}
+
+/* ── buttons ──────────────────────────────────────── */
+.sf .sf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 26px;
+  background: var(--ink);
+  color: #fff;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+.sf .sf-btn:hover:not(:disabled) {
+  background: var(--ink-2);
+  border-color: var(--ink-2);
+}
+.sf .sf-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.sf .sf-btn.wide {
+  width: 100%;
+}
+.sf .sf-btn.quiet {
+  background: none;
+  color: var(--ink);
+  border-color: transparent;
+  padding-inline: 4px;
+}
+.sf .sf-btn.quiet:hover:not(:disabled) {
+  background: none;
+  color: var(--grey);
+  border-color: transparent;
+}
+
+/* ── cards and rows ───────────────────────────────── */
+.sf-note {
+  border: 1px solid var(--line);
+  background: var(--stone);
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.sf-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 22px;
+  border-block: 1px solid var(--line);
+  padding: 12px 0;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--grey);
+}
+.sf-banner b {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.sf-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+.sf-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  transition: opacity 0.2s;
+}
+.sf-item[data-off] {
+  opacity: 0.45;
+}
+.sf-shot {
+  width: 60px;
+  flex: none;
+  aspect-ratio: 2 / 3;
+  background: var(--stone);
+  overflow: hidden;
+}
+.sf-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+}
+.sf-item-body {
+  min-width: 0;
+  flex: 1;
+}
+.sf-item-body p {
+  margin: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sf-item-body small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--grey);
+}
+.sf-item-body em {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-style: normal;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+.sf-qty {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+.sf .sf-qty button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  font-size: 15px;
+  transition: border-color 0.15s;
+}
+.sf .sf-qty button:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+.sf .sf-qty button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.sf-qty span {
+  width: 32px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── choices: reasons and refunds ─────────────────── */
+.sf-reasons {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 560px) {
+  .sf-reasons {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.sf .sf-choice {
+  display: block;
+  width: 100%;
+  text-align: start;
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.sf .sf-choice:hover:not(:disabled) {
+  border-color: var(--line-2);
+}
+.sf .sf-choice[aria-pressed='true'] {
+  border-color: var(--ink);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+.sf .sf-choice:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sf .sf-refund {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px;
+}
+.sf-refund .ico {
+  flex: none;
+  margin-top: 2px;
+  color: var(--grey);
+}
+.sf-refund[aria-pressed='true'] .ico {
+  color: var(--accent);
+}
+.sf-refund-body {
+  flex: 1;
+  min-width: 0;
+}
+.sf-refund-body b {
+  font-weight: 500;
+}
+.sf-refund-body small {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--grey);
+}
+.sf-bonus {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.sf-refund-amount {
+  flex: none;
+  font-size: 16px;
+}
+
+/* ── step footer ──────────────────────────────────── */
+.sf-foot-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 8px;
+}
+.sf-foot-row .hint {
+  font-size: 12px;
+  color: var(--grey);
+}
+.sf-foot-row .go {
+  margin-inline-start: auto;
+}
+
+/* ── done ─────────────────────────────────────────── */
+.sf-done {
+  text-align: center;
+  padding-block: clamp(48px, 10vw, 110px) 64px;
+}
+.sf-done .tick {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 26px;
+  border-radius: 50%;
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.sf-done p {
+  margin: 14px auto 0;
+  max-width: 44ch;
+  color: var(--ink-2);
+}
+.sf-done p.quiet {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--grey);
+}
+
+.sf-alert {
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  font-size: 13px;
+}
+
+.sf-stack {
+  display: grid;
+  gap: 24px;
+}
+
+/* ── embedded in a storefront page ────────────────── */
+/* The shop around it supplies the header and the footer, so the portal drops its own and is
+   nothing but the four steps. */
+.sf[data-embedded] {
+  /* The height goes back to the shop, but not the paper: the console around this page is dark, and
+     a transparent portal would show it through the frame. */
+  min-height: 0;
+}
+.sf[data-embedded] .sf-main {
+  padding-block: 4px 16px;
+}
+/* Relay's own body is dark and its atmosphere is a gradient. Inside a shop's frame the customer
+   would see both under the portal, so for this page the document goes to paper too. */
+html:has(.sf[data-embedded]) body {
+  background: #ffffff;
+}
+html:has(.sf[data-embedded]) .atmosphere {
+  display: none;
+}
+
+/* ── photographs ──────────────────────────────────── */
+.sf-photos-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+.sf-photos-label em {
+  font-style: normal;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.sf-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sf-shots li {
+  position: relative;
+  width: 88px;
+  aspect-ratio: 3 / 4;
+}
+.sf-shots img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--stone);
+}
+.sf-shots li > button[aria-label] {
+  position: absolute;
+  top: -7px;
+  inset-inline-end: -7px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.sf .sf-shot-add {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  border: 1px dashed var(--line-2);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--grey);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.sf .sf-shot-add:hover:not(:disabled) {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.sf .sf-shot-add span {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding-inline: 4px;
+}
+
+/* ── branches ─────────────────────────────────────── */
+.sf .sf-branch {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 16px 18px;
+}

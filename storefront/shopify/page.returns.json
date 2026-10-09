@@ -1,0 +1,12 @@
+{
+  "sections": {
+    "main": {
+      "type": "fig-returns",
+      "settings": {
+        "store_id": "REPLACE-WITH-THIS-STORE-S-CHANNEL-ID",
+        "heading": "Returns"
+      }
+    }
+  },
+  "order": ["main"]
+}
