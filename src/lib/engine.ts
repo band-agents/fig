@@ -495,7 +495,7 @@ export async function retryStore(actor: Actor, orderId: string) {
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
   if (!o) throw notFound('Order not found.');
   if (actor.principal && (!seesChannel(actor.principal, o.channelId) || !can(actor.principal, 'orders', 2))) throw forbidden();
-  const { failed, unsent } = changesToResend(o.writeBack);
+  const { failed, unsent } = changesToResend(o.writeBack, o.channelId);
   if (!failed.length && !unsent.length) throw invalid('Nothing to send: Shopify already has every change on this order.');
   // the stage's own changes again; a change already done is never sent twice (writeback.ts)
   queueWriteBack(o.id, o.stage, { reason: o.cancelReason ?? undefined });

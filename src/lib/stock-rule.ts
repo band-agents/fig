@@ -1,6 +1,6 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
-import { CHANNELS, channelConfigured, type ChannelDef } from './channels';
+import { CHANNELS, channelConfigured, storeWriteBack, type ChannelDef } from './channels';
 import { draftProduct, publishProduct, searchProducts } from './connectors/shopify';
 import { cannotDraft, cannotPublish, OOS_TAG, type RuleMode } from './domain/stock-rule';
 import { getDb, schema } from './db';
@@ -95,7 +95,8 @@ export async function runStockRule(opts: { mode?: RuleMode; channelId?: string }
   if (mode === 'off') return { mode, ran: false as const, channels: [] as ChannelResult[] };
 
   const targets = CHANNELS.filter(
-    (c) => c.platform === 'shopify' && channelConfigured(c) && (!opts.channelId || c.id === opts.channelId),
+    // a read-only store (FIG, 25 Oct) is never drafted or republished from here until its own switch is on
+    (c) => c.platform === 'shopify' && channelConfigured(c) && !(c.readOnly && storeWriteBack(c) === 'off') && (!opts.channelId || c.id === opts.channelId),
   );
 
   const channels: ChannelResult[] = [];

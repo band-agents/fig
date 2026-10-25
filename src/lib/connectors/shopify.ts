@@ -2,7 +2,7 @@ import 'server-only';
 // Shopify Admin GraphQL (2025-07): pulls orders by updated_at, maps order webhooks, and, only when
 // RELAY_WRITE_BACK=true (or =dry, to see without sending), writes what the console does back to the
 // store: stage tags, holds, fulfilment with tracking, delivery steps, payment, cancels and refunds.
-import { channelEnv, type ChannelDef } from '../channels';
+import { channelEnv, storeWriteBack, type ChannelDef } from '../channels';
 import type { Connector, IncomingOrder, WriteBackChange, WriteBackResult } from './types';
 import { backoff, ConnectorError, errorText, fetchRetry, sleep } from './http';
 import { str } from './map-util';
@@ -482,8 +482,8 @@ export const shopify: Connector = {
   },
 
   async writeBack(c, order, change) {
-    const mode = process.env.RELAY_WRITE_BACK;
-    if (mode !== 'true' && mode !== 'dry') return { ok: false, skipped: true, note: 'write-back is off' };
+    const mode = storeWriteBack(c);
+    if (mode === 'off') return { ok: false, skipped: true, note: c.readOnly ? `${c.name} is read-only` : 'write-back is off' };
     const id = order.externalId;
     if (!id.startsWith('gid://shopify/Order/')) return { ok: false, skipped: true, note: `${order.number} is not a Shopify order` };
     const dry = mode === 'dry';
@@ -593,13 +593,20 @@ export async function* searchProducts(c: ChannelDef, query: string): AsyncGenera
  * whole list — on a catalogue where the tags carry the gender, the category and the sub-category,
  * that would quietly strip the menu off the product.
  */
+/** A read-only store takes no product changes, whoever asks (the stock rule filters it out first). */
+const assertWritable = (c: ChannelDef) => {
+  if (c.readOnly && storeWriteBack(c) === 'off') throw new ConnectorError(`${c.name} is connected read-only: nothing is changed in its store.`);
+};
+
 export async function draftProduct(c: ChannelDef, id: string) {
+  assertWritable(c);
   await mutate(c, SET_STATUS, { input: { id, status: 'DRAFT' } }, 'productUpdate');
   await mutate(c, TAGS_ADD, { id, tags: [OOS_TAG] }, 'tagsAdd');
 }
 
 /** Puts a product the rule drafted back on the shop, and takes its mark off. */
 export async function publishProduct(c: ChannelDef, id: string) {
+  assertWritable(c);
   await mutate(c, SET_STATUS, { input: { id, status: 'ACTIVE' } }, 'productUpdate');
   await mutate(c, TAGS_REMOVE, { id, tags: [OOS_TAG] }, 'tagsRemove');
 }

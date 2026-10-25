@@ -71,7 +71,7 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
               </div>
             )}
           </div>
-          <StoreStatus orderId={o.id} {...changesToResend(o.writeBack)} canRetry={can(me, 'orders', 2) && !me.previewing && !READ_ONLY_ROLES.includes(me.role)} />
+          <StoreStatus orderId={o.id} {...changesToResend(o.writeBack, o.channelId)} canRetry={can(me, 'orders', 2) && !me.previewing && !READ_ONLY_ROLES.includes(me.role)} />
           {d.autopilotNext && !o.onHold && (
             <div className="flex items-center gap-2 rounded-full bg-elev-2 px-3 py-1.5 text-[11.5px]" title={d.autopilotNext.why}>
               <Bot className="size-3.5 shrink-0 text-ink-3" />
