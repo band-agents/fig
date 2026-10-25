@@ -35,6 +35,7 @@ export type ChannelDef = {
   warehouse: string; // a location id: fig-cairo, dh-kuwait, or one added later
   carrier: string;
   parked?: boolean; // known but intentionally not wired yet
+  readOnly?: boolean; // read from, never written to, whatever RELAY_WRITE_BACK says (RELAY_<PREFIX>_WRITE_BACK=true opens it)
   notes?: string;
 };
 
@@ -51,6 +52,8 @@ export const CHANNELS: ChannelDef[] = [
     store: 'ujvi0q-ga',
     warehouse: 'fig-cairo',
     carrier: 'Aramex',
+    // Dan, 25 Oct: FIG joins read-only; what the floor does here stays out of FIG's Shopify until he says
+    readOnly: true,
     notes: 'The new FIG Shopify store. App orders pushed here carry the fig-app source and are filed under the FIG app.',
   },
   {
@@ -208,6 +211,15 @@ export function channelEnv(c: ChannelDef) {
     key: v('KEY'),
     secret: v('SECRET'),
   };
+}
+
+/**
+ * What the console sends to this store: its own RELAY_<PREFIX>_WRITE_BACK when set, else nothing for a
+ * read-only store, else RELAY_WRITE_BACK. true = live, dry = read and record without sending.
+ */
+export function storeWriteBack(c: Pick<ChannelDef, 'envPrefix' | 'readOnly'>, env: Record<string, string | undefined> = process.env): 'live' | 'dry' | 'off' {
+  const v = env[`RELAY_${c.envPrefix}_WRITE_BACK`]?.trim() || (c.readOnly ? 'off' : env.RELAY_WRITE_BACK?.trim());
+  return v === 'true' ? 'live' : v === 'dry' ? 'dry' : 'off';
 }
 
 export function channelConfigured(c: ChannelDef) {
