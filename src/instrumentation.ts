@@ -6,7 +6,8 @@ export async function register() {
   setTimeout(() => void import('./lib/stock/facts').then((m) => m.getFacts()).catch(() => {}), 2_000);
   // orders go straight to Pick & pack: anything left waiting in a retired step (a confirmation call,
   // a finance check) is sent on once the server is up, whatever the sync schedule
-  setTimeout(() => void import('./lib/engine').then((m) => m.releaseRetired()).catch((e) => console.error('[relay] releasing waiting orders failed', e instanceof Error ? e.message : e)), 8_000);
+  // (on Vercel every cold start runs this file: the schedule in /api/cron does it there instead)
+  if (!process.env.VERCEL) setTimeout(() => void import('./lib/engine').then((m) => m.releaseRetired()).catch((e) => console.error('[relay] releasing waiting orders failed', e instanceof Error ? e.message : e)), 8_000);
   const minutes = Number(process.env.RELAY_SYNC_MINUTES ?? 0);
   if (!minutes) return;
   // a store connected since the last start: first its catalogue, stock and orders, then its website

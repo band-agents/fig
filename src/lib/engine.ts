@@ -32,6 +32,7 @@ import { findBranch } from './domain/branches';
 import { forbidden, invalid, notFound } from './errors';
 import { publish } from './bus';
 import { changesToResend, queueStoreChanges, queueWriteBack } from './writeback';
+import { keepAlive } from './keep-alive';
 import { mirrorReturn } from './medusa-mirror';
 import { AUTOPILOT_NAME, RISK_NAME, SYSTEM_NAME } from './domain/actors';
 import { stockFollowsOrder, stockFollowsReturn } from './stock/hooks';
@@ -385,7 +386,7 @@ async function setStage(
   // Kuwait parcels: UPS (GMTC) is booked at the configured stage and cancelled with the order. Loaded
   // lazily (it calls back into this module) and never awaited: a courier hiccup must not stop an order.
   if (o.source !== 'demo' && (to === 'cancelled' || to === 'ready' || to === 'packed') && CHANNEL[o.channelId]?.country === 'KW') {
-    void import('./gmtc-shipments').then((m) => m.courierFollowsOrder(o.id, to)).catch(() => {});
+    keepAlive(import('./gmtc-shipments').then((m) => m.courierFollowsOrder(o.id, to)).catch(() => {}));
   }
 }
 

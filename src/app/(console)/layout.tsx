@@ -40,7 +40,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
   // the frame: a warm grey page, the floating icon menu on the left, a top row with the business
   // switch (FIG / Labesny) on the left and search and the bell on the right
   return (
-    <LiveProvider me={me}>
+    <LiveProvider me={me} mode={process.env.VERCEL ? 'poll' : 'stream'}>
       <MeasureProvider initial={measure}>
       <ChannelRegistry defs={CHANNELS.filter((c) => c.custom)} />
       <div className="min-h-dvh bg-bg">

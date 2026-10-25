@@ -1,4 +1,5 @@
 import 'server-only';
+import { keepAlive } from './keep-alive';
 import { eq } from 'drizzle-orm';
 import { getDb, schema } from './db';
 import { CHANNEL, channelConfigured } from './channels';
@@ -52,6 +53,7 @@ function queue(orderId: string, build: (o: Order, carrier: string) => WriteBackC
     .then(() => push(orderId, build))
     .catch((e) => console.error('[relay] write-back failed', orderId, e instanceof Error ? e.message : e));
   chains.set(orderId, next);
+  keepAlive(next);
   void next.finally(() => chains.get(orderId) === next && chains.delete(orderId));
 }
 
