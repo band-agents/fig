@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from '@/components/ui/toast';
+import { REFRESHED } from './instant-links';
 import type { Me } from './nav';
 
 export type LiveEvent = { kind: string; id?: string; number?: string; channelId?: string; stage?: string; actor?: string; message?: string; at: string };
@@ -14,12 +14,8 @@ type Ctx = {
   online: Online[];
   feed: LiveEvent[];
   paletteOpen: boolean;
-  copilotOpen: boolean;
   openPalette: () => void;
   closePalette: () => void;
-  openCopilot: (prompt?: string) => void;
-  closeCopilot: () => void;
-  copilotPrompt: string | null;
 };
 
 const LiveCtx = createContext<Ctx | null>(null);
@@ -37,8 +33,6 @@ export function LiveProvider({ me, children }: { me: Me; children: React.ReactNo
   const [online, setOnline] = useState<Online[]>([]);
   const [feed, setFeed] = useState<LiveEvent[]>([]);
   const [paletteOpen, setPalette] = useState(false);
-  const [copilotOpen, setCopilot] = useState(false);
-  const [copilotPrompt, setCopilotPrompt] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -56,10 +50,13 @@ export function LiveProvider({ me, children }: { me: Me; children: React.ReactNo
       es.addEventListener('live', (m) => {
         const e = JSON.parse((m as MessageEvent).data) as LiveEvent;
         setFeed((f) => [e, ...f].slice(0, 60));
-        if (e.kind === 'order' && e.stage === 'new' && e.actor === undefined) toast(`New order ${e.number ?? ''}`, { tone: 'live' });
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => {
-          if (document.visibilityState === 'visible' && !document.querySelector('[data-editing="true"]')) router.refresh();
+          if (document.visibilityState === 'visible' && !document.querySelector('[data-editing="true"]')) {
+            router.refresh();
+            // the refresh empties the pages kept in memory: the menu pages are loaded again behind it
+            window.dispatchEvent(new Event(REFRESHED));
+          }
         }, 900);
       });
     };
@@ -76,18 +73,9 @@ export function LiveProvider({ me, children }: { me: Me; children: React.ReactNo
         e.preventDefault();
         setPalette((p) => !p);
       }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
-        e.preventDefault();
-        setCopilot((p) => !p);
-      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  const openCopilot = useCallback((prompt?: string) => {
-    setCopilotPrompt(prompt ?? null);
-    setCopilot(true);
   }, []);
 
   const value = useMemo<Ctx>(
@@ -97,14 +85,10 @@ export function LiveProvider({ me, children }: { me: Me; children: React.ReactNo
       online,
       feed,
       paletteOpen,
-      copilotOpen,
-      copilotPrompt,
       openPalette: () => setPalette(true),
       closePalette: () => setPalette(false),
-      openCopilot,
-      closeCopilot: () => setCopilot(false),
     }),
-    [me, connected, online, feed, paletteOpen, copilotOpen, copilotPrompt, openCopilot],
+    [me, connected, online, feed, paletteOpen],
   );
   return <LiveCtx.Provider value={value}>{children}</LiveCtx.Provider>;
 }

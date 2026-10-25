@@ -184,7 +184,7 @@ export function shopifyPayment(
   else if (/instapay/.test(g)) method = 'instapay';
   else if (/knet|myfatoorah/.test(g)) method = country === 'KW' ? 'knet' : 'card';
   else if (/cash|\bcod\b/.test(g)) method = 'cod';
-  else if (/paymob|card|stripe|checkout|shopify_payments/.test(g)) method = 'card';
+  else if (/paymob|hyperpay|card|stripe|checkout|shopify_payments/.test(g)) method = 'card';
   else if (!g.trim()) method = fin === 'PENDING' ? 'cod' : 'card';
   else method = 'card';
 

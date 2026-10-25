@@ -31,8 +31,8 @@ export function Reconcile({ id, expected, currency }: { id: string; expected: nu
         });
       }}
     >
-      <span className="text-[12px] text-ink-3">{currency}</span>
-      <input value={v} onChange={(e) => setV(e.target.value)} className="field !h-[30px] !w-28 text-right font-mono text-[12.5px]" inputMode="decimal" autoFocus />
+      <span className="text-[11.5px] text-ink-3">{currency}</span>
+      <input value={v} onChange={(e) => setV(e.target.value)} className="field !h-[30px] !w-28 text-right font-mono text-[12px]" inputMode="decimal" autoFocus />
       <button className="btn btn-primary btn-sm" disabled={pending}>
         {pending && <Loader2 className="size-3.5 animate-spin" />}
         Save

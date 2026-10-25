@@ -31,7 +31,7 @@ export function FilterBar({ filters, channels, stages }: { filters: OrderFilters
   }, [q]);
 
   const active = [filters.channel, filters.stage, filters.pay, filters.risk, filters.q].filter(Boolean).length;
-  const sel = 'field !h-9 !w-auto min-w-0 !rounded-[10px] !pr-8 text-[13px]';
+  const sel = 'field !h-9 !w-auto shrink-0 !pr-8 text-[12.5px] lg:min-w-0 lg:shrink';
   return (
     <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
       <label className="relative flex-1">

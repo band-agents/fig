@@ -26,7 +26,7 @@ export async function feedFor(p: Principal, limit = 24): Promise<FeedRow[]> {
     left join orders o on o.id = e.order_id
     left join returns r on r.id = e.return_id
     left join users u on u.id = e.actor_id
-    where e.at <= now() and ${scope(p, sql`o.channel_id`)} and e.kind in ('stage','call','note','courier','hold','system','sync')
+    where e.at <= now() and ${scope(p, sql`o.channel_id`, sql`o.id`)} and e.kind in ('stage','call','note','courier','hold','system','sync')
     order by e.at desc limit ${limit}`);
   return r.rows.map((x) => ({
     id: x.id,

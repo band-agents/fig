@@ -4,8 +4,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 // happens on the server for every page and action.
 // `/return` and `/api/returns` are the customer's self-service portal: no account, by design. They
 // carry their own protection — the order number must be paired with the email on the order, and
-// both endpoints are rate limited per address.
-const PUBLIC = ['/login', '/join', '/api/webhooks', '/api/health', '/api/cron', '/return', '/api/returns'];
+// both endpoints are rate limited per address. `/concierge` and `/api/concierge` are the shopping
+// advisor on the storefront: public for the same reason, read-only, and rate limited per address.
+// `/merch` and `/api/merch` are the website placements the shops load: read-only product cards, and
+// a per-day counter of views and clicks, both rate limited. `/welcome` is the landing page and
+// `/api/auth/google` the Google sign-in round trip (it only ever signs in an existing teammate).
+const PUBLIC = ['/login', '/join', '/welcome', '/api/auth/google', '/api/webhooks', '/api/health', '/api/cron', '/return', '/api/returns', '/concierge', '/api/concierge', '/merch', '/api/merch'];
 
 /**
  * A public path is the path itself or something beneath it — never merely something that starts
@@ -19,6 +23,8 @@ export function proxy(req: NextRequest) {
   if (isPublic(pathname)) return NextResponse.next();
   if (!req.cookies.get('relay_session')?.value) {
     if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'signed_out' }, { status: 401 });
+    // the front door: a signed-out visitor to the home address sees the landing page, the address unchanged
+    if (pathname === '/') return NextResponse.rewrite(new URL('/welcome', req.url));
     const url = req.nextUrl.clone();
     url.pathname = '/login';
     url.search = pathname === '/' ? '' : `?next=${encodeURIComponent(pathname)}`;

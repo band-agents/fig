@@ -24,17 +24,17 @@ export function ChannelControls({ id, configured, canAct, lastRun }: { id: strin
         </div>
       )}
       {check && (
-        <div className={`rounded-lg px-3 py-2 text-[12.5px] ${check.ok ? 'bg-[color-mix(in_oklab,var(--good)_10%,transparent)]' : 'bg-[color-mix(in_oklab,var(--critical)_10%,transparent)]'}`}>
+        <div className={`rounded-lg px-3 py-2 text-[12px] ${check.ok ? 'bg-[color-mix(in_oklab,var(--good)_10%,transparent)]' : 'bg-[color-mix(in_oklab,var(--critical)_10%,transparent)]'}`}>
           <div className="flex items-start gap-2">
             {check.ok ? <CircleCheck className="mt-0.5 size-3.5 shrink-0 text-good" /> : <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-critical" />}
             <span>{check.note}</span>
           </div>
           {check.missing && check.missing.length > 0 && <div className="mt-1 pl-5 font-mono text-[11px] text-ink-3">missing scopes: {check.missing.join(', ')}</div>}
-          {check.shop?.name && <div className="mt-1 pl-5 text-[11.5px] text-ink-3">{[check.shop.name, check.shop.currency, check.shop.timezone].filter(Boolean).join(' · ')}</div>}
+          {check.shop?.name && <div className="mt-1 pl-5 text-[11px] text-ink-3">{[check.shop.name, check.shop.currency, check.shop.timezone].filter(Boolean).join(' · ')}</div>}
         </div>
       )}
       {(sync ?? (lastRun && lastRun.ok === false ? { ok: false, note: lastRun.note ?? '' } : null)) && (
-        <div className={`flex items-start gap-2 text-[12.5px] ${(sync ?? lastRun)?.ok ? 'text-good' : 'text-critical'}`}>
+        <div className={`flex items-start gap-2 text-[12px] ${(sync ?? lastRun)?.ok ? 'text-good' : 'text-critical'}`}>
           {(sync ?? lastRun)?.ok ? <CircleCheck className="mt-0.5 size-3.5" /> : <CircleAlert className="mt-0.5 size-3.5" />}
           {(sync ?? lastRun)?.note}
         </div>

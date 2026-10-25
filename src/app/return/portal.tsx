@@ -16,14 +16,17 @@ import {
 } from 'lucide-react';
 import { money } from '@/lib/format';
 
-/* The portal a customer uses to send something back. Four steps, one screen each: find the order,
-   choose what is going back, say why, and choose how the money comes back.
+/* The portal a customer uses to send something back. Five steps, one screen each: sign in with the
+   email or phone they order with, pick the order, choose what is going back, say why, and choose
+   how the money comes back. The brand of each piece follows it through every step, because on
+   Labesny the brand decides which shop takes it back.
    Nothing here decides anything. Every amount on screen was computed by the server and is sent
    back only as a choice of method, never as a figure. */
 
 type Item = {
   id: string;
   title: string;
+  brand: string | null;
   variant: string | null;
   size: string | null;
   image: string | null;
@@ -73,12 +76,26 @@ type RefundOption = {
 
 type Reason = { value: string; label: string };
 
-/** What an order number looks like on each storefront, so the field shows the right shape. */
-const NUMBER_HINT: Record<string, string> = {
-  FIG: 'FIG-24538',
-  Labesny: 'LB-81442',
-  "Women'secret": 'WSE-3267',
+type OrderSummary = {
+  id: string;
+  number: string;
+  placedAt: string;
+  deliveredAt: string | null;
+  currency: string;
+  total: number;
+  storeLabel: string;
+  itemCount: number;
+  images: string[];
+  brands: string[];
+  canReturn: boolean;
+  why: string;
+  daysLeft: number | null;
 };
+
+type Step = 1 | 2 | 3 | 4 | 5;
+
+const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const day = (iso: string) => dateFmt.format(new Date(iso));
 
 const ICON = {
   original: CreditCard,
@@ -87,14 +104,14 @@ const ICON = {
 } as const;
 
 export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?: boolean }) {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<Step>(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [number, setNumber] = useState('');
   /* One field for either, because a customer knows what they ordered with and not which column it
      landed in. The server works out which it is. */
   const [contact, setContact] = useState('');
+  const [orders, setOrders] = useState<OrderSummary[] | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [reasons, setReasons] = useState<Reason[]>([]);
   const [picked, setPicked] = useState<Record<string, number>>({});
@@ -102,6 +119,8 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
   const [note, setNote] = useState('');
   const [photos, setPhotos] = useState<{ id: string; dataUrl: string }[]>([]);
   const [branch, setBranch] = useState<string | null>(null);
+  /* The shops for the pieces actually going back, priced in with the refund. */
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [options, setOptions] = useState<RefundOption[]>([]);
   const [refundMethod, setRefundMethod] = useState<RefundOption['method']>('store_credit');
   const [done, setDone] = useState<{
@@ -132,6 +151,20 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
       ),
     [picked, order]
   );
+  /** The picked pieces, grouped under their brand, for the reason and refund steps. */
+  const pickedByBrand = useMemo(() => {
+    const groups = new Map<string, { item: Item; qty: number }[]>();
+    for (const [id, qty] of Object.entries(picked)) {
+      if (qty <= 0) continue;
+      const item = order?.items.find((i) => i.id === id);
+      if (!item) continue;
+      const key = item.brand ?? order?.brand ?? '';
+      groups.set(key, [...(groups.get(key) ?? []), { item, qty }]);
+    }
+    return [...groups].map(([brand, lines]) => ({ brand, lines }));
+  }, [picked, order]);
+  const pickedBrands = pickedByBrand.map((g) => g.brand).filter(Boolean);
+
   /** What the customer has picked, in the shape both endpoints take. */
   const lines = useMemo(
     () =>
@@ -141,22 +174,44 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
     [picked]
   );
 
-  async function find(e: React.FormEvent) {
+  async function signIn(e: React.FormEvent) {
     e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch('/api/returns/orders', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ contact, brand }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.message ?? 'We could not find your orders.');
+      setOrders(j.orders);
+      setOrder(null);
+      setStep(2);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openOrder(id: string) {
     setBusy(true);
     setError(null);
     try {
       const r = await fetch('/api/returns/lookup', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ number, contact }),
+        body: JSON.stringify({ orderId: id, contact }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.message ?? 'We could not find that order.');
+      if (!r.ok) throw new Error(j.message ?? 'We could not open that order.');
       setOrder(j.order);
       setReasons(j.reasons);
       setPicked({});
-      setStep(2);
+      setBranch(null);
+      setStep(3);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -174,15 +229,18 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
       const r = await fetch('/api/returns/lookup', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ number, contact, items: lines }),
+        body: JSON.stringify({ orderId: order?.id, contact, items: lines }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.message ?? 'Something went wrong.');
       const priced: RefundOption[] = j.quote.options;
       setOptions(priced);
+      const shops: Branch[] = j.quote.branches ?? [];
+      setBranches(shops);
+      if (branch && !shops.some((b) => b.id === branch)) setBranch(null);
       const first = priced.find((o) => o.available && o.method === 'store_credit') ?? priced.find((o) => o.available);
       if (first) setRefundMethod(first.method);
-      setStep(4);
+      setStep(5);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -198,7 +256,7 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          number,
+          orderId: order?.id,
           contact,
           items: lines,
           reason,
@@ -226,7 +284,7 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
   /* Coming in person — either because they chose to collect the cash, or because the store's policy
      takes returns over the counter and not by courier. */
   const comingToABranch = Boolean(order) && (refundMethod === 'cash_at_store' || order!.storeOnly);
-  const needsBranch = comingToABranch && (order?.branches.length ?? 0) > 0 && !branch;
+  const needsBranch = comingToABranch && branches.length > 0 && !branch;
 
   return (
     <div ref={root}>
@@ -252,20 +310,8 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
           )}
 
           {step === 1 && (
-            <form onSubmit={find} className="sf-stack">
-              <Head title="Start a return" sub="Enter your order number and the email or phone you ordered with." />
-              <label className="sf-label">
-                <span>Order number</span>
-                <input
-                  value={number}
-                  onChange={(e) => setNumber(e.target.value)}
-                  className="sf-field"
-                  placeholder={NUMBER_HINT[mark] ?? NUMBER_HINT.FIG}
-                  inputMode="text"
-                  autoComplete="off"
-                  required
-                />
-              </label>
+            <form onSubmit={signIn} className="sf-stack">
+              <Head title="Start a return" sub="Sign in with the email or phone number you order with to see your orders." />
               <label className="sf-label">
                 <span>Email or phone</span>
                 <input
@@ -277,23 +323,57 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
                   autoComplete="email"
                   required
                 />
-                <span className="sf-hint">Whichever you ordered with. The email finds your order faster.</span>
+                <span className="sf-hint">Whichever you order with. A phone number works with or without the country code.</span>
               </label>
               <button className="sf-btn wide" disabled={busy}>
                 {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                Find my order
+                Show my orders
                 {!busy && <ArrowRight className="size-4" />}
               </button>
             </form>
           )}
 
-          {step === 2 && order && (
+          {step === 2 && orders && (
+            <div className="sf-stack">
+              <Head title="Your orders" sub="Choose the order you would like to return from." />
+              {orders.length === 0 ? (
+                <p className="sf-note">
+                  We could not find any {mark} orders for that email or phone. Try the other one, or the
+                  number with its country code.
+                </p>
+              ) : (
+                <ul className="sf-orders">
+                  {orders.map((o) => (
+                    <li key={o.id}>
+                      <OrderCard order={o} busy={busy} onOpen={() => void openOrder(o.id)} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="sf-foot-row">
+                <button type="button" onClick={() => setStep(1)} className="sf-btn quiet">
+                  <ArrowLeft className="size-4" />
+                  Back
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && order && (
             <div className="sf-stack">
               <Head title="What are you returning back?" sub={`${order.storeLabel} · order ${order.number}`} />
               <OrderBanner order={order} />
 
               {!order.canReturn ? (
-                <p className="sf-note">{order.why}</p>
+                <>
+                  <p className="sf-note">{order.why}</p>
+                  <div className="sf-foot-row">
+                    <button type="button" onClick={() => setStep(2)} className="sf-btn quiet">
+                      <ArrowLeft className="size-4" />
+                      Your orders
+                    </button>
+                  </div>
+                </>
               ) : (
                 <>
                   <ul className="sf-items">
@@ -308,8 +388,8 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
                     ))}
                   </ul>
                   <StepFooter
-                    back={() => setStep(1)}
-                    next={() => setStep(3)}
+                    back={() => setStep(2)}
+                    next={() => setStep(4)}
                     nextLabel="Choose a reason"
                     disabled={chosenCount === 0}
                     hint={
@@ -323,9 +403,10 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
             </div>
           )}
 
-          {step === 3 && order && (
+          {step === 4 && order && (
             <div className="sf-stack">
               <Head title="Why are you returning it?" sub="This helps us put it right." />
+              <Returning groups={pickedByBrand} />
               <div className="sf-reasons">
                 {reasons.map((r) => (
                   <button
@@ -345,7 +426,7 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
                 <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className="sf-field" />
               </label>
               <StepFooter
-                back={() => setStep(2)}
+                back={() => setStep(3)}
                 next={toRefund}
                 nextLabel="Choose a refund"
                 /* The photograph is not optional: it is what the desk looks at before sending a
@@ -357,12 +438,13 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
             </div>
           )}
 
-          {step === 4 && order && (
+          {step === 5 && order && (
             <div className="sf-stack">
               <Head
                 title="How would you like the money back?"
                 sub={`${chosenCount} item${chosenCount > 1 ? 's' : ''} from order ${order.number}`}
               />
+              <Returning groups={pickedByBrand} />
               <div className="sf-stack" style={{ gap: 10 }}>
                 {options.map((o) => (
                   <RefundChoice
@@ -376,7 +458,8 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
               </div>
               {comingToABranch && (
                 <Branches
-                  branches={order.branches}
+                  branches={branches}
+                  brands={pickedBrands}
                   chosen={branch}
                   onChoose={setBranch}
                   collecting={refundMethod === 'cash_at_store'}
@@ -384,7 +467,7 @@ export function ReturnsPortal({ brand, chrome = true }: { brand: string; chrome?
               )}
               {order.storeOnly && <p className="sf-note">{order.policyLabel}</p>}
               <StepFooter
-                back={() => setStep(3)}
+                back={() => setStep(4)}
                 next={submit}
                 nextLabel="Send my request"
                 disabled={busy || needsBranch}
@@ -497,31 +580,37 @@ function Photos({
   );
 }
 
-/** Which shop they are coming to. Shown the moment collecting in person is on the table. */
+/** Which shop they are coming to: only the shops of the brands going back. */
 function Branches({
   branches,
+  brands,
   chosen,
   onChoose,
   collecting,
 }: {
   branches: Branch[];
+  brands: string[];
   chosen: string | null;
   onChoose: (id: string) => void;
   collecting: boolean;
 }) {
+  const named = brands.length ? brands.join(' and ') : 'this brand';
   if (!branches.length) {
-    /* Honest rather than empty: a market whose shop list we do not hold yet says so. */
+    /* Honest rather than empty: a brand with no shop of its own here, or a market whose shop list
+       we do not hold yet, says so — and is not offered another brand's counter. */
     return (
       <p className="sf-note">
         {collecting
-          ? 'We will confirm which branch to collect from when we approve the return.'
-          : 'We will confirm which branch to bring it to when we approve the return.'}
+          ? `We will confirm which ${named} branch to collect from when we approve the return.`
+          : `We will confirm where to bring your ${named} pieces when we approve the return.`}
       </p>
     );
   }
   return (
     <div className="sf-stack" style={{ gap: 10 }}>
-      <span className="sf-photos-label">{collecting ? 'Collect from' : 'Bring it to'}</span>
+      <span className="sf-photos-label">
+        {collecting ? 'Collect from' : 'Bring it to'} · {named} branches
+      </span>
       {branches.map((b) => (
         <button
           key={b.id}
@@ -545,7 +634,7 @@ function Branches({
 }
 
 function Steps({ step }: { step: number }) {
-  const labels = ['Your order', 'Items', 'Reason', 'Refund'];
+  const labels = ['Sign in', 'Orders', 'Items', 'Reason', 'Refund'];
   return (
     <ol className="sf-steps" aria-label="Progress">
       {labels.map((l, i) => (
@@ -589,6 +678,66 @@ function OrderBanner({ order }: { order: Order }) {
   );
 }
 
+/** One order in the customer's list. */
+function OrderCard({ order, busy, onOpen }: { order: OrderSummary; busy: boolean; onOpen: () => void }) {
+  return (
+    <button type="button" className="sf-choice sf-order" onClick={onOpen} disabled={busy || !order.canReturn}>
+      <span className="sf-order-shots" aria-hidden>
+        {order.images.slice(0, 3).map((src) => (
+          <span key={src} className="sf-shot">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt="" />
+          </span>
+        ))}
+      </span>
+      <span className="sf-refund-body">
+        <b>Order {order.number}</b>
+        {order.brands.length > 0 && <span className="sf-brand">{order.brands.join(' · ')}</span>}
+        <small>
+          {day(order.placedAt)} · {order.itemCount} item{order.itemCount === 1 ? '' : 's'} ·{' '}
+          <span className="sf-money">{money(order.total, order.currency)}</span>
+        </small>
+        <small>
+          {order.canReturn
+            ? order.daysLeft != null && order.daysLeft >= 0
+              ? `${order.daysLeft} day${order.daysLeft === 1 ? '' : 's'} left to return`
+              : 'Can be returned'
+            : order.why}
+        </small>
+      </span>
+      {order.canReturn && <ArrowRight className="ico size-4" />}
+    </button>
+  );
+}
+
+/** What is going back, under each piece's brand, so the customer sees the brands they chose. */
+function Returning({ groups }: { groups: { brand: string; lines: { item: Item; qty: number }[] }[] }) {
+  if (!groups.length) return null;
+  return (
+    <div className="sf-returning">
+      {groups.map((g) => (
+        <div key={g.brand} className="sf-returning-group">
+          <span className="sf-brand">{g.brand || 'Returning'}</span>
+          <ul>
+            {g.lines.map(({ item, qty }) => (
+              <li key={item.id}>
+                <span className="sf-shot">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {item.image ? <img src={item.image} alt="" /> : null}
+                </span>
+                <span>
+                  {item.title}
+                  {qty > 1 ? ` × ${qty}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ItemRow({
   item,
   currency,
@@ -608,6 +757,7 @@ function ItemRow({
         {item.image ? <img src={item.image} alt="" /> : null}
       </span>
       <span className="sf-item-body">
+        {item.brand && <span className="sf-brand">{item.brand}</span>}
         <p>{item.title}</p>
         <small>
           {/* Most lines carry the size in both fields — "M · M · EGP 16,100" reads like a mistake. */}

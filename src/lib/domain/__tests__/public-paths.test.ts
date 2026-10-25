@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
    the list: a public entry covers that path and what sits beneath it, never a different path that
    merely begins with the same letters. `/returns` is the staff queue and `/return` is the customer
    portal, and a plain startsWith would publish the queue. */
-const PUBLIC = ['/login', '/join', '/api/webhooks', '/api/health', '/api/cron', '/return', '/api/returns'];
+const PUBLIC = ['/login', '/join', '/welcome', '/api/auth/google', '/api/webhooks', '/api/health', '/api/cron', '/return', '/api/returns', '/concierge', '/api/concierge', '/merch', '/api/merch'];
 const isPublic = (pathname: string) => PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 describe('which paths skip the session gate', () => {
@@ -12,6 +12,29 @@ describe('which paths skip the session gate', () => {
     expect(isPublic('/return')).toBe(true);
     expect(isPublic('/api/returns')).toBe(true);
     expect(isPublic('/api/returns/lookup')).toBe(true);
+  });
+
+  it('opens the shopping concierge and its endpoint', () => {
+    expect(isPublic('/concierge')).toBe(true);
+    expect(isPublic('/api/concierge')).toBe(true);
+    expect(isPublic('/api/copilot')).toBe(false);
+  });
+
+  it('opens the website placements the shops load, and nothing else of the stock module', () => {
+    expect(isPublic('/merch/embed.js')).toBe(true);
+    expect(isPublic('/api/merch/labesny-web')).toBe(true);
+    expect(isPublic('/api/merch/track')).toBe(true);
+    expect(isPublic('/stock/merch')).toBe(false);
+    expect(isPublic('/stock')).toBe(false);
+    expect(isPublic('/merchandise')).toBe(false);
+  });
+
+  it('opens the landing page and the Google sign-in round trip, nothing else under /api/auth', () => {
+    expect(isPublic('/welcome')).toBe(true);
+    expect(isPublic('/api/auth/google')).toBe(true);
+    expect(isPublic('/api/auth/google/callback')).toBe(true);
+    expect(isPublic('/api/auth')).toBe(false);
+    expect(isPublic('/api/authors')).toBe(false);
   });
 
   it('keeps the staff returns queue behind the gate', () => {

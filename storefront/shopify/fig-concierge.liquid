@@ -1,0 +1,31 @@
+{%- comment -%}
+  Labesny's Customer Service advisor.
+
+  Put this one line in layout/theme.liquid, just before </body>:
+
+    {% render 'fig-concierge' %}
+
+  Then set the two values below:
+    relay_url      where Relay is served, no trailing slash.
+    signing_secret the same value as CONCIERGE_LABESNY_SECRET in Relay's environment. It lets the
+                   advisor show a signed-in customer their own orders and details. The secret stays
+                   in the theme code; visitors only ever see the signature it produces. Leave it
+                   empty and everyone is treated as a guest (one order at a time, by number and
+                   email or phone).
+
+  Relay must also list the shop's origin in RETURNS_EMBED_ORIGINS, or the advisor's frame is refused.
+{%- endcomment -%}
+{%- assign relay_url = 'https://RELAY-ADDRESS-HERE' -%}
+{%- assign signing_secret = '' -%}
+<script
+  src="{{ relay_url }}/concierge/launcher.js"
+  data-store="labesny-web"
+  {%- if customer and signing_secret != blank %}
+    {%- assign who = customer.email | downcase | append: ':' | append: customer.id %}
+  data-customer-email="{{ customer.email | downcase | escape }}"
+  data-customer-id="{{ customer.id }}"
+  data-customer-name="{{ customer.first_name | escape }}"
+  data-customer-sig="{{ who | hmac_sha256: signing_secret }}"
+  {%- endif %}
+  defer
+></script>

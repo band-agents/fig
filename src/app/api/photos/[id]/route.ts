@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { requireUser } from '@/lib/auth/session';
 import { getDb, schema } from '@/lib/db';
-import { seesChannel } from '@/lib/domain/perms';
+import { seesBrands, seesChannel } from '@/lib/domain/perms';
 import { photoById } from '@/lib/return-photos';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +23,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const db = await getDb();
   const [ret] = await db.select().from(schema.returns).where(eq(schema.returns.id, photo.returnId));
   if (!ret || !seesChannel(me, ret.channelId)) return new Response('Not found', { status: 404 });
+  if (me.brands?.length && !seesBrands(me, (await db.select({ b: schema.orderItems.brand }).from(schema.orderItems).where(eq(schema.orderItems.orderId, ret.orderId))).map((x) => x.b))) return new Response('Not found', { status: 404 });
 
   const body = Buffer.from(photo.bytes, 'base64');
   return new Response(new Uint8Array(body), {

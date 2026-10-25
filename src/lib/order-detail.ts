@@ -2,7 +2,7 @@ import 'server-only';
 import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
 import { getDb, schema } from './db';
 import { CHANNEL } from './channels';
-import { can, maskName, maskPhone, seesChannel, type Principal } from './domain/perms';
+import { can, effectiveScopes, maskName, maskPhone, seesBrands, seesChannel, type Principal } from './domain/perms';
 import { eligibility, policyFor } from './domain/returns-policy';
 import { DEPTS, ORDER_STAGE, type OrderStage } from './domain/stages';
 import { autopilotPreview } from './engine';
@@ -23,6 +23,8 @@ export async function orderDetail(p: Principal, id: string) {
     o.customerId ? db.select().from(schema.customers).where(eq(schema.customers.id, o.customerId)).then((r) => r[0] ?? null) : null,
     db.select({ id: schema.users.id, name: schema.users.name, hue: schema.users.hue, role: schema.users.role, channels: schema.users.channels, scopes: schema.users.scopes }).from(schema.users).where(eq(schema.users.active, true)),
   ]);
+  // someone limited to brands opens only the orders holding one of their pieces
+  if (!seesBrands(p, lines.map((l) => l.brand))) return null;
   const others = o.customerId
     ? await db
         .select({ id: schema.orders.id, number: schema.orders.number, channelId: schema.orders.channelId, stage: schema.orders.stage, placedAt: schema.orders.placedAt, total: schema.orders.total, currency: schema.orders.currency })
@@ -39,7 +41,7 @@ export async function orderDetail(p: Principal, id: string) {
   const seesMoney = can(p, 'money', 1);
   const stageMeta = ORDER_STAGE[o.stage as OrderStage];
   const ownerArea = stageMeta?.dept && stageMeta.dept !== 'none' ? DEPTS[stageMeta.dept].area : null;
-  const assignable = team.filter((u) => (!u.channels.length || u.channels.includes(o.channelId)) && (!ownerArea || (u.scopes[ownerArea] ?? 0) >= 2));
+  const assignable = team.filter((u) => (!u.channels.length || u.channels.includes(o.channelId)) && (!ownerArea || (effectiveScopes(u.role, u.scopes)[ownerArea] ?? 0) >= 2));
 
   // When each stage was reached, and by whom: drives the tracker
   const reached: Record<string, { at: Date; by: string }> = {};

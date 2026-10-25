@@ -10,16 +10,14 @@ const KW = sql`('labesny-web','labesny-app','ws-kw')`;
 const TODAY = sql`(date_trunc('day', now() at time zone 'Africa/Cairo') at time zone 'Africa/Cairo')`;
 
 export const LANES = [
-  { key: 'care', label: 'Customer care', verb: 'confirming', stages: ['new', 'confirming'], tint: 'violet', href: '/queue/care' },
-  { key: 'finance', label: 'Finance', verb: 'clearing', stages: ['finance'], tint: 'amber', href: '/queue/finance' },
-  { key: 'fulfilment', label: 'Pick & pack', verb: 'in the warehouse', stages: ['ready', 'picking'], tint: 'blue', href: '/queue/fulfilment' },
+  { key: 'fulfilment', label: 'Pick & pack', verb: 'in the warehouse', stages: ['new', 'confirming', 'finance', 'ready', 'picking'], tint: 'blue', href: '/queue/fulfilment' },
   { key: 'shipping', label: 'Courier', verb: 'on the road', stages: ['packed', 'shipped', 'delivering'], tint: 'cyan', href: '/queue/shipping' },
   { key: 'cash', label: 'Cash to settle', verb: 'awaiting cash', stages: ['delivered'], tint: 'green', href: '/finance' },
 ] as const;
 
 export async function commandCentre(p: Principal) {
   const db = await getDb();
-  const s = scope(p);
+  const s = scope(p, sql`channel_id`, sql`orders.id`);
 
   const [kpi] = (
     await db.execute<{
@@ -38,13 +36,14 @@ export async function commandCentre(p: Principal) {
       count(*) filter (where placed_at >= ${TODAY})::int as today,
       count(*) filter (where placed_at >= ${TODAY} - interval '1 day' and placed_at < now() - interval '1 day')::int as yday,
       count(*) filter (where stage not in ('settled','cancelled','rto_closed','delivered'))::int as inflight,
-      count(*) filter (where not on_hold and due_at < now() and stage not in ('settled','cancelled','rto_closed'))::int as late,
+      -- late among what is still moving: a delivered order waiting to be marked settled is not late for anyone
+      count(*) filter (where not on_hold and due_at < now() and stage not in ('settled','cancelled','rto_closed','delivered'))::int as late,
       count(*) filter (where placed_at between now() - interval '9 days' and now() - interval '2 days' and shipped_at is not null
         and shipped_at - placed_at <= case when channel_id in ${KW} then interval '30 hours' else interval '48 hours' end)::int as ontime_n,
       count(*) filter (where placed_at between now() - interval '9 days' and now() - interval '2 days' and shipped_at is not null)::int as ontime_d,
       count(*) filter (where payment_method = 'cod' and placed_at > now() - interval '30 days' and stage in ('rto','rto_closed'))::int as rto_n,
       count(*) filter (where payment_method = 'cod' and placed_at > now() - interval '30 days' and stage in ('delivered','settled','rto','rto_closed'))::int as rto_d,
-      (select count(*)::int from returns r where ${scope(p, sql`r.channel_id`)} and r.requested_at > now() - interval '30 days') as ret_n,
+      (select count(*)::int from returns r where ${scope(p, sql`r.channel_id`, sql`r.order_id`)} and r.requested_at > now() - interval '30 days') as ret_n,
       count(*) filter (where delivered_at > now() - interval '30 days')::int as ret_d
     from orders where ${s}`)
   ).rows;
@@ -54,6 +53,14 @@ export async function commandCentre(p: Principal) {
       coalesce(sum(total) filter (where placed_at >= ${TODAY}), 0)::bigint as today,
       coalesce(sum(total) filter (where placed_at >= ${TODAY} - interval '1 day' and placed_at < now() - interval '1 day'), 0)::bigint as yday
     from orders where ${s} and stage <> 'cancelled' group by currency`);
+  // pieces as well as money, for the Value | Pieces switch
+  const pieces = (
+    await db.execute<{ today: number; yday: number }>(sql`
+    select coalesce(sum(i.quantity) filter (where o.placed_at >= ${TODAY}), 0)::int as today,
+      coalesce(sum(i.quantity) filter (where o.placed_at >= ${TODAY} - interval '1 day' and o.placed_at < now() - interval '1 day'), 0)::int as yday
+    from order_items i join orders o on o.id = i.order_id
+    where ${scope(p, sql`o.channel_id`, sql`o.id`)} and o.stage <> 'cancelled' and o.placed_at >= ${TODAY} - interval '1 day'`)
+  ).rows[0];
 
   const days = await db.execute<{ d: string; currency: string; n: number; total: number; rto: number }>(sql`
     select to_char(placed_at at time zone 'Africa/Cairo', 'YYYY-MM-DD') as d, currency, count(*)::int as n, sum(total)::bigint as total,
@@ -62,7 +69,7 @@ export async function commandCentre(p: Principal) {
     group by 1, 2 order by 1`);
   const retDays = await db.execute<{ d: string; n: number }>(sql`
     select to_char(requested_at at time zone 'Africa/Cairo', 'YYYY-MM-DD') as d, count(*)::int as n from returns
-    where ${scope(p, sql`channel_id`)} and requested_at > now() - interval '14 days' group by 1 order by 1`);
+    where ${scope(p, sql`channel_id`, sql`returns.order_id`)} and requested_at > now() - interval '14 days' group by 1 order by 1`);
   const keys = Array.from({ length: 14 }, (_, i) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(Date.now() - (13 - i) * 86400000)));
   const spark = {
     orders: keys.map((k) => days.rows.filter((r) => r.d === k).reduce((a, r) => a + r.n, 0)),
@@ -80,7 +87,7 @@ export async function commandCentre(p: Principal) {
     from orders where ${s} and stage not in ('settled','cancelled','rto_closed') group by stage`);
   const passed = await db.execute<{ from_stage: string; n: number }>(sql`
     select e.from_stage, count(*)::int as n from events e join orders o on o.id = e.order_id
-    where ${scope(p, sql`o.channel_id`)} and e.kind = 'stage' and e.at > now() - interval '24 hours' and e.from_stage is not null
+    where ${scope(p, sql`o.channel_id`, sql`o.id`)} and e.kind = 'stage' and e.at > now() - interval '24 hours' and e.from_stage is not null
     group by 1`);
   const laneData = LANES.map((l) => {
     const rows = lanes.rows.filter((r) => (l.stages as readonly string[]).includes(r.stage));
@@ -91,7 +98,7 @@ export async function commandCentre(p: Principal) {
   });
   const rto = lanes.rows.find((r) => r.stage === 'rto');
   const openReturns = await db.execute<{ n: number; late: number }>(sql`
-    select count(*)::int as n, count(*) filter (where due_at < now())::int as late from returns where ${scope(p, sql`channel_id`)} and stage not in ('refunded','closed','rejected')`);
+    select count(*)::int as n, count(*) filter (where due_at < now())::int as late from returns where ${scope(p, sql`channel_id`, sql`returns.order_id`)} and stage not in ('refunded','closed','rejected')`);
 
   const hours = await db.execute<{ h: number; today: number; prev: number }>(sql`
     select extract(hour from placed_at at time zone 'Africa/Cairo')::int as h,
@@ -125,6 +132,8 @@ export async function commandCentre(p: Principal) {
       returnRate: kpi.ret_d ? kpi.ret_n / kpi.ret_d : null,
       revenueToday: revenue.rows.reduce((a, r) => a + inEgp(Number(r.today), r.currency), 0),
       revenueYday: revenue.rows.reduce((a, r) => a + inEgp(Number(r.yday), r.currency), 0),
+      piecesToday: pieces?.today ?? 0,
+      piecesYday: pieces?.yday ?? 0,
       byCurrency: revenue.rows.map((r) => ({ currency: r.currency, today: Number(r.today) })),
     },
     spark,

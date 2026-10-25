@@ -1,0 +1,5 @@
+# HTTPS for the console's address; Caddy fetches and renews the certificate on its own.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3400
+}

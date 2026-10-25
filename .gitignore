@@ -15,6 +15,10 @@
 
 # next.js
 /.next/
+/.next-staging/
+/.next-build/
+/.next-prev/
+/.next-ups/
 /out/
 
 # production
@@ -45,3 +49,10 @@ next-env.d.ts
 
 # keep the template
 !.env.example
+
+# the server copy of the environment and its database dumps
+deploy/.env
+deploy/backups/
+
+# a local demo crib that names real customers: never in the repository
+DEMO-LABESNY.md

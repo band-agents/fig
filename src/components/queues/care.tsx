@@ -27,7 +27,7 @@ export function CareQueue({ orders, returns, view, me }: { orders: OrderRow[]; r
         {returns.map((r) => (
           <div key={r.id} className="panel p-4">
             <div className="flex items-center gap-2">
-              <Link href={`/returns/${r.id}`} className="font-mono text-[13.5px] hover:underline">
+              <Link href={`/returns/${r.id}`} className="font-mono text-[12.5px] hover:underline">
                 {r.number}
               </Link>
               <span className="text-ink-4">·</span>
@@ -37,20 +37,20 @@ export function CareQueue({ orders, returns, view, me }: { orders: OrderRow[]; r
                 <SlaChip due={r.dueAt} since={r.stageAt} />
               </span>
             </div>
-            <div className="mt-2 text-[14px]">{r.customer}</div>
+            <div className="mt-2 text-[13px]">{r.customer}</div>
             <div className="mt-3 flex gap-2">
               {r.items.map((it, i) => (
                 <div key={i} className="flex items-center gap-2 rounded-lg bg-elev-2 p-1.5 pr-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {it.image && <img src={it.image} alt="" className="size-10 rounded-md object-cover" />}
-                  <div className="text-[12px] leading-tight">
+                  <div className="text-[11.5px] leading-tight">
                     <div className="max-w-[180px] truncate">{it.title}</div>
                     <div className="text-ink-3">{it.size ? `Size ${it.size}` : ''}</div>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-ink-2">
               <span className="pill" data-tint="rose">
                 <span className="dot" />
                 {RETURN_REASONS[r.reason as ReturnReason]}
@@ -99,25 +99,25 @@ export function CareQueue({ orders, returns, view, me }: { orders: OrderRow[]; r
             <div className="flex items-center gap-2">
               <OrderLink id={o.id} number={o.number} />
               <ChannelChip id={o.channelId} compact />
-              <span className="text-[11.5px] text-ink-4" suppressHydrationWarning>{ago(o.placedAt)}</span>
+              <span className="text-[11px] text-ink-4" suppressHydrationWarning>{ago(o.placedAt)}</span>
               <span className="ml-auto">
                 <SlaChip due={o.dueAt} since={o.stageAt} held={o.onHold} />
               </span>
             </div>
             <div className="mt-3 flex items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-1.5 text-[16px] font-medium">
+                <div className="flex items-center gap-1.5 text-[14.5px] font-medium">
                   {o.customer}
                   {o.vip && <Crown className="size-4 text-[var(--t-amber)]" />}
                 </div>
-                <div className="mt-0.5 text-[12.5px] text-ink-3">
+                <div className="mt-0.5 text-[12px] text-ink-3">
                   {o.city}
                   {o.history && <> · {o.history.orders <= 1 ? 'first order' : `${o.history.orders} orders, ${o.history.delivered} delivered${o.history.refused ? `, ${o.history.refused} refused` : ''}`}</>}
                 </div>
               </div>
               {o.total != null && (
                 <div className="text-right">
-                  <div className="font-display text-[24px] leading-none tabular">{money(o.total, o.currency)}</div>
+                  <div className="font-display text-[16px] leading-none tabular">{money(o.total, o.currency)}</div>
                   <div className="mt-1">
                     <Payment method={o.paymentMethod} status={o.paymentStatus} short />
                   </div>
@@ -131,7 +131,7 @@ export function CareQueue({ orders, returns, view, me }: { orders: OrderRow[]; r
                   .filter((r) => r.weight >= 8)
                   .slice(0, 4)
                   .map((r) => (
-                    <span key={r.code} className={`inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11.5px] ${r.code === 'bracketing' || r.weight >= 20 ? 'bg-[color-mix(in_oklab,var(--critical)_12%,transparent)] text-critical' : 'bg-elev-2 text-ink-2'}`}>
+                    <span key={r.code} className={`inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] ${r.code === 'bracketing' || r.weight >= 20 ? 'bg-[color-mix(in_oklab,var(--critical)_12%,transparent)] text-critical' : 'bg-elev-2 text-ink-2'}`}>
                       {r.weight >= 20 && <ShieldAlert className="size-3" />}
                       {r.label}
                     </span>
@@ -141,7 +141,7 @@ export function CareQueue({ orders, returns, view, me }: { orders: OrderRow[]; r
 
             <ul className="mt-3 space-y-1.5">
               {o.lines.slice(0, 4).map((l, i) => (
-                <li key={i} className="flex items-center gap-2.5 text-[12.5px]">
+                <li key={i} className="flex items-center gap-2.5 text-[12px]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {l.image ? <img src={l.image} alt="" className="size-9 rounded-md object-cover" /> : <span className="size-9 rounded-md bg-elev-3" />}
                   <span className="min-w-0 flex-1 truncate">{l.title}</span>
@@ -151,7 +151,7 @@ export function CareQueue({ orders, returns, view, me }: { orders: OrderRow[]; r
               ))}
             </ul>
             {bracket && (
-              <p className="mt-2 flex items-start gap-1.5 text-[12px] text-ink-2">
+              <p className="mt-2 flex items-start gap-1.5 text-[11.5px] text-ink-2">
                 <Sparkles className="mt-0.5 size-3.5 shrink-0 text-signal" /> Same piece in several sizes. Ask which one they want before it ships.
               </p>
             )}

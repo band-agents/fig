@@ -29,6 +29,7 @@ export async function POST(req: Request) {
 
   let body: {
     number?: string;
+    orderId?: string;
     email?: string;
     phone?: string;
     contact?: string;
@@ -48,7 +49,8 @@ export async function POST(req: Request) {
 
   try {
     const order = await lookupOrder({
-      number: body.number ?? '',
+      number: body.number,
+      orderId: body.orderId,
       email: body.email,
       phone: body.phone,
       contact: body.contact,
@@ -77,15 +79,16 @@ export async function POST(req: Request) {
 
     const refundMethod: RefundMethod = body.refundMethod ?? 'original';
     /* Checked here so the customer is told plainly, rather than meeting the engine's exception. */
-    const { options } = quoteRefund(order, picked);
+    const { options, branches } = quoteRefund(order, picked);
     const chosen = options.find((o) => o.method === refundMethod);
     if (!chosen) throw invalid('Choose how you would like to be refunded.');
     if (!chosen.available) throw invalid(chosen.why ?? 'That refund method is not available for this order.');
 
-    /* Coming to a shop means saying which shop — as long as that market's branches are known. */
-    const branch = order.branches.find((b) => b.id === body.branch) ?? null;
+    /* Coming to a shop means saying which shop — one of the shops for the brands going back, as
+       long as that brand has a shop in the market at all. */
+    const branch = branches.find((b) => b.id === body.branch) ?? null;
     const comingToABranch = refundMethod === 'cash_at_store' || order.storeOnly;
-    if (comingToABranch && order.branches.length && !branch) {
+    if (comingToABranch && branches.length && !branch) {
       throw invalid('Choose the branch you would like to come to.');
     }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CornerDownLeft, Search, Sparkles } from 'lucide-react';
+import { CornerDownLeft, Search } from 'lucide-react';
 import { allowed, NAV, type Me } from './nav';
 import { useLive } from './live';
 
@@ -14,7 +14,7 @@ export function CommandPalette({ me }: { me: Me }) {
 }
 
 function Palette({ me }: { me: Me }) {
-  const { closePalette, openCopilot } = useLive();
+  const { closePalette } = useLive();
   const router = useRouter();
   const [q, setQ] = useState('');
   const [found, setFound] = useState<{ q: string; hits: Hit[] }>({ q: '', hits: [] });
@@ -48,7 +48,7 @@ function Palette({ me }: { me: Me }) {
       go: () => router.push(h.kind === 'return' ? `/returns/${h.id}` : `/orders/${h.id}`),
       node: (
         <>
-          <span className="font-mono text-[13px]">{h.number}</span>
+          <span className="font-mono text-[12.5px]">{h.number}</span>
           <span className="truncate text-ink-3">{h.customer}</span>
           <span className="ml-auto flex items-center gap-2 text-xs text-ink-3">
             {h.channel}
@@ -60,22 +60,6 @@ function Palette({ me }: { me: Me }) {
         </>
       ),
     })),
-    ...(q.trim().length > 3
-      ? [
-          {
-            key: 'ask',
-            go: () => openCopilot(q),
-            node: (
-              <>
-                <Sparkles className="size-4 text-signal" />
-                <span className="truncate">
-                  Ask Relay: <span className="text-ink-2">“{q}”</span>
-                </span>
-              </>
-            ),
-          },
-        ]
-      : []),
     ...pages.map((p) => ({
       key: p.href,
       go: () => router.push(p.href),
@@ -116,7 +100,7 @@ function Palette({ me }: { me: Me }) {
               else if (e.key === 'Escape') closePalette();
             }}
             placeholder="Order number, customer, phone, waybill, RMA, or a question…"
-            className="h-14 flex-1 bg-transparent text-[15px] outline-none placeholder:text-ink-4"
+            className="h-14 flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-4"
           />
           <span className="kbd">esc</span>
         </div>
@@ -124,7 +108,7 @@ function Palette({ me }: { me: Me }) {
           {rows.length === 0 && <li className="px-3 py-8 text-center text-sm text-ink-3">Nothing matches.</li>}
           {rows.map((r, k) => (
             <li key={r.key}>
-              <button onMouseEnter={() => setI(k)} onClick={() => choose(k)} className={`flex h-11 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[13.5px] ${k === i ? 'bg-elev-2' : ''}`}>
+              <button onMouseEnter={() => setI(k)} onClick={() => choose(k)} className={`flex h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-[12.5px] ${k === i ? 'bg-elev-2' : ''}`}>
                 {r.node}
                 {k === i && <CornerDownLeft className="ml-2 size-3.5 shrink-0 text-ink-3" />}
               </button>

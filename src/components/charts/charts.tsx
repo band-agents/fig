@@ -22,7 +22,7 @@ export function Sparkline({ data, color = 'var(--ink-2)', height = 32, fill = tr
         </linearGradient>
       </defs>
       {fill && <path d={`${d} L${w} ${height} L0 ${height} Z`} fill={`url(#${id})`} />}
-      <path d={d} fill="none" stroke={color} strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+      <path className="draw" d={d} fill="none" stroke={color} strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
       <circle cx={pts.at(-1)![0]} cy={pts.at(-1)![1]} r="2.2" fill={color} />
     </svg>
   );
@@ -33,7 +33,7 @@ type Tip = { x: number; y: number; content: React.ReactNode } | null;
 function Tooltip({ tip }: { tip: Tip }) {
   if (!tip) return null;
   return (
-    <div className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-line-2 bg-elev-3 px-2.5 py-1.5 text-[12px] shadow-[var(--shadow-lg)]" style={{ left: `${tip.x}%`, top: tip.y - 10 }}>
+    <div className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-line-2 bg-elev-3 px-2.5 py-1.5 text-[11.5px] shadow-[var(--shadow-lg)]" style={{ left: `${tip.x}%`, top: tip.y - 10 }}>
       {tip.content}
     </div>
   );
@@ -75,7 +75,7 @@ export function HourArea({ today, usual, nowHour, label = 'Orders' }: { today: n
         ))}
         <path d={line(usual)} fill="none" stroke="var(--ink-4)" strokeWidth="1.5" strokeDasharray="3 4" />
         <path d={`${line(today, nowHour)} L${x(nowHour)} ${y(0)} L${x(0)} ${y(0)} Z`} fill="var(--s1)" opacity="0.14" />
-        <path d={line(today, nowHour)} fill="none" stroke="var(--s1)" strokeWidth="2" strokeLinejoin="round" />
+        <path className="draw" d={line(today, nowHour)} fill="none" stroke="var(--s1)" strokeWidth="2" strokeLinejoin="round" />
         <circle cx={x(nowHour)} cy={y(today[nowHour] ?? 0)} r="4" fill="var(--s1)" stroke="var(--bg-elev)" strokeWidth="2" />
         {hover != null && (
           <g>
@@ -106,7 +106,7 @@ export function HourArea({ today, usual, nowHour, label = 'Orders' }: { today: n
           }}
         />
       )}
-      <div className="mt-1 flex items-center gap-4 text-[11.5px] text-ink-3">
+      <div className="mt-1 flex items-center gap-4 text-[11px] text-ink-3">
         <span className="flex items-center gap-1.5">
           <span className="h-0.5 w-3.5 rounded bg-[var(--s1)]" /> Today
         </span>
@@ -157,7 +157,7 @@ export function StackedDays({ days, series }: { days: { label: string; values: n
                 const top = H - P.b - acc - h;
                 acc += h;
                 const isTop = d.values.slice(k + 1).every((z) => !z);
-                return <rect key={k} x={x} y={top + (k ? 0 : 0)} width={w} height={Math.max(0, h - 2)} rx={isTop ? 3 : 1} fill={series[k].color} />;
+                return <rect key={k} className="grow" x={x} y={top + (k ? 0 : 0)} width={w} height={Math.max(0, h - 2)} rx={isTop ? 3 : 1} fill={series[k].color} />;
               })}
               {(i % Math.ceil(days.length / 8) === 0 || i === days.length - 1) && (
                 <text x={x + w / 2} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--ink-4)">
@@ -190,7 +190,7 @@ export function StackedDays({ days, series }: { days: { label: string; values: n
           }}
         />
       )}
-      <div className="mt-1 flex flex-wrap gap-4 text-[11.5px] text-ink-3">
+      <div className="mt-1 flex flex-wrap gap-4 text-[11px] text-ink-3">
         {series.map((s) => (
           <span key={s.name} className="flex items-center gap-1.5">
             <span className="size-2.5 rounded-sm" style={{ background: s.color }} /> {s.name}
@@ -230,11 +230,11 @@ export function Heatmap({ grid, rows }: { grid: number[][]; rows: string[] }) {
         ))}
       </div>
       {tip && (
-        <div className="mt-2 text-[12px] text-ink-2">
+        <div className="mt-2 text-[11.5px] text-ink-2">
           {rows[tip.r]} {String(tip.c).padStart(2, '0')}:00 · <b className="font-mono">{grid[tip.r][tip.c]}</b> orders
         </div>
       )}
-      {!tip && <div className="mt-2 text-[12px] text-ink-4">Darker = more orders. Hover a cell for the count.</div>}
+      {!tip && <div className="mt-2 text-[11.5px] text-ink-4">Darker = more orders. Hover a cell for the count.</div>}
     </div>
   );
 }

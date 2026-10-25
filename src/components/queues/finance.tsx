@@ -1,5 +1,6 @@
 'use client';
 
+import { ReviewCard } from '@/components/returns/review-card';
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Banknote, Check, Loader2, Undo2 } from 'lucide-react';
@@ -35,49 +36,46 @@ export function FinanceQueue({ orders, returns, view, scopes }: { orders: OrderR
 
   if (view === 'refunds') {
     if (!returns.length) return <div className="panel"><Empty icon={Undo2} title="No refunds waiting" body="Returns that pass inspection land here for the money to go back." /></div>;
+    // each refund carries what the returns desk recorded when it approved the return
     return (
       <div className="panel overflow-hidden">
-        <table className="table text-[13px]">
-          <thead>
-            <tr>
-              <th>Return</th>
-              <th>Customer</th>
-              <th>Reason</th>
-              <th className="text-right">Refund</th>
-              <th>Target</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {returns.map((r) => (
-              <tr key={r.id}>
-                <td>
+        <ul className="divide-y divide-[var(--line)]">
+          {returns.map((r) => {
+            const part = r.review?.refundKind === 'partial' && r.review.refundAmount != null;
+            return (
+              <li key={r.id} className="grid gap-3 px-4 py-4 text-[12.5px] md:grid-cols-[180px_1fr_140px_auto] md:items-start md:gap-5 md:px-5">
+                <div>
                   <Link href={`/returns/${r.id}`} className="font-mono hover:underline">
                     {r.number}
                   </Link>
-                  <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-ink-3">
+                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-ink-3">
                     <OrderLink id={r.orderId} number={r.orderNumber} /> <ChannelChip id={r.channelId} compact />
                   </div>
-                </td>
-                <td>{r.customer}</td>
-                <td className="text-ink-2">{RETURN_REASONS[r.reason as ReturnReason]}</td>
-                <td className="text-right font-mono">{r.amount != null ? money(r.amount, r.currency) : '—'}</td>
-                <td>
-                  <SlaChip due={r.dueAt} since={r.stageAt} />
-                </td>
-                <td className="text-right">
+                  <div className="mt-1.5 text-ink-2">{r.customer}</div>
+                  <div className="text-[11.5px] text-ink-3">{RETURN_REASONS[r.reason as ReturnReason]}</div>
+                </div>
+                <ReviewCard review={r.review} currency={r.currency} seesMoney={r.amount != null} compact />
+                <div className="md:text-right">
+                  <div className="font-mono text-[13px]">{r.amount != null ? money(part ? r.review!.refundAmount! : r.amount, r.currency) : '—'}</div>
+                  {part && r.amount != null && <div className="text-[11px] text-ink-3">part of {money(r.amount, r.currency)}</div>}
+                  <div className="text-[11px] text-ink-3">{r.refundMethod === 'store_credit' ? 'as account credit' : r.refundMethod === 'cash_at_store' ? 'cash at a branch' : 'the way they paid'}</div>
+                  <div className="mt-1.5 md:flex md:justify-end">
+                    <SlaChip due={r.dueAt} since={r.stageAt} />
+                  </div>
+                </div>
+                <div className="md:text-right">
                   {canRefund ? (
                     <button onClick={() => m.ret(r.id, 'refunded')} disabled={m.pending} className="btn btn-primary btn-sm">
                       <Spin on={m.busy === `${r.id}:refunded`} /> Refund issued
                     </button>
                   ) : (
-                    <span className="text-[12px] text-ink-3">Needs refund access</span>
+                    <span className="text-[11.5px] text-ink-3">Needs refund access</span>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     );
   }
@@ -86,7 +84,7 @@ export function FinanceQueue({ orders, returns, view, scopes }: { orders: OrderR
   return (
     <div className="space-y-3">
       {canApprove && orders.length > 1 && (
-        <div className="flex items-center justify-between rounded-xl border border-line bg-elev px-4 py-2.5 text-[13px]">
+        <div className="flex items-center justify-between rounded-xl border border-line bg-elev px-4 py-2.5 text-[12.5px]">
           <span className="text-ink-2">
             {orders.length} orders waiting
             {orders.some((o) => o.total != null) && <> · {money(orders.filter((o) => o.currency === 'EGP').reduce((s, o) => s + (o.total ?? 0), 0), 'EGP', { compact: true })} in Egypt</>}
@@ -119,15 +117,15 @@ export function FinanceQueue({ orders, returns, view, scopes }: { orders: OrderR
                   <ChannelChip id={o.channelId} compact />
                   <SlaChip due={o.dueAt} since={o.stageAt} held={o.onHold} />
                 </div>
-                <div className="mt-1 text-[13px] text-ink-2">
+                <div className="mt-1 text-[12.5px] text-ink-2">
                   {o.customer}
                   {o.city ? ` · ${o.city}` : ''}
                   {o.history && <span className="text-ink-3"> · {o.history.orders <= 1 ? 'first order' : `${o.history.delivered}/${o.history.orders} delivered`}</span>}
                 </div>
-                <div className="mt-1.5 text-[12px] text-[var(--warn)]">{whyHere(o)}</div>
+                <div className="mt-1.5 text-[11.5px] text-[var(--warn)]">{whyHere(o)}</div>
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                {o.total != null && <span className="font-display text-[22px] tabular">{money(o.total, o.currency)}</span>}
+                {o.total != null && <span className="font-display text-[15px] tabular">{money(o.total, o.currency)}</span>}
                 <Payment method={o.paymentMethod} status={o.paymentStatus} short />
                 <RiskBadge level={o.riskLevel} score={o.risk} />
               </div>

@@ -11,7 +11,7 @@ const WORDS: Record<RuleMode, { label: string; tone: string; says: string }> = {
   off: {
     label: 'Off',
     tone: 'text-ink-3',
-    says: 'The rule is not running. Set RELAY_STOCK_RULE to dry or on where Relay is served.',
+    says: 'The rule is not running. Set RELAY_STOCK_RULE to dry or on on the server.',
   },
   dry: {
     label: 'Dry run',
@@ -48,24 +48,24 @@ export function StockRuleCard({
     <section className="panel mt-5 p-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 text-[15px] font-medium">
+          <h2 className="flex items-center gap-2 text-[14px] font-medium">
             <PackageX className="size-4 text-ink-3" />
             Sold out comes off the shop
           </h2>
-          <p className="mt-1.5 max-w-[62ch] text-[13px] text-ink-3">
+          <p className="mt-1.5 max-w-[62ch] text-[12.5px] text-ink-3">
             A product with nothing left is drafted on every connected storefront, and published again when
             stock arrives. It only ever publishes what it drafted — a product carries the{' '}
-            <code className="font-mono text-[12px]">relay:oos</code> tag while it is down — and it never touches
+            <code className="font-mono text-[11.5px]">relay:oos</code> tag while it is down — and it never touches
             one whose stock is untracked or that is set to keep selling at zero.
           </p>
         </div>
-        <span className={`text-[12px] font-medium ${words.tone}`}>{words.label}</span>
+        <span className={`text-[11.5px] font-medium ${words.tone}`}>{words.label}</span>
       </header>
 
-      <p className="mt-3 text-[12.5px] text-ink-3">{words.says}</p>
+      <p className="mt-3 text-[12px] text-ink-3">{words.says}</p>
 
       {last && (
-        <div className="mt-4 border-t border-line pt-3 text-[12.5px]">
+        <div className="mt-4 border-t border-line pt-3 text-[12px]">
           <div className="flex flex-wrap gap-x-5 gap-y-1">
             <span className="text-ink-3">Last sweep {when(new Date(last.at))}</span>
             <span>
@@ -104,7 +104,7 @@ export function StockRuleCard({
             {busy && <Loader2 className="size-4 animate-spin" />}
             See what it would do
           </button>
-          {note && <span className="text-[12.5px] text-ink-2">{note}</span>}
+          {note && <span className="text-[12px] text-ink-2">{note}</span>}
         </div>
       )}
     </section>

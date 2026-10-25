@@ -5,7 +5,6 @@ import { inArray, sql } from 'drizzle-orm';
 import { getDb, schema } from '../lib/db';
 import { CHANNEL, CHANNELS, channelConfigured } from '../lib/channels';
 import type { IncomingItem, IncomingOrder } from '../lib/connectors/types';
-import { scopesFor } from '../lib/domain/perms';
 import { RTO_REASONS, type ReturnReason } from '../lib/domain/stages';
 import { toMinor } from '../lib/format';
 import {
@@ -19,7 +18,10 @@ import {
   setHold,
   type Actor,
 } from '../lib/engine';
-import catalog from './catalog.json';
+import { CATALOG, POOL, webWeight } from './model';
+import { seedStock } from './stock';
+import { importShopifyStock } from '../lib/stock/live';
+import { catalogueChanged } from '../lib/stock/hooks';
 import { DEMO_STAFF, EG_FIRST_F, EG_FIRST_M, EG_LAST, EG_PLACES, EG_STREETS, KW_FIRST_F, KW_FIRST_M, KW_LAST, KW_PLACES, KW_STREETS } from './people';
 
 type Product = { title: string; brand: string; type: string; tags: string[]; price: number; compareAt: number | null; currency: string; sku: string; sizes: string[]; image: string | null };
@@ -100,19 +102,31 @@ function makePerson(country: 'EG' | 'KW', i: number): Person {
   };
 }
 
-const CATALOG = {
-  fig: (catalog as { fig: Product[] }).fig,
-  wsEg: (catalog as { wsEg: Product[] }).wsEg,
-  labesny: (catalog as { labesny: Product[] }).labesny,
-};
-const wsKw: Product[] = CATALOG.wsEg.map((p) => ({ ...p, currency: 'KWD', price: Math.max(2, Math.round((p.price / 158) * 4) / 4), compareAt: p.compareAt ? Math.round((p.compareAt / 158) * 4) / 4 : null }));
-const productsFor: Record<string, Product[]> = { 'fig-web': CATALOG.fig, 'fig-app': CATALOG.fig, 'ws-eg': CATALOG.wsEg, 'labesny-web': CATALOG.labesny, 'labesny-app': CATALOG.labesny, 'ws-kw': wsKw };
+const productsFor: Record<string, Product[]> = POOL;
+
+/** Baskets follow what sells: a style's popularity and its category's season, as of the order's day. */
+const weightCache = new Map<string, { cum: number[]; total: number }>();
+function pickWeighted(channelId: string, at: number): Product {
+  const pool = productsFor[channelId];
+  const country = CHANNEL[channelId].country as 'EG' | 'KW';
+  const key = `${channelId}:${new Date(at).getUTCMonth()}`;
+  let w = weightCache.get(key);
+  if (!w) {
+    let total = 0;
+    const cum = pool.map((p) => (total += webWeight(p, country, new Date(at))));
+    w = { cum, total };
+    weightCache.set(key, w);
+  }
+  const r = rnd() * w.total;
+  const i = w.cum.findIndex((c) => c >= r);
+  return pool[i < 0 ? pool.length - 1 : i];
+}
 
 const PER_DAY: Record<string, number> = { 'fig-web': 15, 'fig-app': 5, 'ws-eg': 6, 'labesny-web': 8, 'labesny-app': 3, 'ws-kw': 3 };
 const PREFIX: Record<string, [string, number]> = { 'fig-web': ['FIG-', 24100], 'fig-app': ['FIGAPP-', 1200], 'ws-eg': ['WSE-', 3100], 'labesny-web': ['LB-', 81200], 'labesny-app': ['LBAPP-', 900], 'ws-kw': ['WSK-', 1400] };
 const WEEKDAY = [0.92, 0.9, 0.95, 1.0, 1.25, 1.15, 1.05]; // Sun..Sat, Cairo shopping rhythm
 
-function basket(channelId: string, sizeRunsSmall: string): IncomingItem[] {
+function basket(channelId: string, sizeRunsSmall: string, at: number): IncomingItem[] {
   const pool = productsFor[channelId];
   const lines = weighted([{ n: 1, weight: 52 }, { n: 2, weight: 28 }, { n: 3, weight: 13 }, { n: 4, weight: 7 }]).n;
   const items: IncomingItem[] = [];
@@ -120,7 +134,7 @@ function basket(channelId: string, sizeRunsSmall: string): IncomingItem[] {
   const bracket = chance(0.06);
   for (let i = 0; i < lines; i++) {
     // the product that runs small sells well: it's the one the return pattern will expose
-    const p = chance(0.05) ? pool.find((x) => x.sku === sizeRunsSmall) ?? pick(pool) : pick(pool);
+    const p = chance(0.05) ? pool.find((x) => x.sku === sizeRunsSmall) ?? pickWeighted(channelId, at) : pickWeighted(channelId, at);
     const sizes = p.sizes.length ? p.sizes : [null];
     const make = (size: string | null) => ({
       sku: size ? `${p.sku}-${size}` : p.sku,
@@ -145,6 +159,8 @@ function basket(channelId: string, sizeRunsSmall: string): IncomingItem[] {
   return items;
 }
 
+const work = (s: (typeof DEMO_STAFF)[number]) => ({ locationId: s.location ?? null, shiftStart: s.shift?.[0] ?? null, shiftEnd: s.shift?.[1] ?? null, restDays: s.rest ?? [5], skills: s.skills ?? [] });
+
 export async function seedDemo(opts: { days?: number; log?: (m: string) => void } = {}) {
   const days = opts.days ?? 30;
   const log = opts.log ?? (() => {});
@@ -153,6 +169,9 @@ export async function seedDemo(opts: { days?: number; log?: (m: string) => void 
   const t0 = Date.now();
 
   log('Clearing demo data…');
+  // the stockroom goes first, so replaying the orders does not post stock moves against the old one
+  await db.execute(sql`delete from products where source = 'demo'`);
+  catalogueChanged();
   await db.execute(sql`delete from events where order_id in (select id from orders where source = 'demo') or return_id in (select r.id from returns r join orders o on o.id = r.order_id where o.source = 'demo')`);
   await db.execute(sql`delete from orders where source = 'demo'`);
   await db.execute(sql`delete from events where order_id is null and return_id is null and kind <> 'sync'`);
@@ -164,8 +183,8 @@ export async function seedDemo(opts: { days?: number; log?: (m: string) => void 
   for (const s of DEMO_STAFF) {
     const [u] = await db
       .insert(schema.users)
-      .values({ email: s.email, name: s.name, title: s.title, role: s.role, scopes: scopesFor(s.role), channels: s.channels ?? [], hue: s.hue })
-      .onConflictDoUpdate({ target: schema.users.email, set: { name: s.name, title: s.title, role: s.role, scopes: scopesFor(s.role), channels: s.channels ?? [], hue: s.hue, active: true } })
+      .values({ email: s.email, name: s.name, title: s.title, role: s.role, scopes: {}, channels: s.channels ?? [], hue: s.hue, ...work(s) })
+      .onConflictDoUpdate({ target: schema.users.email, set: { name: s.name, title: s.title, role: s.role, scopes: {}, channels: s.channels ?? [], hue: s.hue, active: true, ...work(s) } })
       .returning();
     staff[s.email.split('@')[0]] = { id: u.id, name: u.name, dept: s.title };
   }
@@ -197,6 +216,8 @@ export async function seedDemo(opts: { days?: number; log?: (m: string) => void 
     const wd = new Date(dayStart + OFFSET + 12 * HOUR).getUTCDay();
     const trend = d > days - 7 ? 1.12 : 1;
     for (const [channelId, rate] of Object.entries(PER_DAY)) {
+      // a live store's orders are its own: no demo order is ever placed beside them
+      if (channelConfigured(CHANNEL[channelId])) continue;
       const n = Math.round(rate * WEEKDAY[wd] * trend * between(0.8, 1.2));
       for (let i = 0; i < n; i++) {
         const hour = weighted([
@@ -227,7 +248,7 @@ export async function seedDemo(opts: { days?: number; log?: (m: string) => void 
     const reuse = regulars[country].length > 20 && chance(0.42);
     const person = reuse ? pick(regulars[country].filter((p) => p.type !== 'oneoff')) ?? pick(people[country]) : pick(people[country]);
     if (!reuse && person.type !== 'oneoff') regulars[country].push(person);
-    const items = basket(channelId, country === 'KW' ? runsSmall.sku : runsSmallEg.sku);
+    const items = basket(channelId, country === 'KW' ? runsSmall.sku : runsSmallEg.sku, at);
     const subtotal = items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
     const discount = chance(0.12) ? Math.round(subtotal * pick([0.1, 0.15, 0.2])) : 0;
     const shipping = country === 'KW' && subtotal - discount < toMinor(20, 'KWD') ? toMinor(2, 'KWD') : 0;
@@ -472,6 +493,17 @@ export async function seedDemo(opts: { days?: number; log?: (m: string) => void 
 
   invalidateRiskContext(true);
   const [{ n }] = (await db.execute<{ n: number }>(sql`select count(*)::int as n from orders where source = 'demo'`)).rows;
-  log(`Done: ${n} orders in ${Math.round((Date.now() - t0) / 1000)}s.`);
-  return { orders: n };
+  log(`Orders done: ${n} in ${Math.round((Date.now() - t0) / 1000)}s.`);
+  // the stockroom is built on top of the floor, so the month's website sales are these orders
+  const stock = await seedStock({ log });
+  // a live store's market is its real stockroom, read again from the store
+  for (const c of CHANNELS.filter((x) => x.platform === 'shopify' && channelConfigured(x))) {
+    try {
+      await importShopifyStock(c.id, { log });
+    } catch (e) {
+      log(`Could not read ${c.name} live: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  log(`Done: ${n} orders, ${stock.products} styles in ${Math.round((Date.now() - t0) / 1000)}s.`);
+  return { orders: n, styles: stock.products };
 }

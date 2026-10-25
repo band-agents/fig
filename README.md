@@ -22,9 +22,12 @@ npm run seed      # a month of demo trading (stop `npm run dev` first; the embed
 npm run dev       # http://localhost:3400
 ```
 
-In demo mode the sign-in page lists one door per department (Admin, Operations, Customer care,
-Finance, Warehouse Cairo/Kuwait, Shipping, Returns, Marketing). Each one shows exactly what that job
-sees. An admin can rebuild the demo floor from **Rules & SLAs**.
+Signed out, `/` is the landing page; staff sign in from its header (password, or Google when
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set). Locally, `GOOGLE_MOCK=1` puts a stand-in account chooser behind
+"Continue with Google": pick any seeded teammate (`*@relay.local`) to see exactly what that job sees.
+An admin can rebuild the demo floor from **Rules & SLAs**.
+
+**Going live:** see [deploy/README.md](deploy/README.md) (one server: the console, Postgres, HTTPS, nightly backups).
 
 No database to install: locally Relay runs an embedded Postgres (PGlite) in `.data/`. In production,
 set `DATABASE_URL` to a real Postgres. The same migrations (`drizzle/`) run on start in both cases.
@@ -63,6 +66,15 @@ ever sees Kuwait.
 | Customer data | masked · name & city · full contact |
 | Money | hidden · totals · payments · refunds |
 | Insights, Channels, Team, Rules | hidden · view · edit · manage |
+| Command centre (the whole floor: Command centre + Pipeline) | hidden · view |
+| Stock, Purchasing, Warehouse work, Merchandising | hidden · view · act · manage |
+
+**Pages are need-to-know.** `PAGES` in `src/lib/domain/perms.ts` says which levels open each page; the
+menu, the phone tabs, the palette and every page guard read it, so what is offered and what opens never
+differ. Someone without the Command centre lands on their own first page (care on Confirm, the warehouse
+on Pick & pack). **Team & access → What each job sees** lists each job's pages; `page-access.test.ts`
+pins them. A teammate's stored access is only where they differ from their job, so improving a preset
+reaches everyone on that job.
 
 Rules that always hold:
 

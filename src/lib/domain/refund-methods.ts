@@ -97,7 +97,7 @@ export function refundOptions(input: {
     cod: 'Cash back to you',
     card: 'Back to your card',
     wallet: 'Back to your wallet',
-    knet: 'Back to your KNET card',
+    knet: 'Back to your KNET debit or credit card',
     instapay: 'Back to your InstaPay account',
     store_credit: 'Back to your account credit',
     mixed: 'Back the way you paid',
@@ -105,17 +105,29 @@ export function refundOptions(input: {
 
   /* Account credit leads. It is the one the customer is better off taking — it is worth 5% more and
      it is the quickest — and it is the one the business would rather pay, so it is not buried under
-     the two that move cash out. */
+     the two that move cash out. Cash at a branch comes next and the refund to the card or cash they
+     paid with comes last: it is the slowest of the three and the one that sends money back out of
+     the business, so it is offered, not suggested. */
   return [
     {
       method: 'store_credit',
-      label: bonus > 0 ? `Account credit, plus ${Math.round(STORE_CREDIT_BONUS * 100)}% extra` : 'Account credit',
+      label: bonus > 0 ? `Account credit, and gain ${Math.round(STORE_CREDIT_BONUS * 100)}% extra` : 'Account credit',
       amount: amount + bonus,
       bonus,
       detail:
         bonus > 0
           ? 'Yours straight after inspection, and the fastest of the three.'
           : 'This order was paid with account credit, so the extra does not apply again.',
+      available: true,
+    },
+    {
+      method: 'cash_at_store',
+      label: 'Cash from one of our branches',
+      amount,
+      bonus: 0,
+      detail: input.policy.storeOnly
+        ? 'Bring the item to the branch you choose and collect the cash there.'
+        : 'Collect the cash in person once the return is approved.',
       available: true,
     },
     {
@@ -129,16 +141,6 @@ export function refundOptions(input: {
           : 'Back to the account you paid from, usually within 5 to 10 working days.',
       available: settled,
       why: settled ? undefined : 'This order has not been paid for yet.',
-    },
-    {
-      method: 'cash_at_store',
-      label: 'Cash from one of our branches',
-      amount,
-      bonus: 0,
-      detail: input.policy.storeOnly
-        ? 'Bring the item to the branch you choose and collect the cash there.'
-        : 'Collect the cash in person once the return is approved.',
-      available: true,
     },
   ];
 }

@@ -71,3 +71,11 @@ export const initials = (name: string) =>
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())
     .join('');
+
+/** An EGP-equivalent amount (minor units) shown in another currency: a Kuwait-only view reads KWD. */
+export function moneyIn(egpMinor: number | null | undefined, currency: string, opts: { compact?: boolean; sign?: boolean } = {}) {
+  if (egpMinor == null) return '—';
+  if (currency === 'EGP') return money(egpMinor, 'EGP', opts);
+  const major = egpMinor / 100 / (TO_EGP[currency] ?? 1);
+  return money(Math.round(major * 10 ** decimalsFor(currency)), currency, opts);
+}

@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react';
 import { Hand, Loader2, Pause, Play, PhoneCall, Undo2, UserRound } from 'lucide-react';
 import { assignAction, holdAction, moveOrderAction, noteAction } from '@/app/actions';
-import { CANCEL_REASONS, HOLD_REASONS, ORDER_FLOW, ORDER_STAGE, RTO_REASONS, type OrderStage, type Transition } from '@/lib/domain/stages';
+import { CANCEL_REASONS, HOLD_REASONS, mayTake, ORDER_FLOW, ORDER_STAGE, RTO_REASONS, type OrderStage, type Transition } from '@/lib/domain/stages';
 import type { Scopes } from '@/lib/domain/perms';
 import { toast } from '@/components/ui/toast';
 import { Modal } from '@/components/ui/modal';
@@ -28,7 +28,7 @@ export function OrderActions(p: Props) {
   const [holdOpen, setHoldOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
   const flows = ORDER_FLOW[p.stage as OrderStage] ?? [];
-  const mine = flows.filter((t) => (p.scopes[t.area] ?? 0) >= (t.level ?? 2));
+  const mine = flows.filter((t) => mayTake(p.scopes, t));
   const others = flows.filter((t) => !mine.includes(t));
   const canHold = p.canWork && !['settled', 'cancelled', 'rto_closed'].includes(p.stage);
 
@@ -71,7 +71,7 @@ export function OrderActions(p: Props) {
         ))
       )}
       {!p.onHold && mine.length === 0 && others.length > 0 && (
-        <span className="text-[12.5px] text-ink-3">Waiting on {[...new Set(others.map((o) => ORDER_STAGE[o.to] && areaLabel(o.area)))].join(' or ')}</span>
+        <span className="text-[12px] text-ink-3">Waiting on {[...new Set(others.map((o) => ORDER_STAGE[o.to] && areaLabel(o.area)))].join(' or ')}</span>
       )}
       <span className="mx-1 hidden h-6 w-px bg-line-2 sm:block" />
       {(p.scopes.intake ?? 0) >= 2 && (
@@ -167,7 +167,7 @@ function AssignMenu({ orderId, people, current }: { orderId: string; people: { i
                 else toast(r.error, { tone: 'error' });
           })
         }
-        className="field !h-[30px] !w-auto !rounded-lg !pl-8 text-[12.5px]"
+        className="field !h-[30px] !w-auto !rounded-lg !pl-8 text-[12px]"
         aria-label="Assign to"
       >
         <option value="">Unassigned</option>
@@ -215,7 +215,7 @@ function MoveDialog({ t, courier, pending, onClose, onSubmit }: { t: Transition<
                 {reasons.map((r) => (
                   <label key={r} className="cursor-pointer">
                     <input type="radio" name="reasonPick" value={r} className="peer sr-only" />
-                    <span className="inline-flex h-8 items-center rounded-lg border border-line-2 px-2.5 text-[12.5px] text-ink-2 transition peer-checked:border-ink peer-checked:bg-elev-3 peer-checked:text-ink">{r}</span>
+                    <span className="inline-flex h-8 items-center rounded-lg border border-line-2 px-2.5 text-[12px] text-ink-2 transition peer-checked:border-ink peer-checked:bg-elev-3 peer-checked:text-ink">{r}</span>
                   </label>
                 ))}
               </div>
@@ -252,7 +252,7 @@ function ReasonDialog({ title, sub, reasons, cta, pending, onClose, onSubmit }: 
     <Modal title={title} sub={sub} onClose={onClose}>
       <div className="flex flex-wrap gap-1.5">
         {reasons.map((r) => (
-          <button key={r} type="button" onClick={() => setText(r)} className={`h-8 rounded-lg border px-2.5 text-[12.5px] transition ${text === r ? 'border-ink bg-elev-3 text-ink' : 'border-line-2 text-ink-2 hover:text-ink'}`}>
+          <button key={r} type="button" onClick={() => setText(r)} className={`h-8 rounded-lg border px-2.5 text-[12px] transition ${text === r ? 'border-ink bg-elev-3 text-ink' : 'border-line-2 text-ink-2 hover:text-ink'}`}>
             {r}
           </button>
         ))}

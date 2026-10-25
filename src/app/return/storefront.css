@@ -590,3 +590,77 @@ html:has(.sf[data-embedded]) .atmosphere {
   align-items: flex-start;
   padding: 16px 18px;
 }
+
+/* ── brand label ──────────────────────────────────── */
+/* Labesny sells a dozen labels and the shops are per label, so the brand rides on every piece from
+   the order list to the refund. Small caps, like the storefront's own vendor line. */
+.sf-brand {
+  display: block;
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+.sf-item-body .sf-brand {
+  margin-bottom: 3px;
+}
+
+/* ── the customer's orders ────────────────────────── */
+.sf-orders {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sf .sf-order {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+}
+.sf-order .ico {
+  flex: none;
+  color: var(--grey);
+}
+.sf-order-shots {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+.sf-order-shots .sf-shot {
+  width: 40px;
+}
+.sf-order .sf-brand {
+  margin-top: 3px;
+}
+@media (max-width: 420px) {
+  .sf-order-shots .sf-shot:nth-child(n + 2) {
+    display: none;
+  }
+}
+
+/* ── what is going back, by brand ─────────────────── */
+.sf-returning {
+  display: grid;
+  gap: 14px;
+  border-block: 1px solid var(--line);
+  padding: 14px 0;
+}
+.sf-returning-group ul {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sf-returning-group li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.sf-returning-group .sf-shot {
+  width: 32px;
+}

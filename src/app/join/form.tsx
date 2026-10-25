@@ -20,7 +20,7 @@ export function JoinForm({ token, email }: { token: string; email: string }) {
       {state && !state.ok && <p className="text-sm text-critical">{state.error}</p>}
       <button className="btn btn-primary btn-lg mt-2 w-full" disabled={pending}>
         {pending && <Loader2 className="size-4 animate-spin" />}
-        Join Relay <ArrowRight className="size-4" />
+        Join DH &amp; DCO <ArrowRight className="size-4" />
       </button>
     </form>
   );

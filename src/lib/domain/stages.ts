@@ -29,65 +29,76 @@ export const DEPTS: Record<Exclude<Dept, 'none'>, { label: string; area: Area; t
   returns: { label: 'Returns desk', area: 'returns', tint: 'rose' },
 };
 
+export type BadgeTone = 'neutral' | 'attention' | 'warning' | 'info' | 'critical' | 'success';
+
 type StageMeta = {
   label: string;
   verb: string; // what is happening, for timelines: "Picking"
   dept: Dept;
   group: 'intake' | 'finance' | 'fulfilment' | 'shipping' | 'done' | 'exception';
-  tint: string;
+  tint: string; // the department's identity colour (relay lanes, the tracker)
+  badge: BadgeTone; // the status pill, in Shopify's meaning: grey done, yellow to do, orange payment waiting, blue on its way, red a problem
   slaHours: number | null; // default target for leaving this stage (overridable in Rules)
   open: boolean; // still needs someone's work
 };
 
 export const ORDER_STAGE: Record<OrderStage, StageMeta> = {
-  new: { label: 'New', verb: 'Received', dept: 'care', group: 'intake', tint: 'violet', slaHours: 0.5, open: true },
-  confirming: { label: 'Confirming', verb: 'Confirming with customer', dept: 'care', group: 'intake', tint: 'violet', slaHours: 2, open: true },
-  finance: { label: 'Finance check', verb: 'Finance check', dept: 'finance', group: 'finance', tint: 'amber', slaHours: 4, open: true },
-  ready: { label: 'Ready to pick', verb: 'Queued for the warehouse', dept: 'fulfilment', group: 'fulfilment', tint: 'blue', slaHours: 12, open: true },
-  picking: { label: 'Picking', verb: 'Picking', dept: 'fulfilment', group: 'fulfilment', tint: 'blue', slaHours: 3, open: true },
-  packed: { label: 'Packed', verb: 'Packed, waiting for courier', dept: 'shipping', group: 'shipping', tint: 'cyan', slaHours: 8, open: true },
-  shipped: { label: 'Shipped', verb: 'With the courier', dept: 'shipping', group: 'shipping', tint: 'cyan', slaHours: 48, open: true },
-  delivering: { label: 'Out for delivery', verb: 'Out for delivery', dept: 'shipping', group: 'shipping', tint: 'cyan', slaHours: 12, open: true },
-  delivered: { label: 'Delivered', verb: 'Delivered, cash to settle', dept: 'finance', group: 'done', tint: 'green', slaHours: 168, open: true },
-  settled: { label: 'Settled', verb: 'Settled', dept: 'none', group: 'done', tint: 'green', slaHours: null, open: false },
-  cancelled: { label: 'Cancelled', verb: 'Cancelled', dept: 'none', group: 'exception', tint: 'neutral', slaHours: null, open: false },
-  rto: { label: 'Returning to origin', verb: 'Refused, coming back', dept: 'returns', group: 'exception', tint: 'red', slaHours: 96, open: true },
-  rto_closed: { label: 'RTO closed', verb: 'Back in stock', dept: 'none', group: 'exception', tint: 'neutral', slaHours: null, open: false },
+  new: { label: 'New', verb: 'Received', dept: 'care', group: 'intake', tint: 'violet', badge: 'attention', slaHours: 0.5, open: true },
+  confirming: { label: 'Confirming', verb: 'Confirming with customer', dept: 'care', group: 'intake', tint: 'violet', badge: 'attention', slaHours: 2, open: true },
+  finance: { label: 'Finance check', verb: 'Finance check', dept: 'finance', group: 'finance', tint: 'amber', badge: 'warning', slaHours: 4, open: true },
+  ready: { label: 'Ready to pick', verb: 'Queued for the warehouse', dept: 'fulfilment', group: 'fulfilment', tint: 'blue', badge: 'attention', slaHours: 12, open: true },
+  picking: { label: 'Picking', verb: 'Picking', dept: 'fulfilment', group: 'fulfilment', tint: 'blue', badge: 'attention', slaHours: 3, open: true },
+  packed: { label: 'Packed', verb: 'Packed, waiting for courier', dept: 'shipping', group: 'shipping', tint: 'cyan', badge: 'attention', slaHours: 8, open: true },
+  shipped: { label: 'Shipped', verb: 'With the courier', dept: 'shipping', group: 'shipping', tint: 'cyan', badge: 'info', slaHours: 48, open: true },
+  delivering: { label: 'Out for delivery', verb: 'Out for delivery', dept: 'shipping', group: 'shipping', tint: 'cyan', badge: 'info', slaHours: 12, open: true },
+  delivered: { label: 'Delivered', verb: 'Delivered, cash to settle', dept: 'finance', group: 'done', tint: 'green', badge: 'neutral', slaHours: 168, open: true },
+  settled: { label: 'Settled', verb: 'Settled', dept: 'none', group: 'done', tint: 'green', badge: 'neutral', slaHours: null, open: false },
+  cancelled: { label: 'Cancelled', verb: 'Cancelled', dept: 'none', group: 'exception', tint: 'neutral', badge: 'neutral', slaHours: null, open: false },
+  rto: { label: 'Returning to origin', verb: 'Refused, coming back', dept: 'returns', group: 'exception', tint: 'red', badge: 'critical', slaHours: 96, open: true },
+  rto_closed: { label: 'RTO closed', verb: 'Back in stock', dept: 'none', group: 'exception', tint: 'neutral', badge: 'neutral', slaHours: null, open: false },
 };
 
+/**
+ * Steps the business has switched off. Dan, 21 Oct 2026: orders no longer wait for a confirmation call
+ * or a finance check, they go from the store straight to Pick & pack. The stages stay defined so the
+ * history of older orders still reads, and an order still sitting in one can be sent on.
+ */
+export const RETIRED_STAGES: OrderStage[] = ['confirming', 'finance'];
+
 /** The happy path, in order: drives progress trackers and the pipeline board. */
-export const ORDER_TRACK: OrderStage[] = ['new', 'confirming', 'finance', 'ready', 'picking', 'packed', 'shipped', 'delivering', 'delivered', 'settled'];
+export const ORDER_TRACK: OrderStage[] = ['new', 'ready', 'picking', 'packed', 'shipped', 'delivering', 'delivered', 'settled'];
 
 export type Need = 'reason' | 'tracking' | 'note';
 export type Transition<S extends string> = {
   to: S;
   label: string;
   area: Area;
+  /** Other areas whose people may take this step too: care and the warehouse can both cancel a waiting order. */
+  also?: Area[];
   level?: Level;
   tone?: 'primary' | 'danger' | 'quiet';
   needs?: Need[];
 };
 
-const cancel = (area: Area): Transition<OrderStage> => ({ to: 'cancelled', label: 'Cancel order', area, tone: 'danger', needs: ['reason'] });
+const cancel = (area: Area, also?: Area[]): Transition<OrderStage> => ({ to: 'cancelled', label: 'Cancel order', area, also, tone: 'danger', needs: ['reason'] });
 
 export const ORDER_FLOW: Record<OrderStage, Transition<OrderStage>[]> = {
   new: [
-    { to: 'confirming', label: 'Send to confirmation', area: 'intake', tone: 'primary' },
-    { to: 'finance', label: 'Skip confirmation', area: 'intake', tone: 'quiet' },
-    cancel('intake'),
+    { to: 'ready', label: 'Send to Pick & pack', area: 'orders', also: ['intake', 'fulfilment'], tone: 'primary' },
+    cancel('intake', ['orders']),
   ],
+  // retired steps: an order left in one is sent on to the warehouse
   confirming: [
-    { to: 'finance', label: 'Customer confirmed', area: 'intake', tone: 'primary' },
-    cancel('intake'),
+    { to: 'ready', label: 'Send to Pick & pack', area: 'orders', also: ['intake', 'fulfilment'], tone: 'primary' },
+    cancel('intake', ['orders']),
   ],
   finance: [
-    { to: 'ready', label: 'Approve for fulfilment', area: 'finance', tone: 'primary' },
-    { to: 'confirming', label: 'Send back to Customer care', area: 'finance', tone: 'quiet', needs: ['reason'] },
-    cancel('finance'),
+    { to: 'ready', label: 'Send to Pick & pack', area: 'finance', also: ['orders', 'fulfilment'], tone: 'primary' },
+    cancel('finance', ['orders']),
   ],
   ready: [
     { to: 'picking', label: 'Start picking', area: 'fulfilment', tone: 'primary' },
-    cancel('fulfilment'),
+    cancel('fulfilment', ['intake', 'orders']),
   ],
   picking: [
     { to: 'packed', label: 'Mark packed', area: 'fulfilment', tone: 'primary' },
@@ -118,16 +129,16 @@ export const RETURN_STAGES = ['requested', 'approved', 'pickup', 'in_transit', '
 export type ReturnStage = (typeof RETURN_STAGES)[number];
 
 export const RETURN_STAGE: Record<ReturnStage, StageMeta> = {
-  requested: { label: 'Requested', verb: 'Return requested', dept: 'care', group: 'intake', tint: 'violet', slaHours: 24, open: true },
-  approved: { label: 'Approved', verb: 'Approved, awaiting pickup', dept: 'shipping', group: 'shipping', tint: 'cyan', slaHours: 24, open: true },
-  pickup: { label: 'Pickup booked', verb: 'Courier pickup booked', dept: 'shipping', group: 'shipping', tint: 'cyan', slaHours: 48, open: true },
-  in_transit: { label: 'In transit', verb: 'On its way back', dept: 'shipping', group: 'shipping', tint: 'cyan', slaHours: 72, open: true },
-  received: { label: 'Received', verb: 'At the returns desk', dept: 'returns', group: 'fulfilment', tint: 'rose', slaHours: 24, open: true },
-  inspected: { label: 'Inspected', verb: 'Inspected', dept: 'returns', group: 'fulfilment', tint: 'rose', slaHours: 12, open: true },
-  refund_pending: { label: 'Refund pending', verb: 'Waiting for refund', dept: 'finance', group: 'finance', tint: 'amber', slaHours: 72, open: true },
-  refunded: { label: 'Refunded', verb: 'Refunded', dept: 'none', group: 'done', tint: 'green', slaHours: null, open: false },
-  closed: { label: 'Closed', verb: 'Closed', dept: 'none', group: 'done', tint: 'green', slaHours: null, open: false },
-  rejected: { label: 'Rejected', verb: 'Rejected', dept: 'none', group: 'exception', tint: 'neutral', slaHours: null, open: false },
+  requested: { label: 'Requested', verb: 'Return requested', dept: 'care', group: 'intake', tint: 'violet', badge: 'attention', slaHours: 24, open: true },
+  approved: { label: 'Approved', verb: 'Approved, awaiting pickup', dept: 'shipping', group: 'shipping', tint: 'cyan', badge: 'info', slaHours: 24, open: true },
+  pickup: { label: 'Pickup booked', verb: 'Courier pickup booked', dept: 'shipping', group: 'shipping', tint: 'cyan', badge: 'info', slaHours: 48, open: true },
+  in_transit: { label: 'In transit', verb: 'On its way back', dept: 'shipping', group: 'shipping', tint: 'cyan', badge: 'info', slaHours: 72, open: true },
+  received: { label: 'Received', verb: 'At the returns desk', dept: 'returns', group: 'fulfilment', tint: 'rose', badge: 'info', slaHours: 24, open: true },
+  inspected: { label: 'Inspected', verb: 'Inspected', dept: 'returns', group: 'fulfilment', tint: 'rose', badge: 'info', slaHours: 12, open: true },
+  refund_pending: { label: 'Refund pending', verb: 'Waiting for refund', dept: 'finance', group: 'finance', tint: 'amber', badge: 'warning', slaHours: 72, open: true },
+  refunded: { label: 'Refunded', verb: 'Refunded', dept: 'none', group: 'done', tint: 'green', badge: 'neutral', slaHours: null, open: false },
+  closed: { label: 'Closed', verb: 'Closed', dept: 'none', group: 'done', tint: 'green', badge: 'neutral', slaHours: null, open: false },
+  rejected: { label: 'Rejected', verb: 'Rejected', dept: 'none', group: 'exception', tint: 'neutral', badge: 'neutral', slaHours: null, open: false },
 };
 
 export const RETURN_TRACK: ReturnStage[] = ['requested', 'approved', 'pickup', 'in_transit', 'received', 'inspected', 'refund_pending', 'refunded'];
@@ -169,6 +180,10 @@ export type ReturnReason = keyof typeof RETURN_REASONS;
 export const RTO_REASONS = ['Customer refused at door', 'Customer unreachable', 'Wrong address', 'Customer asked to cancel', 'Payment not ready (COD)'] as const;
 export const CANCEL_REASONS = ['Customer cancelled', 'Duplicate order', 'Out of stock', 'Failed confirmation', 'Suspected fraud', 'Address not serviceable'] as const;
 export const HOLD_REASONS = ['Waiting for stock', 'Customer asked to delay', 'Address check', 'Payment check', 'Gift wrap / special request'] as const;
+
+/** Whether these access levels may take a step: its own area, or one of the areas it also allows. */
+export const mayTake = (scopes: Partial<Record<Area, number>>, t: Pick<Transition<string>, 'area' | 'also' | 'level'>) =>
+  [t.area, ...(t.also ?? [])].some((a) => (scopes[a] ?? 0) >= (t.level ?? 2));
 
 export function transitionsFor<S extends string>(flow: Record<S, Transition<S>[]>, stage: S) {
   return flow[stage] ?? [];

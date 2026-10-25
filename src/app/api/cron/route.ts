@@ -1,5 +1,6 @@
 import { runStockRule } from '@/lib/stock-rule';
 import { syncAll, trackCouriers } from '@/lib/sync';
+import { runPlanner } from '@/lib/stock/planner';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -14,5 +15,7 @@ export async function POST(req: Request) {
      been read, and it writes to the same Shopify API the sync is talking to. It is a no-op unless
      RELAY_STOCK_RULE says otherwise. */
   const stock = await runStockRule();
-  return Response.json({ stores, couriers, stock });
+  // and the AI planner, on the stock as it now stands
+  const planner = await runPlanner();
+  return Response.json({ stores, couriers, stock, planner });
 }

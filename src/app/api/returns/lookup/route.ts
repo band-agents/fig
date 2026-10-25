@@ -28,6 +28,7 @@ export async function POST(req: Request) {
 
   let body: {
     number?: string;
+    orderId?: string;
     email?: string;
     phone?: string;
     contact?: string;
@@ -41,7 +42,8 @@ export async function POST(req: Request) {
 
   try {
     const order = await lookupOrder({
-      number: body.number ?? '',
+      number: body.number,
+      orderId: body.orderId,
       email: body.email,
       phone: body.phone,
       contact: body.contact,

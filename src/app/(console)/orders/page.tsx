@@ -1,19 +1,21 @@
 import Link from 'next/link';
 import { PackageSearch } from 'lucide-react';
-import { requireUser } from '@/lib/auth/session';
+import { requireUser, sendHome } from '@/lib/auth/session';
 import { listOrders, viewCounts, VIEWS, type OrderFilters } from '@/lib/order-query';
 import { CHANNELS } from '@/lib/channels';
 import { ORDER_STAGE, ORDER_STAGES } from '@/lib/domain/stages';
-import { can } from '@/lib/domain/perms';
+import { can, canSee } from '@/lib/domain/perms';
 import { num } from '@/lib/format';
 import { Empty, PageHeader } from '@/components/ui/bits';
 import { OrdersTable } from '@/components/orders/orders-table';
 import { FilterBar } from '@/components/orders/filter-bar';
+import { ExportButton } from '@/components/ui/export-button';
 
 export const metadata = { title: 'Orders' };
 
 export default async function OrdersPage(props: PageProps<'/orders'>) {
   const me = await requireUser();
+  if (!canSee(me, 'orders')) sendHome(me);
   const sp = await props.searchParams;
   const str = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : undefined);
   const f: OrderFilters = { view: str('view') ?? 'open', q: str('q'), channel: str('channel'), stage: str('stage'), pay: str('pay'), risk: str('risk'), sla: str('sla'), sort: str('sort'), page: Number(str('page') ?? 1) };
@@ -28,14 +30,18 @@ export default async function OrdersPage(props: PageProps<'/orders'>) {
 
   return (
     <div>
-      <PageHeader eyebrow="Every storefront, one list" title="Orders" sub="Search by number, name, phone, waybill, product or SKU. Everything here updates live as the floor works." />
+      <PageHeader
+        title="Orders"
+        sub="Search by number, name, phone, waybill, product or SKU."
+        right={<ExportButton name={`orders-${f.view}`} href={`/orders/export${qs({}).replace('/orders', '')}`} label={`Export ${num(data.total)}`} />}
+      />
 
       <div className="no-scrollbar -mx-4 mb-4 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         {VIEWS.map((v) => {
           const active = (f.view ?? 'open') === v.key;
           const n = counts[v.key];
           return (
-            <Link key={v.key} href={qs({ view: v.key })} className={`flex h-9 shrink-0 items-center gap-2 rounded-[10px] px-3 text-[13px] transition ${active ? 'bg-inv text-inv-ink' : 'text-ink-2 hover:bg-elev-2 hover:text-ink'}`}>
+            <Link key={v.key} href={qs({ view: v.key })} className={`flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-[12.5px] transition ${active ? 'bg-elev-3 font-semibold text-ink' : 'text-ink-2 hover:bg-elev-2 hover:text-ink'}`}>
               {v.label}
               <span className={`font-mono text-[11px] ${active ? 'opacity-70' : 'text-ink-4'} ${v.key === 'attention' && n > 0 && !active ? '!text-critical' : ''}`}>{num(n ?? 0)}</span>
             </Link>
@@ -54,7 +60,7 @@ export default async function OrdersPage(props: PageProps<'/orders'>) {
       </div>
 
       {pages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-[13px] text-ink-3">
+        <div className="mt-4 flex items-center justify-between text-[12.5px] text-ink-3">
           <span>
             {num((data.page - 1) * data.limit + 1)}–{num(Math.min(data.total, data.page * data.limit))} of {num(data.total)}
           </span>

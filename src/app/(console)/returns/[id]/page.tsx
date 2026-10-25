@@ -4,7 +4,7 @@ import { ArrowLeft, Check, Store, Truck, UserRound } from 'lucide-react';
 import { asc, eq } from 'drizzle-orm';
 import { requireUser } from '@/lib/auth/session';
 import { getDb, schema } from '@/lib/db';
-import { can, maskName, seesChannel } from '@/lib/domain/perms';
+import { can, maskName, seesBrands, seesChannel } from '@/lib/domain/perms';
 import { RETURN_REASONS, RETURN_STAGE, RETURN_TRACK, type ReturnReason, type ReturnStage } from '@/lib/domain/stages';
 import { money, when } from '@/lib/format';
 import { CHANNEL } from '@/lib/channels';
@@ -15,6 +15,8 @@ import { SlaChip } from '@/components/ui/sla';
 import { Timeline } from '@/components/order/timeline';
 import { NoteComposer } from '@/components/order/composer';
 import { DeskActions } from '@/components/returns/desk-actions';
+import { ReviewCard } from '@/components/returns/review-card';
+import { reviewContext } from '@/lib/return-query';
 
 export const metadata = { title: 'Return' };
 
@@ -29,6 +31,7 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
     db.select({ ri: schema.returnItems, i: schema.orderItems }).from(schema.returnItems).innerJoin(schema.orderItems, eq(schema.orderItems.id, schema.returnItems.orderItemId)).where(eq(schema.returnItems.returnId, id)),
     db.select({ e: schema.events, hue: schema.users.hue }).from(schema.events).leftJoin(schema.users, eq(schema.users.id, schema.events.actorId)).where(eq(schema.events.returnId, id)).orderBy(asc(schema.events.at)),
   ]);
+  if (me.brands?.length && !seesBrands(me, (await db.select({ b: schema.orderItems.brand }).from(schema.orderItems).where(eq(schema.orderItems.orderId, r.orderId))).map((x) => x.b))) notFound();
   const reached: Record<string, Date> = {};
   for (const { e } of events) if (e.toStage) reached[e.toStage] = e.at;
   const idx = RETURN_TRACK.indexOf(r.stage as ReturnStage);
@@ -40,18 +43,18 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
 
   return (
     <div className="space-y-5">
-      <Link href="/returns" className="inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink">
+      <Link href="/returns" className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-3 hover:text-ink">
         <ArrowLeft className="size-4" /> Returns
       </Link>
       <section className="panel overflow-hidden">
         <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="font-mono text-[28px] font-medium">{r.number}</h1>
+              <h1 className="font-mono text-[21px] font-medium">{r.number}</h1>
               <ReturnPill stage={r.stage} />
               <SlaChip due={r.dueAt} since={r.stageAt} big />
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-ink-3">
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-ink-3">
               <ChannelChip id={r.channelId} />
               <span>Requested {when(r.requestedAt)}</span>
               <span className="inline-flex items-center gap-1">{r.method === 'store' ? <Store className="size-3.5" /> : <Truck className="size-3.5" />}{r.method === 'store' ? 'Store drop-off' : 'Courier pickup'}</span>
@@ -66,12 +69,13 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
           </div>
           {seesMoney && (
             <div className="text-right">
-              <div className="text-[12px] text-ink-3">{r.resolution === 'refund' ? 'Refund' : r.resolution === 'exchange' ? 'Exchange value' : 'Account credit'}</div>
-              <div className="font-display text-[32px] leading-none tabular">{money(r.amount, r.currency)}</div>
+              <div className="text-[11.5px] text-ink-3">{r.resolution === 'refund' ? 'Refund' : r.resolution === 'exchange' ? 'Exchange value' : 'Account credit'}</div>
+              <div className="font-display text-[20px] leading-none tabular">{money(r.amount, r.currency)}</div>
               {/* The amount is what the customer was promised, bonus included. Finance pays it, so
                   the part that is not the order's own money is named here. */}
+              {r.review?.refundKind === 'partial' && r.review.refundAmount != null && <div className="mt-1 text-[11.5px] text-ink-2">Desk approved {money(r.review.refundAmount, r.currency)} back</div>}
               {r.bonus > 0 && (
-                <div className="mt-1 text-[12px] text-ink-3">
+                <div className="mt-1 text-[11.5px] text-ink-3">
                   incl. {money(r.bonus, r.currency)} account-credit bonus
                 </div>
               )}
@@ -90,16 +94,23 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
                   <span className={`relative z-[1] grid size-6 place-items-center rounded-full border-2 ${cur ? 'border-[var(--tint)] bg-bg' : done || reached[s] ? 'border-[var(--tint)] bg-[var(--tint)]' : 'border-line-2 bg-bg'}`}>
                     {cur ? <span className="size-2 animate-pulse rounded-full bg-[var(--tint)]" /> : reached[s] && <Check className="size-3.5 text-bg" strokeWidth={3} />}
                   </span>
-                  <span className={`mt-2 text-[12px] ${cur ? 'font-medium' : reached[s] ? 'text-ink-2' : 'text-ink-4'}`}>{m.label}</span>
+                  <span className={`mt-2 text-[11.5px] ${cur ? 'font-medium' : reached[s] ? 'text-ink-2' : 'text-ink-4'}`}>{m.label}</span>
                   {reached[s] && <span className="text-[10.5px] text-ink-3">{when(reached[s]).replace('Today ', '')}</span>}
                 </li>
               );
             })}
           </ol>
-          {(r.stage === 'rejected' || r.stage === 'closed') && <p className="mt-3 text-[13px] text-ink-2">{RETURN_STAGE[r.stage as ReturnStage].label} {r.closedAt ? when(r.closedAt) : ''}</p>}
+          {(r.stage === 'rejected' || r.stage === 'closed') && <p className="mt-3 text-[12.5px] text-ink-2">{RETURN_STAGE[r.stage as ReturnStage].label} {r.closedAt ? when(r.closedAt) : ''}</p>}
         </div>
         <div className="border-t border-line bg-inset/50 px-5 py-3">
-          <DeskActions id={r.id} number={r.number} stage={r.stage} method={r.method} scopes={me.scopes} />
+          <DeskActions
+            id={r.id}
+            number={r.number}
+            stage={r.stage}
+            method={r.method}
+            scopes={me.scopes}
+            review={reviewContext({ amount: seesMoney ? r.amount : null, currency: r.currency, resolution: r.resolution, refundMethod: r.refundMethod, deliveredAt: o?.deliveredAt ?? null, requestedAt: r.requestedAt, photos: photos.length, channelId: r.channelId })}
+          />
         </div>
       </section>
 
@@ -107,7 +118,7 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
         <div className="space-y-5">
           <section className="panel">
             <header className="border-b border-line px-5 py-3.5">
-              <h2 className="text-[15px] font-medium">Coming back</h2>
+              <h2 className="text-[14px] font-medium">Coming back</h2>
             </header>
             <ul className="divide-y divide-[var(--line)]">
               {items.map(({ ri, i }) => (
@@ -115,17 +126,17 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {i.image ? <img src={i.image} alt="" className="h-20 w-16 rounded-lg object-cover" /> : <span className="h-20 w-16 rounded-lg bg-elev-3" />}
                   <div className="min-w-0 flex-1">
-                    <div className="text-[11.5px] uppercase tracking-[0.06em] text-ink-3">{i.brand}</div>
-                    <div className="text-[14px]">{i.title}</div>
-                    <div className="mt-1 text-[12px] text-ink-3">
+                    <div className="text-[11px] uppercase tracking-[0.06em] text-ink-3">{i.brand}</div>
+                    <div className="text-[13px]">{i.title}</div>
+                    <div className="mt-1 text-[11.5px] text-ink-3">
                       {i.size ? `Size ${i.size} · ` : ''}Qty {ri.quantity} · <span className="font-mono">{i.sku}</span>
                     </div>
                   </div>
-                  {seesMoney && <div className="font-mono text-[13px]">{money(i.unitPrice * ri.quantity, r.currency)}</div>}
+                  {seesMoney && <div className="font-mono text-[12.5px]">{money(i.unitPrice * ri.quantity, r.currency)}</div>}
                 </li>
               ))}
             </ul>
-            <div className="space-y-1 border-t border-line px-5 py-4 text-[13px]">
+            <div className="space-y-1 border-t border-line px-5 py-4 text-[12.5px]">
               <div className="flex justify-between">
                 <span className="text-ink-3">Reason</span>
                 <span>{RETURN_REASONS[r.reason as ReturnReason]}</span>
@@ -174,7 +185,7 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
           </section>
           <section className="panel">
             <header className="border-b border-line px-5 py-3.5">
-              <h2 className="text-[15px] font-medium">Timeline</h2>
+              <h2 className="text-[14px] font-medium">Timeline</h2>
             </header>
             <div className="p-5">
               <div className="mb-5">
@@ -185,17 +196,18 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
           </section>
         </div>
         <aside className="space-y-5">
+          <ReviewCard review={r.review ?? null} currency={r.currency} seesMoney={seesMoney} />
           {o && (
             <section className="panel p-5">
               <div className="eyebrow mb-3">Original order</div>
-              <Link href={`/orders/${o.id}`} className="flex items-center gap-2 font-mono text-[15px] hover:underline">
+              <Link href={`/orders/${o.id}`} className="flex items-center gap-2 font-mono text-[14px] hover:underline">
                 {o.number}
               </Link>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-2">
                 <StagePill stage={o.stage} />
                 <span>{can(me, 'customers', 1) ? o.customerName : maskName(o.customerName)}</span>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-[12px]">
+              <div className="mt-3 grid grid-cols-2 gap-2 text-[11.5px]">
                 <div className="rounded-lg bg-elev-2 px-2.5 py-2">
                   <div className="text-ink-4">Delivered</div>
                   <div className="font-mono">{o.deliveredAt ? when(o.deliveredAt) : '—'}</div>
@@ -205,7 +217,7 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
                   <div>{o.paymentMethod === 'cod' ? 'Cash' : o.paymentMethod.toUpperCase()}</div>
                 </div>
               </div>
-              {o.paymentMethod === 'cod' && r.resolution === 'refund' && <p className="mt-3 text-[12px] text-ink-3">Paid in cash: the refund goes out by wallet or bank transfer, not to a card.</p>}
+              {o.paymentMethod === 'cod' && r.resolution === 'refund' && <p className="mt-3 text-[11.5px] text-ink-3">Paid in cash: the refund goes out by wallet or bank transfer, not to a card.</p>}
             </section>
           )}
         </aside>

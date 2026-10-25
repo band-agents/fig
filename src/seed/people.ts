@@ -1,18 +1,35 @@
 // Fictional people and places for demo data. Nobody here is a real customer or employee.
 import type { Role } from '../lib/domain/perms';
 
-export const DEMO_STAFF: { email: string; name: string; title: string; role: Role; channels?: string[]; hue: number }[] = [
-  { email: 'admin@relay.local', name: 'FIG Admin', title: 'Owner', role: 'admin', hue: 2 },
-  { email: 'nour@relay.local', name: 'Nour Hassan', title: 'Head of Operations', role: 'ops', hue: 262 },
-  { email: 'salma@relay.local', name: 'Salma Adel', title: 'Customer care', role: 'care', channels: ['fig-web', 'fig-app', 'fig-woo', 'ws-eg'], hue: 286 },
-  { email: 'youssef@relay.local', name: 'Youssef Kamal', title: 'Customer care', role: 'care', channels: ['fig-web', 'fig-app', 'fig-woo', 'ws-eg'], hue: 300 },
+/** Shifts are minutes after local midnight; rest days 0 = Sunday … 5 = Friday, 6 = Saturday. */
+export type DemoPerson = { email: string; name: string; title: string; role: Role; channels?: string[]; hue: number; location?: string; shift?: [number, number]; rest?: number[]; skills?: string[] };
+
+const EG = ['fig-web', 'fig-app', 'fig-woo', 'ws-eg'];
+const KW = ['labesny-web', 'labesny-app', 'ws-kw'];
+const OFFICE = [5, 6];
+
+export const DEMO_STAFF: DemoPerson[] = [
+  { email: 'admin@relay.local', name: 'DH & DCO Admin', title: 'Owner', role: 'admin', hue: 2 },
+  { email: 'nour@relay.local', name: 'Nour Hassan', title: 'Head of Operations', role: 'ops', hue: 262, shift: [540, 1080], rest: OFFICE },
+  { email: 'hala@relay.local', name: 'Hala Barakat', title: 'Head of supply chain', role: 'supply', hue: 24, location: 'dh-kuwait', shift: [540, 1020], rest: OFFICE },
+  { email: 'dana@relay.local', name: 'Dana Al-Mutairi', title: 'Stock planner · Kuwait', role: 'planner', hue: 168, location: 'dh-kuwait', shift: [540, 1020], rest: OFFICE, skills: ['po_review'] },
+  { email: 'tarek@relay.local', name: 'Tarek Nabil', title: 'Buyer · Egypt', role: 'buyer', channels: EG, hue: 48, location: 'fig-cairo', shift: [540, 1020], rest: OFFICE, skills: ['supplier_followup', 'po_review'] },
+  { email: 'noura@relay.local', name: 'Noura Behbehani', title: 'Buyer · Kuwait', role: 'buyer', channels: KW, hue: 330, location: 'dh-kuwait', shift: [540, 1020], rest: OFFICE, skills: ['supplier_followup', 'po_review'] },
+  { email: 'maya@relay.local', name: 'Maya Haddad', title: 'E-commerce merchandiser', role: 'merchandiser', hue: 310, shift: [600, 1080], rest: OFFICE, skills: ['merch_setup'] },
+  { email: 'salma@relay.local', name: 'Salma Adel', title: 'Customer care', role: 'care', channels: EG, hue: 286 },
+  { email: 'youssef@relay.local', name: 'Youssef Kamal', title: 'Customer care', role: 'care', channels: EG, hue: 300 },
   { email: 'mariam@relay.local', name: 'Mariam Fawzy', title: 'Finance', role: 'finance', hue: 40 },
-  { email: 'omar@relay.local', name: 'Omar Saeed', title: 'Warehouse lead · Cairo', role: 'fulfilment', channels: ['fig-web', 'fig-app', 'fig-woo', 'ws-eg'], hue: 214 },
-  { email: 'karim@relay.local', name: 'Karim Lotfy', title: 'Picker · Cairo', role: 'fulfilment', channels: ['fig-web', 'fig-app', 'fig-woo', 'ws-eg'], hue: 200 },
+  { email: 'omar@relay.local', name: 'Omar Saeed', title: 'Warehouse lead · Cairo', role: 'fulfilment', channels: EG, hue: 214, location: 'fig-cairo', shift: [540, 1080], rest: [5], skills: ['receive', 'quality_check'] },
+  { email: 'karim@relay.local', name: 'Karim Lotfy', title: 'Picker · Cairo', role: 'fulfilment', channels: EG, hue: 200, location: 'fig-cairo', shift: [780, 1260], rest: [5], skills: ['transfer_pick', 'replenish'] },
+  { email: 'mahmoud@relay.local', name: 'Mahmoud Ragab', title: 'Warehouse · Cairo', role: 'warehouse', channels: EG, hue: 190, location: 'fig-cairo', shift: [600, 1140], rest: [5], skills: ['putaway', 'cycle_count'] },
+  { email: 'sherif@relay.local', name: 'Sherif Adel', title: 'Store operations · Cairo', role: 'warehouse', channels: EG, hue: 236, shift: [660, 1200], rest: [5], skills: ['transfer_receive', 'relabel', 'cycle_count'] },
   { email: 'hady@relay.local', name: 'Hady Mansour', title: 'Shipping', role: 'shipping', hue: 186 },
   { email: 'rana@relay.local', name: 'Rana Samir', title: 'Returns desk', role: 'returns', hue: 340 },
-  { email: 'fatma@relay.local', name: 'Fatma Al-Enezi', title: 'Warehouse · Kuwait', role: 'fulfilment', channels: ['labesny-web', 'labesny-app', 'ws-kw'], hue: 222 },
-  { email: 'abdullah@relay.local', name: 'Abdullah Al-Rashidi', title: 'Customer care · Kuwait', role: 'care', channels: ['labesny-web', 'labesny-app', 'ws-kw'], hue: 270 },
+  { email: 'fatma@relay.local', name: 'Fatma Al-Enezi', title: 'Warehouse lead · Kuwait', role: 'fulfilment', channels: KW, hue: 222, location: 'dh-kuwait', shift: [480, 960], rest: [5], skills: ['receive', 'quality_check'] },
+  { email: 'joel@relay.local', name: 'Joel Santos', title: 'Warehouse · Kuwait', role: 'warehouse', channels: KW, hue: 205, location: 'dh-kuwait', shift: [480, 960], rest: [5], skills: ['putaway', 'replenish'] },
+  { email: 'ramesh@relay.local', name: 'Ramesh Nair', title: 'Warehouse · Kuwait (evening)', role: 'warehouse', channels: KW, hue: 160, location: 'dh-kuwait', shift: [840, 1320], rest: [5], skills: ['transfer_pick', 'cycle_count'] },
+  { email: 'dalal@relay.local', name: 'Dalal Al-Kandari', title: 'Store operations · Kuwait', role: 'warehouse', channels: KW, hue: 280, shift: [600, 1140], rest: [5], skills: ['transfer_receive', 'relabel', 'cycle_count'] },
+  { email: 'abdullah@relay.local', name: 'Abdullah Al-Rashidi', title: 'Customer care · Kuwait', role: 'care', channels: KW, hue: 270 },
   { email: 'laila@relay.local', name: 'Laila Mostafa', title: 'Marketing', role: 'marketing', hue: 150 },
 ];
 

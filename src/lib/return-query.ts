@@ -1,4 +1,7 @@
 import 'server-only';
+import type { ReturnReview, ReviewContext } from './domain/return-review';
+import { policyFor } from './domain/returns-policy';
+import { CHANNEL } from './channels';
 import { sql, type SQL } from 'drizzle-orm';
 import { getDb } from './db';
 import { scope } from './queries';
@@ -45,11 +48,25 @@ export type ReturnRow = {
   inspection: string | null;
   tracking: string | null;
   items: { title: string; size: string | null; image: string | null; quantity: number; brand: string | null }[];
+  /** What the desk recorded when it approved or declined. */
+  review: ReturnReview | null;
+  refundMethod: string;
+  deliveredAt: Date | null;
+  photos: number;
 };
+
+/** What the review form needs to know about a return: its value, how it pays back, the window, the photos. */
+export function reviewContext(r: Pick<ReturnRow, 'amount' | 'currency' | 'resolution' | 'refundMethod' | 'deliveredAt' | 'requestedAt' | 'photos' | 'channelId'>): ReviewContext | null {
+  if (r.amount == null) return null;
+  const c = CHANNEL[r.channelId];
+  const window = policyFor(c?.brand ?? 'FIG', c?.country ?? 'EG').windowDays;
+  const daysLeft = r.deliveredAt ? Math.ceil(window - (r.requestedAt.getTime() - r.deliveredAt.getTime()) / 86_400_000) : null;
+  return { amount: r.amount, currency: r.currency, resolution: r.resolution, refundMethod: r.refundMethod, daysLeft, photos: r.photos };
+}
 
 export async function listReturns(p: Principal, f: { view?: string; q?: string; channel?: string; limit?: number; page?: number }) {
   const db = await getDb();
-  const parts: SQL[] = [scope(p, sql`r.channel_id`), VIEW_SQL[f.view ?? 'open'] ?? VIEW_SQL.open];
+  const parts: SQL[] = [scope(p, sql`r.channel_id`, sql`r.order_id`), VIEW_SQL[f.view ?? 'open'] ?? VIEW_SQL.open];
   if (f.channel) parts.push(sql`r.channel_id = ${f.channel}`);
   if (f.q?.trim()) {
     const like = `%${f.q.trim()}%`;
@@ -60,7 +77,8 @@ export async function listReturns(p: Principal, f: { view?: string; q?: string; 
   const page = Math.max(1, f.page ?? 1);
   const [rows, count] = await Promise.all([
     db.execute<Record<string, unknown>>(sql`
-      select r.*, o.number as order_number, o.customer_name, o.address, o.phone,
+      select r.*, o.number as order_number, o.customer_name, o.address, o.phone, o.delivered_at as order_delivered_at,
+        (select count(*) from return_photos ph where ph.return_id = r.id)::int as photo_count,
         coalesce((select json_agg(json_build_object('title', i.title, 'size', i.size, 'image', i.image, 'quantity', ri.quantity, 'brand', i.brand))
           from return_items ri join order_items i on i.id = ri.order_item_id where ri.return_id = r.id), '[]') as items
       from returns r join orders o on o.id = r.order_id
@@ -95,6 +113,10 @@ export async function listReturns(p: Principal, f: { view?: string; q?: string; 
         inspection: (r.inspection as string) ?? null,
         tracking: (r.tracking as string) ?? null,
         items: (typeof r.items === 'string' ? JSON.parse(r.items) : r.items) as ReturnRow['items'],
+        review: (typeof r.review === 'string' ? JSON.parse(r.review) : (r.review ?? null)) as ReturnReview | null,
+        refundMethod: (r.refund_method as string) ?? 'original',
+        deliveredAt: r.order_delivered_at ? new Date(r.order_delivered_at as string) : null,
+        photos: Number(r.photo_count ?? 0),
       }),
     ),
     total: count.rows[0].n,
@@ -113,6 +135,6 @@ export async function returnViewCounts(p: Principal) {
       count(*) filter (where r.stage in ('received','inspected'))::int as desk,
       count(*) filter (where r.stage = 'refund_pending')::int as refund,
       count(*) filter (where r.stage in ('refunded','closed','rejected'))::int as closed
-    from returns r where ${scope(p, sql`r.channel_id`)}`);
+    from returns r where ${scope(p, sql`r.channel_id`, sql`r.order_id`)}`);
   return r.rows[0];
 }

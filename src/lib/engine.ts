@@ -10,6 +10,7 @@ import { DEFAULT_SLA, dueFor, type SlaTargets } from './domain/sla';
 import {
   DEPTS,
   isAllowed,
+  mayTake,
   ORDER_FLOW,
   ORDER_STAGE,
   RETURN_FLOW,
@@ -18,6 +19,7 @@ import {
   type ReturnReason,
   type ReturnStage,
 } from './domain/stages';
+import { cleanReview, reviewProblem, reviewSummary, type ReturnReview } from './domain/return-review';
 import { eligibility, itemReturnable, policyFor } from './domain/returns-policy';
 import {
   refundOptions,
@@ -29,11 +31,14 @@ import {
 import { findBranch } from './domain/branches';
 import { forbidden, invalid, notFound } from './errors';
 import { publish } from './bus';
-import { queueWriteBack } from './writeback';
+import { changesToResend, queueStoreChanges, queueWriteBack } from './writeback';
+import { mirrorReturn } from './medusa-mirror';
+import { AUTOPILOT_NAME, RISK_NAME, SYSTEM_NAME } from './domain/actors';
+import { stockFollowsOrder, stockFollowsReturn } from './stock/hooks';
 
 export type Actor = { id: string | null; name: string; dept: string | null; principal?: Principal };
-export const AUTOPILOT: Actor = { id: null, name: 'Relay Autopilot', dept: null };
-export const SYSTEM: Actor = { id: null, name: 'Relay', dept: null };
+export const AUTOPILOT: Actor = { id: null, name: AUTOPILOT_NAME, dept: null };
+export const SYSTEM: Actor = { id: null, name: SYSTEM_NAME, dept: null };
 
 export const actorFor = (p: Principal): Actor => ({ id: p.id, name: p.name, dept: ROLES[p.role]?.label ?? null, principal: p });
 
@@ -268,7 +273,7 @@ export async function ingestOrder(inc: IncomingOrder, opts: Opts & { autopilot?:
     await record({
       orderId: order.id,
       at: inc.placedAt,
-      actorName: 'Relay Risk',
+      actorName: RISK_NAME,
       kind: 'risk',
       message: `${risk.level === 'high' ? 'High' : 'Medium'} delivery risk (${risk.score}): ${risk.reasons.slice(0, 3).map((r) => r.label.toLowerCase()).join(', ')}`,
       data: { score: risk.score, reasons: risk.reasons },
@@ -374,7 +379,14 @@ async function setStage(
     await refreshCustomer(o.customerId);
     invalidateRiskContext();
   }
+  // the stockroom follows: pieces come off the shelf when the parcel leaves, back on if it is refused
+  if (['packed', 'shipped', 'delivering', 'delivered', 'rto_closed'].includes(to)) await stockFollowsOrder(o.id, to, at, actor.name);
   if (!input.viaPlatform) queueWriteBack(o.id, to, input);
+  // Kuwait parcels: UPS (GMTC) is booked at the configured stage and cancelled with the order. Loaded
+  // lazily (it calls back into this module) and never awaited: a courier hiccup must not stop an order.
+  if (o.source !== 'demo' && (to === 'cancelled' || to === 'ready' || to === 'packed') && CHANNEL[o.channelId]?.country === 'KW') {
+    void import('./gmtc-shipments').then((m) => m.courierFollowsOrder(o.id, to)).catch(() => {});
+  }
 }
 
 /** A person moves an order. The transition must exist, and their access must cover its area. */
@@ -386,7 +398,7 @@ export async function moveOrder(actor: Actor, orderId: string, to: OrderStage, i
   if (!t) throw invalid(`An order that is ${ORDER_STAGE[o.stage as OrderStage]?.label.toLowerCase()} can't go to ${ORDER_STAGE[to].label.toLowerCase()}.`);
   if (actor.principal) {
     if (!seesChannel(actor.principal, o.channelId)) throw forbidden();
-    if (level(actor.principal, t.area) < (t.level ?? 2)) throw forbidden(`Moving to ${ORDER_STAGE[to].label} needs ${DEPTS[deptOfArea(t.area)]?.label ?? t.area} access.`);
+    if (!mayTake(actor.principal.scopes, t)) throw forbidden(`Moving to ${ORDER_STAGE[to].label} needs ${DEPTS[deptOfArea(t.area)]?.label ?? t.area} access.`);
   }
   if (o.onHold && to !== 'cancelled') throw invalid('This order is on hold. Release the hold first.');
   if (t.needs?.includes('reason') && !input.reason?.trim()) throw invalid('Give a reason.');
@@ -403,7 +415,6 @@ const deptOfArea = (a: string) =>
 export async function runAutopilot(orderId: string, opts: Opts = {}) {
   const db = await getDb();
   const rules = await autopilotRules();
-  if (!rules.enabled) return [];
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
   if (!o) return [];
   const h = await historyFor(o.customerId, o.id);
@@ -416,6 +427,18 @@ export async function runAutopilot(orderId: string, opts: Opts = {}) {
     [cur] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
   }
   return steps;
+}
+
+/**
+ * Sends on every order still waiting in a step the business retired (a confirmation call or a finance
+ * check), and any new order not yet picked up, so nothing sits in a queue nobody works any more.
+ * Orders on hold stay where they are until the hold is released. Runs with the store sync.
+ */
+export async function releaseRetired() {
+  const db = await getDb();
+  const rows = await db.execute<{ id: string }>(sql`select id from orders where stage in ('new','confirming','finance') and not on_hold order by placed_at limit 500`);
+  for (const r of rows.rows) await runAutopilot(r.id, { quiet: true });
+  return rows.rows.length;
 }
 
 export async function autopilotPreview(orderId: string) {
@@ -440,7 +463,43 @@ export async function setHold(actor: Actor, orderId: string, on: boolean, reason
     .where(eq(schema.orders.id, orderId));
   await record({ orderId, at, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'hold', message: on ? `On hold · ${reason}` : 'Hold released, clock restarted' });
   if (!opts.quiet) publish({ kind: 'order', id: o.id, number: o.number, channelId: o.channelId, actor: actor.name, message: on ? `${o.number} on hold` : `${o.number} released` });
+  if (!opts.quiet) queueStoreChanges(orderId, [on ? { kind: 'hold', reason: reason! } : { kind: 'release' }]);
   if (!on) await runAutopilot(orderId, { quiet: true });
+}
+
+/**
+ * A cancelled order that was paid online: cancelling never refunds on its own (Dan, 24 Oct), so
+ * Finance refunds it here, and the store sends the money back the way it was paid.
+ */
+export async function refundCancelled(actor: Actor, orderId: string) {
+  const db = await getDb();
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
+  if (!o) throw notFound('Order not found.');
+  if (actor.principal) {
+    if (!seesChannel(actor.principal, o.channelId)) throw forbidden();
+    if (!can(actor.principal, 'finance', 3)) throw forbidden('Refunding needs Finance manage access.');
+  }
+  if (o.stage !== 'cancelled') throw invalid('Only a cancelled order is refunded here; a return is refunded from the return.');
+  if (o.paymentMethod === 'cod' || !['paid', 'partially_refunded'].includes(o.paymentStatus)) throw invalid('Nothing was paid online on this order.');
+  const at = new Date();
+  await db.update(schema.orders).set({ paymentStatus: 'refunded', updatedAt: at }).where(eq(schema.orders.id, orderId));
+  await record({ orderId, at, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'payment', message: 'Refund of the cancelled order sent to the store' });
+  publish({ kind: 'order', id: o.id, number: o.number, channelId: o.channelId, actor: actor.name, message: `${o.number} refunded` });
+  queueStoreChanges(orderId, [{ kind: 'refund_order', notifyCustomer: true }]);
+}
+
+/** Sends again what the store refused last time on this order (the order page's Retry). */
+export async function retryStore(actor: Actor, orderId: string) {
+  const db = await getDb();
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
+  if (!o) throw notFound('Order not found.');
+  if (actor.principal && (!seesChannel(actor.principal, o.channelId) || !can(actor.principal, 'orders', 2))) throw forbidden();
+  const { failed, unsent } = changesToResend(o.writeBack);
+  if (!failed.length && !unsent.length) throw invalid('Nothing to send: Shopify already has every change on this order.');
+  // the stage's own changes again; a change already done is never sent twice (writeback.ts)
+  queueWriteBack(o.id, o.stage, { reason: o.cancelReason ?? undefined });
+  if (o.onHold) queueStoreChanges(o.id, [{ kind: 'hold', reason: o.holdReason ?? 'On hold' }]);
+  await record({ orderId, at: new Date(), actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'note', message: 'Store update sent again' });
 }
 
 export async function addNote(actor: Actor, target: { orderId?: string; returnId?: string }, message: string, kind: 'note' | 'call' = 'note', opts: Opts & { data?: Record<string, unknown> } = {}) {
@@ -583,6 +642,8 @@ export async function openReturn(
   await record({ orderId, returnId: ret.id, at: now, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'stage', toStage: 'requested', message: msg, data: input.note ? { note: input.note } : undefined });
   await refreshCustomer(o.customerId);
   if (!opts.quiet) publish({ kind: 'return', id: ret.id, number, channelId: o.channelId, stage: 'requested', actor: actor.name, message: msg });
+  /* A copy for the Labesny app's admin; sent after the return is saved, and never in the way of it. */
+  if (!opts.quiet) void mirrorReturn(ret.id);
   return ret;
 }
 
@@ -590,7 +651,7 @@ export async function moveReturn(
   actor: Actor,
   returnId: string,
   to: ReturnStage,
-  input: MoveInput & { inspection?: 'pass' | 'damaged' | 'wrong_item' | 'partial'; restock?: boolean } = {},
+  input: MoveInput & { inspection?: 'pass' | 'damaged' | 'wrong_item' | 'partial'; restock?: boolean; review?: ReturnReview } = {},
   opts: Opts = {},
 ) {
   const db = await getDb();
@@ -600,7 +661,16 @@ export async function moveReturn(
   if (!t) throw invalid(`A return that is ${RETURN_STAGE[r.stage as ReturnStage].label.toLowerCase()} can't go to ${RETURN_STAGE[to].label.toLowerCase()}.`);
   if (actor.principal) {
     if (!seesChannel(actor.principal, r.channelId)) throw forbidden();
-    if (level(actor.principal, t.area) < (t.level ?? 2)) throw forbidden();
+    if (!mayTake(actor.principal.scopes, t)) throw forbidden();
+  }
+  // a person approving or declining leaves a review for the refund team; a decline's reason comes from it
+  let review: ReturnReview | undefined;
+  if ((to === 'approved' || to === 'rejected') && actor.principal) {
+    const wanted = input.review ? { ...input.review, decision: to } : null;
+    const problem = reviewProblem(wanted, r);
+    if (problem) throw invalid(problem);
+    review = cleanReview(wanted!, r, { id: actor.id ?? "", name: actor.name }, opts.at ?? new Date());
+    if (to === 'rejected') input = { ...input, reason: review.reason };
   }
   if (t.needs?.includes('reason') && !input.reason?.trim()) throw invalid('Give a reason.');
   if (t.needs?.includes('tracking') && !input.tracking?.trim()) throw invalid('Add the pickup waybill.');
@@ -615,6 +685,7 @@ export async function moveReturn(
       stageAt: at,
       dueAt: dueFor('returns', to, at, targets),
       ...(input.tracking ? { tracking: input.tracking } : {}),
+      ...(review ? { review } : {}),
       ...(input.inspection ? { inspection: input.inspection, restocked: input.restock ?? input.inspection === 'pass' } : {}),
       ...(['refunded', 'closed', 'rejected'].includes(to) ? { closedAt: at } : {}),
     })
@@ -623,14 +694,27 @@ export async function moveReturn(
   const detail =
     to === 'inspected'
       ? ` · ${input.inspection === 'pass' ? 'passed, back to stock' : input.inspection === 'damaged' ? 'damaged, not restocked' : input.inspection === 'wrong_item' ? 'wrong item returned' : 'partly accepted'}`
-      : input.reason
+      : review
+        ? ` · ${reviewSummary(review)}`
+        : input.reason
         ? ` · ${input.reason}`
         : input.tracking
           ? ` · ${input.tracking}`
           : '';
-  await record({ orderId: r.orderId, returnId, at, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'stage', fromStage: r.stage, toStage: to, message: `${r.number} ${meta.label.toLowerCase()}${detail}`, data: input.note ? { note: input.note } : undefined });
+  await record({ orderId: r.orderId, returnId, at, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'stage', fromStage: r.stage, toStage: to, message: `${r.number} ${meta.label.toLowerCase()}${detail}`, data: review ? { review, ...(input.note ? { note: input.note } : {}) } : input.note ? { note: input.note } : undefined });
+  if (review) await record({ orderId: r.orderId, returnId, at, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'note', message: `For the refund team: ${review.note}` });
+  if (to === 'inspected' && (input.restock ?? input.inspection === 'pass')) await stockFollowsReturn(r.id, at, actor.name);
   if (to === 'refunded') {
     const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, r.orderId));
+    if (o && !opts.quiet) {
+      const pieces = await db
+        .select({ sku: schema.orderItems.sku, barcode: schema.orderItems.barcode, title: schema.orderItems.title, quantity: schema.returnItems.quantity })
+        .from(schema.returnItems)
+        .innerJoin(schema.orderItems, eq(schema.orderItems.id, schema.returnItems.orderItemId))
+        .where(eq(schema.returnItems.returnId, r.id));
+      const method = r.refundMethod === 'store_credit' || r.refundMethod === 'cash_at_store' ? r.refundMethod : 'original';
+      queueStoreChanges(o.id, [{ kind: 'refund', returnNumber: r.number, lines: pieces, amount: Number(r.amount), bonus: Number(r.bonus ?? 0), currency: r.currency, method, notifyCustomer: true }]);
+    }
     if (o) {
       const lines = await db.select({ q: schema.orderItems.quantity }).from(schema.orderItems).where(eq(schema.orderItems.orderId, o.id));
       const all = await db.select({ q: schema.returnItems.quantity }).from(schema.returnItems).innerJoin(schema.returns, eq(schema.returns.id, schema.returnItems.returnId)).where(and(eq(schema.returns.orderId, o.id), eq(schema.returns.stage, 'refunded')));
@@ -639,6 +723,7 @@ export async function moveReturn(
     }
   }
   if (!opts.quiet) publish({ kind: 'return', id: r.id, number: r.number, channelId: r.channelId, stage: to, actor: actor.name, message: `${r.number} → ${meta.label}` });
+  if (!opts.quiet) void mirrorReturn(r.id);
 }
 
 // ── Lookups used by several screens ─────────────────────────────────────────────────────────────
@@ -660,4 +745,25 @@ export async function recentEvents(limit = 30, channelIds?: string[]) {
     .limit(limit);
   if (channelIds?.length) return q.where(inArray(schema.orders.channelId, channelIds));
   return q;
+}
+
+/**
+ * Records the branch an order leaves from: a Lucida store code (or one of our locations) and its
+ * name. The people who handle the order may set it; clearing it puts it back to "not decided".
+ */
+export async function setShipFrom(actor: Actor, orderId: string, branch: { code: string; name: string } | null) {
+  const db = await getDb();
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
+  if (!o) throw notFound('Order not found.');
+  if (actor.principal) {
+    if (!seesChannel(actor.principal, o.channelId)) throw forbidden();
+    const p = actor.principal;
+    if (!(['fulfilment', 'orders', 'intake', 'shipping'] as const).some((a) => level(p, a) >= 2)) throw forbidden('Choosing the branch needs access to work on orders.');
+  }
+  const code = branch?.code.trim().slice(0, 60) || null;
+  const name = code ? branch!.name.trim().slice(0, 120) || code : null;
+  const at = new Date();
+  await db.update(schema.orders).set({ shipFrom: code, shipFromName: name, shipFromBy: code ? actor.name : null, shipFromAt: code ? at : null, updatedAt: at }).where(eq(schema.orders.id, orderId));
+  await record({ orderId, at, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'note', message: code ? `Ships from ${name}` : 'Branch cleared: not decided' });
+  publish({ kind: 'order', id: o.id, number: o.number, channelId: o.channelId, stage: o.stage, actor: actor.name, message: code ? `${o.number} ships from ${name}` : `${o.number}: branch cleared` });
 }

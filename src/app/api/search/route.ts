@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   const r = await db.execute<{ id: string; number: string; channel_id: string; stage: string; customer_name: string; placed_at: string; kind: string; rma: string | null; return_id: string | null }>(sql`
     select o.id, o.number, o.channel_id, o.stage, o.customer_name, o.placed_at, 'order' as kind, null as rma, null as return_id
     from orders o
-    where ${scope(user, sql`o.channel_id`)} and (
+    where ${scope(user, sql`o.channel_id`, sql`o.id`)} and (
       o.number ilike ${like} or o.tracking ilike ${like}
       ${pii ? sql`or o.customer_name ilike ${like} or o.email ilike ${like}` : sql``}
       ${pii && digits.length >= 6 ? sql`or o.phone like ${'%' + digits.slice(-9) + '%'}` : sql``}
@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     union all
     select o.id, o.number, o.channel_id, r.stage, o.customer_name, r.requested_at, 'return', r.number, r.id
     from returns r join orders o on o.id = r.order_id
-    where ${scope(user, sql`r.channel_id`)} and (r.number ilike ${like} or r.tracking ilike ${like})
+    where ${scope(user, sql`r.channel_id`, sql`r.order_id`)} and (r.number ilike ${like} or r.tracking ilike ${like})
     order by placed_at desc limit 10`);
   return Response.json({
     orders: r.rows.map((o) => ({

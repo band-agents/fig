@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { Loader2, ScanSearch } from 'lucide-react';
-import { RETURN_FLOW, type ReturnStage, type Transition } from '@/lib/domain/stages';
+import { mayTake, RETURN_FLOW, type ReturnStage, type Transition } from '@/lib/domain/stages';
 import type { Scopes } from '@/lib/domain/perms';
 import { Modal } from '@/components/ui/modal';
 import { ReasonModal, useMover } from '@/components/queues/shared';
+import { ReviewModal, type ReviewContext } from '@/components/returns/review-modal';
 
 const INSPECT = [
   { v: 'pass', label: 'Passed', sub: 'Unworn, tags on. Back to stock.' },
@@ -14,11 +15,13 @@ const INSPECT = [
   { v: 'wrong_item', label: 'Wrong item', sub: 'Not what we sent.' },
 ] as const;
 
-export function DeskActions({ id, number, stage, method, scopes, compact = false }: { id: string; number: string; stage: string; method: string; scopes: Scopes; compact?: boolean }) {
+export function DeskActions({ id, number, stage, method, scopes, review, compact = false }: { id: string; number: string; stage: string; method: string; scopes: Scopes; review?: ReviewContext | null; compact?: boolean }) {
   const m = useMover();
   const [need, setNeed] = useState<Transition<ReturnStage> | null>(null);
+  // approving or declining a request asks for the review the refund team reads
+  const [deciding, setDeciding] = useState<'approved' | 'rejected' | null>(null);
   const [inspect, setInspect] = useState(false);
-  const flows = (RETURN_FLOW[stage as ReturnStage] ?? []).filter((t) => (scopes[t.area] ?? 0) >= (t.level ?? 2)).filter((t) => !(t.to === 'pickup' && method === 'store'));
+  const flows = (RETURN_FLOW[stage as ReturnStage] ?? []).filter((t) => mayTake(scopes, t)).filter((t) => !(t.to === 'pickup' && method === 'store'));
   if (!flows.length) return null;
   const shown = compact ? flows.slice(0, 1) : flows;
   return (
@@ -27,7 +30,7 @@ export function DeskActions({ id, number, stage, method, scopes, compact = false
         <button
           key={t.to}
           disabled={m.pending}
-          onClick={() => (t.to === 'inspected' ? setInspect(true) : t.needs?.length ? setNeed(t) : m.ret(id, t.to))}
+          onClick={() => (t.to === 'approved' || t.to === 'rejected' ? setDeciding(t.to) : t.to === 'inspected' ? setInspect(true) : t.needs?.length ? setNeed(t) : m.ret(id, t.to))}
           className={`btn ${compact ? 'btn-sm' : ''} ${t.tone === 'primary' ? 'btn-primary' : t.tone === 'danger' ? 'btn-danger' : 'btn-quiet'}`}
         >
           {m.busy === `${id}:${t.to}` && <Loader2 className="size-3.5 animate-spin" />}
@@ -44,6 +47,16 @@ export function DeskActions({ id, number, stage, method, scopes, compact = false
           danger={need.tone === 'danger'}
           onClose={() => setNeed(null)}
           onSubmit={(reason, tracking) => m.ret(id, need.to, { reason, tracking, note: need.needs?.includes('note') ? reason : undefined }, () => setNeed(null))}
+        />
+      )}
+      {deciding && (
+        <ReviewModal
+          number={number}
+          decision={deciding}
+          ctx={review ?? null}
+          pending={m.pending}
+          onClose={() => setDeciding(null)}
+          onSubmit={(rv) => m.ret(id, deciding, { review: rv }, () => setDeciding(null))}
         />
       )}
       {inspect && <InspectModal number={number} onClose={() => setInspect(false)} onSubmit={(inspection, restock, note) => m.ret(id, 'inspected', { inspection, restock, note: note || undefined }, () => setInspect(false))} pending={m.pending} />}
@@ -67,12 +80,12 @@ function InspectModal({ number, onClose, onSubmit, pending }: { number: string; 
             }}
             className={`rounded-xl border p-3 text-left transition ${v === o.v ? 'border-ink bg-elev-3' : 'border-line-2 hover:border-line-3'}`}
           >
-            <div className="text-[13.5px] font-medium">{o.label}</div>
-            <div className="mt-0.5 text-[12px] text-ink-3">{o.sub}</div>
+            <div className="text-[12.5px] font-medium">{o.label}</div>
+            <div className="mt-0.5 text-[11.5px] text-ink-3">{o.sub}</div>
           </button>
         ))}
       </div>
-      <label className="mt-4 flex items-center gap-2 text-[13px]">
+      <label className="mt-4 flex items-center gap-2 text-[12.5px]">
         <input type="checkbox" checked={restock} onChange={(e) => setRestock(e.target.checked)} className="accent-[var(--ink)]" /> Put back into sellable stock
       </label>
       <textarea value={note} onChange={(e) => setNote(e.target.value)} className="field mt-3" rows={2} placeholder="Notes for finance (optional)" />

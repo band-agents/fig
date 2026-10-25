@@ -101,15 +101,16 @@ export function sameBrand(a: string, b: string): boolean {
 /**
  * The shops that can take this particular return.
  *
- * A customer sending back an Etam dress is shown the Etam counters, not all twenty-seven. When
- * nothing matches — a brand with no shop of its own in that market — they are shown everything
- * rather than nothing, and the desk settles it on approval.
+ * A customer sending back an Etam dress is shown the Etam counters, and only those: a shop that does
+ * not sell the brand cannot take it back. When nothing matches — bebe and Springfield sell on
+ * Labesny but have no Kuwait counter of their own — the list is empty, the portal says the desk will
+ * tell them where to bring it, and the desk settles it on approval.
  */
 export function branchesForReturn(brand: string, country: string, itemBrands: string[]): Branch[] {
   const all = branchesFor(brand, country);
   if (!itemBrands.length) return all;
   const matching = all.filter((b) => !b.brands?.length || b.brands.some((x) => itemBrands.some((i) => sameBrand(x, i))));
-  return matching.length ? matching : all;
+  return matching;
 }
 
 /** The chosen branch, or null when it is not one this customer may pick. */

@@ -24,8 +24,8 @@ export function Modal({ title, sub, onClose, children, wide = false }: { title: 
     >
       <div className="flex items-start gap-3 border-b border-line px-5 py-4">
         <div className="min-w-0">
-          <h3 className="font-display text-[24px] leading-tight">{title}</h3>
-          {sub && <p className="mt-0.5 text-[13px] text-ink-3">{sub}</p>}
+          <h3 className="font-display text-[16px] leading-tight">{title}</h3>
+          {sub && <p className="mt-0.5 text-[12.5px] text-ink-3">{sub}</p>}
         </div>
         <button onClick={() => ref.current?.close()} className="btn btn-ghost btn-sm ml-auto !px-2" aria-label="Close">
           <X className="size-4" />
