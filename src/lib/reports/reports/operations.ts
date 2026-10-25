@@ -10,6 +10,7 @@ const hrs = (v: number | null) => (v == null ? '—' : v >= 48 ? `${(v / 24).toF
 
 const speed: Report = {
   id: 'fulfilment-speed',
+  floor: true,
   group: 'operations',
   title: 'Fulfilment speed',
   blurb: 'How long orders take: placed to packed, to shipped, to delivered; the typical order and the slow tenth, by store and over time.',
@@ -68,6 +69,7 @@ const speed: Report = {
 
 const couriers: Report = {
   id: 'couriers',
+  floor: true,
   group: 'operations',
   title: 'Courier performance',
   blurb: 'Each courier: parcels shipped, delivered, refused, delivery rate, days in transit, attempts and cash on delivery share.',
@@ -120,6 +122,7 @@ const couriers: Report = {
 
 const deadlines: Report = {
   id: 'deadlines',
+  floor: true,
   group: 'operations',
   title: 'Deadlines and late orders',
   blurb: 'Open orders by stage now: how many, how many late, the oldest; and how many orders in the period shipped within 24 and 48 hours.',
@@ -168,6 +171,7 @@ const deadlines: Report = {
 
 const shipFrom: Report = {
   id: 'ship-from',
+  floor: true,
   group: 'operations',
   title: 'Orders by branch they left from',
   blurb: 'Which warehouse or mall each order was sent from, as the team recorded it on the order page.',

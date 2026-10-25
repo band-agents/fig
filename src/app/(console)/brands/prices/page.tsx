@@ -23,7 +23,7 @@ export default async function PricesPage(props: PageProps<'/brands/prices'>) {
   const d = await brandsOverview(me, weeks);
   const c = d.currency;
   const m = (v: number | null) => moneyIn(v, c, { compact: true });
-  const o = { money: d.money, currency: c, weeks };
+  const o = { money: d.money, currency: c, weeks, website: d.website };
   const book = [...(d.money ? [tierSheet(d.tiers, { currency: c, weeks })] : []), ...d.bands.map((b) => bandSheet(b.rows, { ...o, name: `Price bands ${b.market}` })), brandSheet(d.rows, o)];
   const series = (k: 'units' | 'value') => d.trend.series.map((s) => ({ name: TIER_LABEL[s.tier], color: TIER_COLOR[s.tier], values: s[k] }));
   const leader = (k: 'shareValue' | 'shareUnits') => [...d.tiers].sort((a, b) => b[k] - a[k])[0];

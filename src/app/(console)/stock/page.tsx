@@ -35,6 +35,14 @@ export default async function StockBriefPage() {
     { label: 'Arriving in 30 days', value: num(b.kpi.inboundUnits), note: `${b.kpi.inboundPos} purchase orders${b.kpi.inboundValue != null ? ` · ${egp(b.kpi.inboundValue)} at cost` : ''}` },
   ].filter((k) => !k.hide);
   const pulse = (area: string) => b.pulse.find((p) => p.area === area);
+  // each team's work today, for the people who can open that team's page; a brand manager reads the stock, not the teams' work
+  const teams = (
+    [
+      { area: 'warehouse', label: 'Warehouse & shops', href: '/stock/warehouse', page: 'warehouse' },
+      { area: 'procurement', label: 'Buying', href: '/stock/purchasing', page: 'purchasing' },
+      { area: 'merch', label: 'Websites', href: '/stock/merch', page: 'merch' },
+    ] as const
+  ).filter((t) => canSee(me, t.page) && me.role !== 'brand');
   const moverSheet = (name: string, rows: typeof b.fast): Sheet => ({
     name,
     columns: [
@@ -204,42 +212,42 @@ export default async function StockBriefPage() {
 
       </section>
 
-      <section>
-        <div className="panel p-5">
-          <div className="mb-4 flex items-end justify-between">
-            <div>
-              <h2 className="text-[14px] font-semibold">The teams today</h2>
-            </div>
-            <Link href="/stock/team" className="text-[12px] text-ink-2 hover:text-ink">
-              Team pulse →
-            </Link>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              { area: 'warehouse', label: 'Warehouse & shops', href: '/stock/warehouse' },
-              { area: 'procurement', label: 'Buying', href: '/stock/purchasing' },
-              { area: 'merch', label: 'Websites', href: '/stock/merch' },
-            ].map((t) => {
-              const x = pulse(t.area);
-              const total = (x?.open ?? 0) + (x?.done_today ?? 0);
-              return (
-                <Link key={t.area} href={t.href} className="rounded-xl border border-line bg-elev-2/50 p-3.5 transition hover:border-line-2">
-                  <Ring value={total ? (x?.done_today ?? 0) / total : null} size={48} stroke={5} />
-                  <div className="mt-2.5 text-[12.5px] font-medium">{t.label}</div>
-                  <div className="mt-0.5 text-[11.5px] text-ink-3">
-                    {x?.done_today ?? 0} done today · {x?.open ?? 0} waiting
-                  </div>
-                  <div className="mt-1 flex gap-2 text-[11px]">
-                    {x?.doing ? <span className="text-ink-2">{x.doing} in hand</span> : null}
-                    {x?.late ? <span className="text-critical">{x.late} late</span> : null}
-                    {x?.blocked ? <span className="text-[var(--warn)]">{x.blocked} blocked</span> : null}
-                  </div>
+      {teams.length > 0 && (
+        <section>
+          <div className="panel p-5">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <h2 className="text-[14px] font-semibold">The teams today</h2>
+              </div>
+              {canSee(me, 'teamPulse') && (
+                <Link href="/stock/team" className="text-[12px] text-ink-2 hover:text-ink">
+                  Team pulse →
                 </Link>
-              );
-            })}
+              )}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {teams.map((t) => {
+                const x = pulse(t.area);
+                const total = (x?.open ?? 0) + (x?.done_today ?? 0);
+                return (
+                  <Link key={t.area} href={t.href} className="rounded-xl border border-line bg-elev-2/50 p-3.5 transition hover:border-line-2">
+                    <Ring value={total ? (x?.done_today ?? 0) / total : null} size={48} stroke={5} />
+                    <div className="mt-2.5 text-[12.5px] font-medium">{t.label}</div>
+                    <div className="mt-0.5 text-[11.5px] text-ink-3">
+                      {x?.done_today ?? 0} done today · {x?.open ?? 0} waiting
+                    </div>
+                    <div className="mt-1 flex gap-2 text-[11px]">
+                      {x?.doing ? <span className="text-ink-2">{x.doing} in hand</span> : null}
+                      {x?.late ? <span className="text-critical">{x.late} late</span> : null}
+                      {x?.blocked ? <span className="text-[var(--warn)]">{x.blocked} blocked</span> : null}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }

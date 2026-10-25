@@ -1,7 +1,7 @@
 import 'server-only';
 import { sql } from 'drizzle-orm';
 import { getDb } from '../db';
-import { can, canSee, seesCost, type Page, type Principal } from '../domain/perms';
+import { can, canSee, seesCost, worksOrders, type Page, type Principal } from '../domain/perms';
 import { channelLabel } from '../channels';
 import { TO_EGP } from '../format';
 import { major, moneyDecimals, type Sheet } from '../sheet';
@@ -34,6 +34,7 @@ export const PAGE_REPORTS: { group: Report['group']; title: string; blurb: strin
 export function mayOpen(p: Principal, r: Report) {
   if (!canSee(p, 'analytics')) return false;
   if (r.wholeOrders && p.brands?.length) return false;
+  if (r.floor && !worksOrders(p)) return false;
   for (const need of r.needs ?? []) {
     if (need === 'money' && !can(p, 'money', 1)) return false;
     if (need === 'payments' && !can(p, 'money', 2)) return false;

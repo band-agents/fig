@@ -130,7 +130,7 @@ describe('brand managers and the retired steps', () => {
   it('keeps the brand manager read-only and off the staff pages', () => {
     expect(READ_ONLY_ROLES).toContain('brand');
     expect(canSee({ role: 'brand', scopes: scopesFor('brand') }, 'team')).toBe(false);
-    expect(canSee({ role: 'brand', scopes: scopesFor('brand') }, 'production')).toBe(true);
+    expect(canSee({ role: 'brand', scopes: scopesFor('brand') }, 'production')).toBe(false); // Dan, 25 Oct: stock and buying, not production
   });
   it('sends new orders straight to Pick & pack, and lets care or the warehouse cancel a waiting one', () => {
     expect(ORDER_TRACK.some((s) => RETIRED_STAGES.includes(s))).toBe(false);

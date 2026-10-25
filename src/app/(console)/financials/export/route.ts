@@ -1,9 +1,9 @@
 import { type NextRequest } from 'next/server';
 import { currentUser } from '@/lib/auth/session';
-import { canSee } from '@/lib/domain/perms';
+import { canSee, worksOrders } from '@/lib/domain/perms';
 import { financials, PERIODS } from '@/lib/financials';
 import { inView } from '@/lib/brands-sheets';
-import { moneyDecimals, type Col } from '@/lib/sheet';
+import { moneyDecimals, type Col, type Sheet } from '@/lib/sheet';
 import { sheetResponse } from '@/lib/sheet-response';
 
 /**
@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
   const m = (key: string, label: string): Col => ({ key, label: `${label} (${c})`, kind: 'num', decimals: moneyDecimals(c) });
   const period = PERIODS.find((p) => p.key === d.period)?.label ?? d.period;
   const k = d.kpi;
+  // the order floor's cash (couriers, refunds owed) only for the people who work the orders, as on the page
+  const floor = worksOrders(me);
   const summary = [
     ['Period', period],
     ['Markets', d.markets.join(' + ')],
@@ -34,11 +36,9 @@ export async function GET(req: NextRequest) {
     ['Discounts given', out(k.discounts)],
     ['Shipping charged', out(k.shipping)],
     ['Refunds paid', out(k.refunded)],
-    ['Refused cash orders', out(k.refused)],
+    ...(floor ? [['Refused cash orders', out(k.refused)]] : []),
     ['Paid online', out(k.paidOnline)],
-    ['With the courier (today)', out(d.cash.withCourier)],
-    ['Still to collect (today)', out(d.cash.toCollect)],
-    ['Refunds owed (today)', out(d.cash.refundsOwed)],
+    ...(floor ? [['With the courier (today)', out(d.cash.withCourier)], ['Still to collect (today)', out(d.cash.toCollect)], ['Refunds owed (today)', out(d.cash.refundsOwed)]] : []),
     ['Owed to suppliers (today)', out(d.cash.supplierOpen)],
     ['Stock at cost (today)', out(d.cash.stockCost)],
     ['Stock at retail (today)', out(d.cash.stockRetail)],
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
         rows: d.months.map((x) => ({ label: x.label, thisYear: out(x.thisYear), lastYear: out(x.lastYear), unitsThisYear: x.unitsThisYear, unitsLastYear: x.unitsLastYear })),
       },
       { name: 'Suppliers owed', columns: [{ key: 'supplier', label: 'Supplier' }, { key: 'terms', label: 'Terms' }, { key: 'orders', label: 'Open orders', kind: 'int' }, m('due30', 'Next 30 days'), m('total', 'Open')], rows: d.payables.map((x) => ({ supplier: x.supplier, terms: x.terms ?? '', orders: x.orders, due30: out(x.due30), total: out(x.total) })) },
-      { name: 'Courier cash', columns: [{ key: 'courier', label: 'Courier' }, { key: 'reference', label: 'Remittance' }, { key: 'status', label: 'Status' }, { key: 'orders', label: 'Orders', kind: 'int' }, m('expected', 'Expected'), m('gap', 'Short by')], rows: d.settlements.map((x) => ({ courier: x.courier, reference: x.reference, status: x.status, orders: x.orders, expected: out(x.expected), gap: out(x.gap) })) },
+      ...(floor ? ([{ name: 'Courier cash', columns: [{ key: 'courier', label: 'Courier' }, { key: 'reference', label: 'Remittance' }, { key: 'status', label: 'Status' }, { key: 'orders', label: 'Orders', kind: 'int' }, m('expected', 'Expected'), m('gap', 'Short by')], rows: d.settlements.map((x) => ({ courier: x.courier, reference: x.reference, status: x.status, orders: x.orders, expected: out(x.expected), gap: out(x.gap) })) }] satisfies Sheet[]) : []),
     ],
     `finance-${d.period}-${d.markets.join('-').toLowerCase()}`,
     sp.get('format'),

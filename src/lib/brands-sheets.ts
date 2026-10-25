@@ -10,7 +10,7 @@ const m = (key: string, label: string, currency: string): Col => ({ key, label: 
 const i = (key: string, label: string): Col => ({ key, label, kind: 'int' });
 const p = (key: string, label: string): Col => ({ key, label, kind: 'pct' });
 
-export function brandSheet(rows: BrandRow[], o: { money: boolean; currency: string; weeks: number }): Sheet {
+export function brandSheet(rows: BrandRow[], o: { money: boolean; currency: string; weeks: number; website?: boolean }): Sheet {
   const c = o.currency;
   const columns: Col[] = [
     { key: 'brand', label: 'Brand' },
@@ -33,10 +33,7 @@ export function brandSheet(rows: BrandRow[], o: { money: boolean; currency: stri
     i('newIn', 'New in'),
     p('markdownShare', 'Sold on markdown'),
     p('returnRate', 'Returned'),
-    i('webLive', 'Website: live styles'),
-    i('webSoldOut', 'Website: live but sold out'),
-    i('webStock', 'Website: stock but not live'),
-    i('webNoPhoto', 'Website: live without a photo'),
+    ...(o.website === false ? [] : [i('webLive', 'Website: live styles'), i('webSoldOut', 'Website: live but sold out'), i('webStock', 'Website: stock but not live'), i('webNoPhoto', 'Website: live without a photo')]),
   ];
   return {
     name: 'Brands',

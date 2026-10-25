@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Megaphone } from 'lucide-react';
 import { requireUser } from '@/lib/auth/session';
-import { can, level } from '@/lib/domain/perms';
+import { can, canSee, level } from '@/lib/domain/perms';
 import { productDetail } from '@/lib/stock/views/product';
 import { CHANNELS, channelLabel } from '@/lib/channels';
 import { num, pct, when } from '@/lib/format';
@@ -203,7 +203,7 @@ export default async function ProductPage(props: PageProps<'/stock/inventory/[id
             ))}
             {!d.pos.length && !d.transfers.length && <li className="px-5 py-6 text-[12.5px] text-ink-3">Nothing ordered or moving.</li>}
           </ul>
-          {d.placements.length > 0 && (
+          {d.placements.length > 0 && canSee(me, 'merch') && (
             <div className="border-t border-line px-5 py-3">
               {d.placements.map((x) => (
                 <Link key={x.id} href="/stock/merch" className="flex items-center gap-2 py-1 text-[12px] text-ink-2 hover:text-ink">

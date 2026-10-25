@@ -17,15 +17,17 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
 const BATCH = 500;
 
+/** The target from .env.migrate: MIGRATE_DATABASE_URL, or Neon's snippet pasted as it is (the direct, unpooled address first). */
 function targetUrl() {
   const file = path.join(process.cwd(), '.env.migrate');
+  const found = new Map<string, string>();
   if (fs.existsSync(file)) {
     for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-      const m = line.match(/^MIGRATE_DATABASE_URL=(.+)$/);
-      if (m) return m[1].trim().replace(/^['"]|['"]$/g, '');
+      const m = line.match(/^\s*([A-Z_]+)\s*=\s*(.+)$/);
+      if (m) found.set(m[1], m[2].trim().replace(/^['"]|['"]$/g, ''));
     }
   }
-  return process.env.MIGRATE_DATABASE_URL?.trim();
+  return found.get('MIGRATE_DATABASE_URL') || found.get('DATABASE_URL_UNPOOLED') || found.get('DATABASE_URL') || process.env.MIGRATE_DATABASE_URL?.trim();
 }
 
 (async () => {

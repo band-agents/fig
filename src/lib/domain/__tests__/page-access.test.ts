@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canSee, landingFor, overridesFor, PAGES, ROLES, scopesFor, type Page, type Role } from '../perms';
+import { can, canSee, landingFor, overridesFor, PAGES, ROLES, scopesFor, worksOrders, type Page, type Role } from '../perms';
 
 /* Who is offered which page. The menu, phone tabs, palette and every page guard read canSee, so
    these are the screens each job actually gets. Need-to-know: a queue's people get their queue and
@@ -20,9 +20,19 @@ describe('pages each job sees', () => {
     expect(sees('viewer')).toEqual((Object.keys(PAGES) as Page[]).filter((p) => p !== 'teamPulse'));
   });
 
-  it('gives a brand manager everything to look at, but not the staff or store-connection pages', () => {
-    expect(sees('brand')).toEqual((Object.keys(PAGES) as Page[]).filter((p) => !['teamPulse', 'team', 'channels'].includes(p)));
+  // Dan, 25 Oct: brand managers read sales (the shops first), stock and buying, and the websites' numbers,
+  // never the websites' order handling
+  it('gives a brand manager their brands, the reports, stock and buying, and nothing from the order floor', () => {
+    expect(sees('brand')).toEqual(['brands', 'analytics', 'stockBrief', 'inventory', 'planning', 'purchasing', 'insights', 'financials']);
     expect(landingFor(job('brand'))).toBe('/brands');
+    for (const area of ['overview', 'orders', 'intake', 'finance', 'fulfilment', 'shipping', 'returns', 'customers'] as const) expect(can(job('brand'), area, 1), area).toBe(false);
+    expect(worksOrders(job('brand'))).toBe(false);
+    expect(can(job('brand'), 'money', 2)).toBe(true); // margin and cost stay
+  });
+
+  it('shows the process side of a page only to the people who work the orders', () => {
+    for (const role of ['admin', 'ops', 'supply', 'viewer', 'care', 'finance', 'fulfilment', 'shipping', 'returns', 'warehouse'] as Role[]) expect(worksOrders(job(role)), role).toBe(true);
+    for (const role of ['brand', 'buyer', 'planner', 'merchandiser', 'marketing'] as Role[]) expect(worksOrders(job(role)), role).toBe(false);
   });
 
   it('lands each job on its own work', () => {
@@ -35,8 +45,6 @@ describe('pages each job sees', () => {
   it('keeps the whole floor for the people who run it', () => {
     for (const role of ['admin', 'ops', 'supply', 'viewer'] as Role[]) expect(canSee(job(role), 'home'), role).toBe(true);
     for (const role of ['care', 'finance', 'fulfilment', 'shipping', 'returns', 'warehouse', 'buyer', 'planner', 'marketing', 'merchandiser', 'brand'] as Role[]) {
-      if (role === 'brand') continue; // a brand manager reads the whole floor for their brands
-
       expect(canSee(job(role), 'home'), role).toBe(false);
       expect(canSee(job(role), 'pipeline'), role).toBe(false);
     }
