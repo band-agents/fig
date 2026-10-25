@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // the staging copy, the build made beside the live one, and the previous build kept for rollback
+    ".next-*/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

@@ -1,0 +1,510 @@
+/* The client advisor wears the boutique, not the console.
+   The same paper, ink and hairlines as the returns portal and the Labesny Couture theme, in the
+   register of a maison's client service: a lot of white, one serif for the voice of the house,
+   small spaced capitals for labels, and nothing that blinks. Scoped to `.cg`. */
+
+.cg {
+  --paper: #ffffff;
+  --ink: #0f0f10;
+  --ink-2: #2a3743;
+  --stone: #f7f3ee;
+  --line: #ebe5dd;
+  --line-2: #d8cfc3;
+  --grey: #6b665f;
+  --mute: #a8a29a;
+  --accent: #a33c41;
+  --ok: #3f8a5f;
+
+  color-scheme: light;
+  height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 14.5px/1.6 var(--sf-sans), var(--sf-arabic), 'Futura', 'Avenir Next', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.cg [lang='ar'],
+.cg[lang='ar'],
+.cg-panel[dir='rtl'] {
+  font-family: var(--sf-arabic), var(--sf-sans), system-ui, sans-serif;
+}
+.cg button,
+.cg textarea {
+  font: inherit;
+  color: inherit;
+}
+.cg :focus-visible {
+  outline: 1.5px solid var(--ink);
+  outline-offset: 2px;
+}
+/* Inside a shop's frame, the console's dark body and atmosphere must not show through. */
+html:has(.cg) body {
+  background: #ffffff;
+}
+html:has(.cg) .atmosphere {
+  display: none;
+}
+
+.cg-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+}
+.cg:not([data-embedded]) .cg-panel {
+  border-inline: 1px solid var(--line);
+}
+
+/* ── header ───────────────────────────────────────── */
+.cg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 10px;
+}
+.cg-id {
+  display: grid;
+  gap: 6px;
+}
+.cg-mark {
+  font-family: var(--sf-display), 'Didot', Georgia, serif;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+.cg-role {
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+.cg-panel[dir='rtl'] .cg-role {
+  letter-spacing: 0;
+  font-size: 12px;
+}
+.cg-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cg .cg-lang {
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--grey);
+}
+.cg .cg-lang:hover {
+  color: var(--ink);
+}
+.cg .cg-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+  color: var(--grey);
+}
+.cg .cg-icon:hover {
+  background: var(--stone);
+  color: var(--ink);
+}
+.cg-presence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0 20px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--grey);
+}
+.cg-presence i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--mute);
+}
+.cg-presence[data-open] i {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 18%, transparent);
+}
+
+/* ── the conversation ─────────────────────────────── */
+.cg-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  scrollbar-width: thin;
+}
+
+.cg-welcome {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
+}
+.cg-greet {
+  margin: 0;
+  font-family: var(--sf-display), 'Didot', Georgia, serif;
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+}
+.cg-panel[dir='rtl'] .cg-greet {
+  font-family: var(--sf-arabic), serif;
+  font-weight: 300;
+  font-size: 30px;
+}
+.cg-welcome > p {
+  margin: 0;
+  color: var(--ink-2);
+  max-width: 34ch;
+}
+
+.cg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 6px;
+}
+.cg .cg-chip {
+  padding: 8px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--paper);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.3;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.cg .cg-chip:hover {
+  border-color: var(--ink);
+}
+.cg .cg-chip:active {
+  background: var(--stone);
+}
+
+.cg-you {
+  align-self: flex-end;
+  max-width: 82%;
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--ink);
+  color: #fff;
+  border-radius: 14px 14px 3px 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cg-panel[dir='rtl'] .cg-you {
+  border-radius: 14px 14px 14px 3px;
+}
+.cg-them {
+  display: grid;
+  gap: 10px;
+  max-width: 100%;
+}
+.cg-says {
+  margin: 0;
+  max-width: 92%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cg-says strong {
+  font-weight: 500;
+}
+.cg-says a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 3px;
+}
+.cg-says a:hover {
+  text-decoration-color: var(--ink);
+}
+
+.cg-wait {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--grey);
+}
+.cg-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.cg-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--mute);
+  animation: cg-breathe 1.2s ease-in-out infinite;
+}
+.cg-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.cg-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes cg-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cg-dots i {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* ── product cards ────────────────────────────────── */
+.cg-caption {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+.cg-panel[dir='rtl'] .cg-caption {
+  letter-spacing: 0;
+  font-size: 12px;
+}
+.cg-products {
+  display: grid;
+  gap: 10px;
+  margin-inline: -20px;
+}
+.cg-products .cg-caption {
+  padding-inline: 20px;
+}
+.cg-rail {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 2px 20px 6px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.cg-rail::-webkit-scrollbar {
+  display: none;
+}
+.cg-rail li {
+  flex: none;
+  width: 156px;
+  scroll-snap-align: start;
+}
+.cg-card {
+  display: grid;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+.cg-card-img {
+  display: block;
+  aspect-ratio: 2 / 3;
+  background: var(--stone);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.cg-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  display: block;
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.cg-card:hover .cg-card-img img {
+  transform: scale(1.03);
+}
+.cg-card-brand {
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+.cg-card-title {
+  font-size: 13px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cg-card-price {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.cg-card-price b {
+  font-weight: 500;
+}
+.cg-card-price b[data-sale] {
+  color: var(--accent);
+}
+.cg-card-price s {
+  font-size: 11.5px;
+  color: var(--mute);
+}
+.cg-card-sizes {
+  font-size: 11px;
+  color: var(--grey);
+}
+.cg-card-view {
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--line-2);
+}
+.cg-card:hover .cg-card-view {
+  text-decoration-color: var(--ink);
+}
+.cg-money {
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── hand-off to the team ─────────────────────────── */
+.cg-handoff {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--stone);
+}
+.cg-wa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 46px;
+  background: var(--ink);
+  color: #fff;
+  text-decoration: none;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transition: background 0.15s;
+}
+.cg-panel[dir='rtl'] .cg-wa {
+  letter-spacing: 0;
+  font-size: 14px;
+}
+.cg-wa:hover {
+  background: #2b2b2e;
+}
+.cg-away {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.cg-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 12.5px;
+}
+.cg-contact a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.cg-contact a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cg-hours {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--grey);
+}
+
+/* ── composer ─────────────────────────────────────── */
+.cg-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 16px;
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 24px;
+  transition: border-color 0.15s;
+}
+.cg-panel[dir='rtl'] .cg-compose {
+  padding: 8px 16px 8px 8px;
+}
+.cg-compose:focus-within {
+  border-color: var(--ink);
+}
+.cg-compose textarea {
+  flex: 1;
+  min-height: 24px;
+  max-height: 120px;
+  padding: 5px 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: none;
+  field-sizing: content;
+}
+.cg-compose textarea::placeholder {
+  color: var(--mute);
+}
+.cg .cg-send {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.cg .cg-send:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+.cg-note {
+  margin: 0;
+  padding: 8px 20px 14px;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--mute);
+}

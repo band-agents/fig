@@ -8,7 +8,7 @@ import type { AutopilotRules } from '@/lib/domain/autopilot';
 import { resetDemoAction, saveRulesAction } from '@/app/actions';
 import { toast } from '@/components/ui/toast';
 
-const ORDER_KEYS: OrderStage[] = ['new', 'confirming', 'finance', 'ready', 'picking', 'packed', 'shipped', 'delivering', 'delivered', 'rto'];
+const ORDER_KEYS: OrderStage[] = ['new', 'ready', 'picking', 'packed', 'shipped', 'delivering', 'delivered', 'rto'];
 const RETURN_KEYS: ReturnStage[] = ['requested', 'approved', 'pickup', 'in_transit', 'received', 'inspected', 'refund_pending'];
 const DEPT: Record<string, string> = { care: 'Customer care', finance: 'Finance', fulfilment: 'Warehouse', shipping: 'Shipping', returns: 'Returns desk', none: '' };
 
@@ -28,8 +28,8 @@ export function RulesForm({ sla, autopilot, canEdit, demo }: { sla: SlaTargets; 
     <div className="grid gap-5 xl:grid-cols-[1.2fr_1fr]" data-editing="true">
       <section className="panel">
         <header className="border-b border-line px-5 py-3.5">
-          <h2 className="text-[15px] font-medium">Stage targets (hours)</h2>
-          <p className="text-[12px] text-ink-3">The clock starts when an order enters the stage and pauses while it is on hold.</p>
+          <h2 className="text-[14px] font-medium">Stage targets (hours)</h2>
+          <p className="text-[11.5px] text-ink-3">The clock starts when an order enters the stage and pauses while it is on hold.</p>
         </header>
         <div className="grid gap-6 p-5 sm:grid-cols-2">
           <div>
@@ -38,7 +38,7 @@ export function RulesForm({ sla, autopilot, canEdit, demo }: { sla: SlaTargets; 
               {ORDER_KEYS.map((k) => (
                 <li key={k} className="flex items-center gap-3" data-tint={ORDER_STAGE[k].tint}>
                   <span className="size-1.5 rounded-full bg-[var(--tint)]" />
-                  <span className="flex-1 text-[13px]">
+                  <span className="flex-1 text-[12.5px]">
                     {ORDER_STAGE[k].label}
                     <span className="ml-1.5 text-[11px] text-ink-4">{DEPT[ORDER_STAGE[k].dept]}</span>
                   </span>
@@ -49,7 +49,7 @@ export function RulesForm({ sla, autopilot, canEdit, demo }: { sla: SlaTargets; 
                     min="0"
                     value={hours(s.orders[k])}
                     onChange={(e) => setS((x) => ({ ...x, orders: { ...x.orders, [k]: Number(e.target.value) } }))}
-                    className="field !h-8 !w-20 text-right font-mono text-[12.5px]"
+                    className="field !h-8 !w-20 text-right font-mono text-[12px]"
                   />
                 </li>
               ))}
@@ -61,7 +61,7 @@ export function RulesForm({ sla, autopilot, canEdit, demo }: { sla: SlaTargets; 
               {RETURN_KEYS.map((k) => (
                 <li key={k} className="flex items-center gap-3" data-tint={RETURN_STAGE[k].tint}>
                   <span className="size-1.5 rounded-full bg-[var(--tint)]" />
-                  <span className="flex-1 text-[13px]">{RETURN_STAGE[k].label}</span>
+                  <span className="flex-1 text-[12.5px]">{RETURN_STAGE[k].label}</span>
                   <input
                     disabled={!canEdit}
                     type="number"
@@ -69,7 +69,7 @@ export function RulesForm({ sla, autopilot, canEdit, demo }: { sla: SlaTargets; 
                     min="0"
                     value={hours(s.returns[k])}
                     onChange={(e) => setS((x) => ({ ...x, returns: { ...x.returns, [k]: Number(e.target.value) } }))}
-                    className="field !h-8 !w-20 text-right font-mono text-[12.5px]"
+                    className="field !h-8 !w-20 text-right font-mono text-[12px]"
                   />
                 </li>
               ))}
@@ -89,34 +89,15 @@ export function RulesForm({ sla, autopilot, canEdit, demo }: { sla: SlaTargets; 
         <section className="panel">
           <header className="flex items-center gap-2 border-b border-line px-5 py-3.5">
             <Bot className="size-4 text-ink-2" />
-            <h2 className="text-[15px] font-medium">Autopilot</h2>
-            <label className="ml-auto flex items-center gap-2 text-[12.5px] text-ink-2">
+            <h2 className="text-[14px] font-medium">Autopilot</h2>
+            <label className="ml-auto flex items-center gap-2 text-[12px] text-ink-2">
               <input type="checkbox" disabled={!canEdit} checked={a.enabled} onChange={(e) => setA({ ...a, enabled: e.target.checked })} className="accent-[var(--ink)]" />
               {a.enabled ? 'On' : 'Off'}
             </label>
           </header>
-          <div className={`space-y-3 p-5 text-[13px] ${!a.enabled ? 'opacity-50' : ''}`}>
-            <Toggle on={a.skipConfirmPrepaid} set={(v) => setA({ ...a, skipConfirmPrepaid: v })} disabled={!canEdit} label="Skip the confirmation call for paid online orders" />
-            <Toggle on={a.skipConfirmTrusted} set={(v) => setA({ ...a, skipConfirmTrusted: v })} disabled={!canEdit} label={`Skip the call for trusted cash customers (${a.trustedMinDelivered}+ delivered, never refused, low risk)`} />
-            <Toggle on={a.financeAutoApprove} set={(v) => setA({ ...a, financeAutoApprove: v })} disabled={!canEdit} label="Let Autopilot clear finance inside these limits" />
-            <div className="grid grid-cols-2 gap-3 pl-6">
-              <label>
-                <span className="mb-1 block text-[11.5px] text-ink-3">Max risk score</span>
-                <input disabled={!canEdit} type="number" value={a.financeMaxRisk} onChange={(e) => setA({ ...a, financeMaxRisk: Number(e.target.value) })} className="field !h-8 font-mono text-[12.5px]" />
-              </label>
-              <label>
-                <span className="mb-1 block text-[11.5px] text-ink-3">Trusted after (delivered)</span>
-                <input disabled={!canEdit} type="number" value={a.trustedMinDelivered} onChange={(e) => setA({ ...a, trustedMinDelivered: Number(e.target.value) })} className="field !h-8 font-mono text-[12.5px]" />
-              </label>
-              {Object.entries(a.financeMaxCod).map(([cur, v]) => (
-                <label key={cur}>
-                  <span className="mb-1 block text-[11.5px] text-ink-3">Max cash order · {cur}</span>
-                  <input disabled={!canEdit} type="number" value={v} onChange={(e) => setA({ ...a, financeMaxCod: { ...a.financeMaxCod, [cur]: Number(e.target.value) } })} className="field !h-8 font-mono text-[12.5px]" />
-                </label>
-              ))}
-            </div>
+          <div className={`space-y-3 p-5 text-[12.5px] ${!a.enabled ? 'opacity-50' : ''}`}>
+            <p className="text-[12.5px] text-ink-2">Every order goes from the store straight to Pick &amp; pack: there is no confirmation call and no finance check any more. Orders on hold wait until the hold is released.</p>
             <Toggle on={a.autoSettlePrepaid} set={(v) => setA({ ...a, autoSettlePrepaid: v })} disabled={!canEdit} label="Close paid online orders as settled the moment they’re delivered" />
-            <p className="text-[12px] text-ink-3">High-risk cash orders always go to a person, whatever these switches say.</p>
           </div>
           {canEdit && (
             <div className="flex justify-end border-t border-line px-5 py-3">
@@ -129,8 +110,8 @@ export function RulesForm({ sla, autopilot, canEdit, demo }: { sla: SlaTargets; 
 
         {demo && (
           <section className="panel p-5">
-            <h2 className="text-[15px] font-medium">Demo floor</h2>
-            <p className="mt-1 text-[12.5px] text-ink-3">Rebuild the month of demo orders from scratch, ending at this moment. Takes about a minute and a half. Live store orders are never touched.</p>
+            <h2 className="text-[14px] font-medium">Demo floor</h2>
+            <p className="mt-1 text-[12px] text-ink-3">Rebuild the month of demo orders from scratch, ending at this moment. Takes about a minute and a half. Live store orders are never touched.</p>
             <button
               disabled={pending}
               onClick={() =>

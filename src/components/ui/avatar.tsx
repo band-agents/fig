@@ -1,4 +1,6 @@
+import { Sparkles } from 'lucide-react';
 import { initials } from '@/lib/format';
+import { isSystemActor } from '@/lib/domain/actors';
 
 export function Avatar({ name, hue = 220, size = 28, ring = false, className = '' }: { name: string; hue?: number; size?: number; ring?: boolean; className?: string }) {
   return (
@@ -15,14 +17,10 @@ export function Avatar({ name, hue = 220, size = 28, ring = false, className = '
 
 /** System actors (Autopilot, a courier, a store) get a mark instead of initials. */
 export function ActorAvatar({ name, hue, size = 26 }: { name: string; hue?: number | null; size?: number }) {
-  if (name === 'Relay Autopilot' || name === 'Relay Risk' || name === 'Relay') {
+  if (isSystemActor(name)) {
     return (
       <span className="inline-grid shrink-0 place-items-center rounded-full bg-inv text-inv-ink" style={{ width: size, height: size }} aria-hidden>
-        <svg width={size * 0.55} height={size * 0.55} viewBox="0 0 24 24">
-          <rect x="2" y="4.6" width="11" height="3.2" rx="1.6" fill="currentColor" opacity=".4" />
-          <rect x="6.5" y="10.4" width="11" height="3.2" rx="1.6" fill="currentColor" opacity=".75" />
-          <rect x="11" y="16.2" width="11" height="3.2" rx="1.6" fill="var(--signal)" />
-        </svg>
+        <Sparkles style={{ width: size * 0.5, height: size * 0.5 }} strokeWidth={1.8} />
       </span>
     );
   }

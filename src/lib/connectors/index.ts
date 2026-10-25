@@ -20,8 +20,9 @@ export function connectorFor(c: ChannelDef): Connector | null {
 }
 
 export { medusa, shopify, woo };
-export { aramexConfigured, aramexTrackingUrl, AramexError, classifyUpdate, createShipmentDraft, trackShipments, withClientInfo } from './aramex';
+export { aramexConfigured, aramexOwnAccounts, aramexTrackingUrl, AramexError, classifyUpdate, createShipmentDraft, trackShipments, withClientInfo } from './aramex';
 export type { ShipmentDraft, ShipmentOrder, TrackClass, TrackUpdate } from './aramex';
+export { cancelConsignment, classifyGmtc, consignmentLabel, createConsignment, GMTC_COURIER, gmtcConfigured, gmtcCreateAt, gmtcEnv, GmtcError, trackConsignments } from './gmtc';
 export { lucidaConfigured, stockByBarcode } from './lucida';
 export type { StockFigure } from './lucida';
 export { ConnectorError } from './http';

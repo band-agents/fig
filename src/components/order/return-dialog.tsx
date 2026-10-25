@@ -25,15 +25,15 @@ export function ReturnDialog({ orderId, lines, currency, policy, canOverride, on
 
   return (
     <Modal title="Open a return" sub={policy.label} onClose={onClose} wide>
-      {!policy.ok && <div className="mb-3 rounded-lg border border-[color-mix(in_oklab,var(--warn)_40%,transparent)] px-3 py-2 text-[13px] text-[var(--warn)]">{policy.why}</div>}
+      {!policy.ok && <div className="mb-3 rounded-lg border border-[color-mix(in_oklab,var(--warn)_40%,transparent)] px-3 py-2 text-[12.5px] text-[var(--warn)]">{policy.why}</div>}
       <ul className="divide-y divide-[var(--line)] rounded-xl border border-line">
         {lines.map((l) => (
           <li key={l.id} className={`flex items-center gap-3 p-3 ${!l.returnable ? 'opacity-60' : ''}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {l.image ? <img src={l.image} alt="" className="size-11 rounded-md object-cover" /> : <span className="size-11 rounded-md bg-elev-3" />}
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px]">{l.title}</div>
-              <div className="text-[11.5px] text-ink-3">
+              <div className="truncate text-[12.5px]">{l.title}</div>
+              <div className="text-[11px] text-ink-3">
                 {l.size ? `Size ${l.size} · ` : ''}
                 {l.unitPrice != null ? money(l.unitPrice, currency) : ''}
                 {!l.returnable && (
@@ -84,12 +84,12 @@ export function ReturnDialog({ orderId, lines, currency, policy, canOverride, on
         <textarea className="field" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder={policy.storeOnly ? 'Returns go back through a brand store in this market' : 'What the customer said'} />
       </label>
       {canOverride && (!policy.ok || picked.some((l) => !l.returnable)) && (
-        <label className="mt-3 flex items-center gap-2 text-[13px] text-ink-2">
+        <label className="mt-3 flex items-center gap-2 text-[12.5px] text-ink-2">
           <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} className="accent-[var(--signal)]" /> Override the policy for this customer (goes on the timeline)
         </label>
       )}
       <div className="mt-5 flex items-center justify-between gap-2">
-        <span className="text-[13px] text-ink-3">{picked.length ? <>Refund value {amount ? <b className="font-mono text-ink">{money(amount, currency)}</b> : '—'}</> : 'Pick what is coming back'}</span>
+        <span className="text-[12.5px] text-ink-3">{picked.length ? <>Refund value {amount ? <b className="font-mono text-ink">{money(amount, currency)}</b> : '—'}</> : 'Pick what is coming back'}</span>
         <div className="flex gap-2">
           <button onClick={onClose} className="btn btn-ghost">
             Back

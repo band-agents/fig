@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "seed": "tsx --conditions=react-server scripts/seed.ts",
+    "import:live": "tsx --conditions=react-server scripts/import-live.ts",
+    "purge:demo": "tsx --conditions=react-server scripts/purge-demo.ts",
     "catalog": "node scripts/fetch-catalog.mjs",
     "db:generate": "drizzle-kit generate"
   },
@@ -21,6 +23,7 @@
     "lucide-react": "^1.52.0",
     "motion": "^14.0.0",
     "next": "16.3.3",
+    "nodemailer": "^10.2.1",
     "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -30,6 +33,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22.20.5",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",

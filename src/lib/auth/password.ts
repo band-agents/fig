@@ -1,4 +1,4 @@
-import { randomBytes, scrypt as _scrypt, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomInt, scrypt as _scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 
 const scrypt = promisify(_scrypt) as (pw: string, salt: Buffer, len: number, opts: { N: number; r: number; p: number }) => Promise<Buffer>;
@@ -23,4 +23,15 @@ export function passwordProblem(pw: string) {
   if (pw.length < 10) return 'Use at least 10 characters.';
   if (!/[a-zA-Z]/.test(pw) || !/\d/.test(pw)) return 'Mix letters and numbers.';
   return null;
+}
+
+/** A password people can read out: no look-alikes, in three groups of four, always letters and numbers. */
+export function tempPassword() {
+  const abc = 'abcdefghjkmnpqrstuvwxyzACDEFGHJKLMNPQRTUVWXY34679';
+  const pick = () => Array.from({ length: 4 }, () => abc[randomInt(abc.length)]).join('');
+  // 24 Oct: about one in four came out with no digit, failed passwordProblem, and that teammate was not added
+  for (;;) {
+    const pw = `${pick()}-${pick()}-${pick()}`;
+    if (!passwordProblem(pw)) return pw;
+  }
 }

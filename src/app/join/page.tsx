@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { getDb, schema } from '@/lib/db';
 import { ROLES, type Role } from '@/lib/domain/perms';
-import { RelayMark } from '@/components/brand';
+import { BrandLockup } from '@/components/brand';
 import { JoinForm } from './form';
 
 export const metadata = { title: 'Join' };
@@ -17,14 +17,13 @@ export default async function JoinPage(props: PageProps<'/join'>) {
     <main className="flex min-h-dvh items-center justify-center px-5">
       <div className="w-full max-w-[400px]">
         <div className="mb-10 flex items-center gap-2">
-          <RelayMark size={24} />
-          <span className="font-display text-2xl">Relay</span>
+          <BrandLockup height={20} />
         </div>
         {valid ? (
           <>
-            <h1 className="font-display text-[42px] leading-[1.02]">
+            <h1 className="font-display text-[20px] leading-tight">
               Welcome, {inv.name?.split(' ')[0] ?? 'friend'}
-              <span className="text-signal">.</span>
+              
             </h1>
             <p className="mt-3 text-ink-2">
               You’re joining as <b className="font-medium text-ink">{ROLES[inv.role as Role]?.label}</b>. {ROLES[inv.role as Role]?.blurb} Choose a password to finish.
@@ -35,7 +34,7 @@ export default async function JoinPage(props: PageProps<'/join'>) {
           </>
         ) : (
           <>
-            <h1 className="font-display text-[42px] leading-[1.02]">This link has expired.</h1>
+            <h1 className="font-display text-[20px] leading-tight">This link has expired.</h1>
             <p className="mt-3 text-ink-2">Join links work once and last seven days. Ask whoever invited you to send a new one.</p>
           </>
         )}

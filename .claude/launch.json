@@ -4,8 +4,29 @@
     {
       "name": "relay",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3400
+    },
+    {
+      "name": "relay-live",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "start"
+      ],
+      "port": 3400
+    },
+    {
+      "name": "relay-staging",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set RELAY_PGLITE_DIR=.data/pglite-staging&& set NEXT_DIST_DIR=.next-staging&& set RELAY_SYNC_MINUTES=0&& npx next dev -p 3401"
+      ],
+      "port": 3401
     }
   ]
 }

@@ -3,7 +3,7 @@
 
 export type LucidaAccount = { username: string; password: string; accountId?: string };
 export type StockFigure = { qty: number; price?: number; was?: number; store?: string };
-export type StockRow = { barcode: string; qty: number; priceA?: number; priceE?: number; storeCode?: string };
+export type StockRow = { barcode: string; qty: number; priceA?: number; priceE?: number; storeCode?: string; storeName?: string; desc?: string };
 
 /** LUCIDA_ACCOUNTS (a JSON array, one entry per company database) or the single LUCIDA_USERNAME/LUCIDA_PASSWORD. */
 export function parseLucidaAccounts(env: Record<string, string | undefined>): LucidaAccount[] {
@@ -31,9 +31,12 @@ export function parseLucidaAccounts(env: Record<string, string | undefined>): Lu
 
 /**
  * The request body. Credentials travel here, not in a header. Naming barcodes means LastUpdateID 0;
- * HideZeroBalance 0 keeps sold-out items in the answer; BalanceByStore 0 gives one figure per item.
+ * HideZeroBalance 0 keeps sold-out items in the answer; BalanceByStore 0 gives one figure per item,
+ * 1 a row per store (its storeCode and storeName), which is how the branches holding a piece are known.
+ * With no barcodes and `days`, it asks for every item Lucida changed in that many days (-1 to -30).
  */
-export function buildStockRequest(account: LucidaAccount, barcodes: string[], opts: { platform?: number; lang?: number } = {}) {
+export function buildStockRequest(account: LucidaAccount, barcodes: string[], opts: { platform?: number; lang?: number; byStore?: boolean; days?: number } = {}) {
+  const naming = barcodes.length > 0;
   return {
     Username: account.username,
     Password: account.password,
@@ -43,10 +46,10 @@ export function buildStockRequest(account: LucidaAccount, barcodes: string[], op
     ItemCode: '',
     ItemBarcode: barcodes.join(','),
     StoreCode: '',
-    BalanceByStore: 0,
+    BalanceByStore: opts.byStore ? 1 : 0,
     HideZeroBalance: 0,
     UpdateType: 1,
-    LastUpdateID: 0,
+    LastUpdateID: naming ? 0 : -Math.min(30, Math.max(1, Math.trunc(opts.days ?? 1))),
   };
 }
 
@@ -78,6 +81,12 @@ export function readStockResponse(payload: unknown, label = 'Lucida'): StockRow[
       }
     }
   }
+  if (!rows && payload && typeof payload === 'object') {
+    // a successful call that found nothing comes back with a null list and says so in Remarks
+    const p = payload as Record<string, unknown>;
+    const remarks = String(field(p, ['remarks', 'Remarks']) ?? '');
+    if (Number(field(p, ['noOfRecords', 'NoOfRecords']) ?? 0) === 0 && /no stock records found/i.test(remarks)) return [];
+  }
   if (!rows) throw new Error(`${label} answered without an items list: ${preview(payload)}`);
 
   return rows.map((row, i) => {
@@ -89,9 +98,13 @@ export function readStockResponse(payload: unknown, label = 'Lucida'): StockRow[
     const priceA = Number(field(row, ['priceA', 'PriceA']));
     const priceE = Number(field(row, ['priceE', 'PriceE']));
     const store = field(row, ['storeCode', 'StoreCode']);
+    const storeName = field(row, ['storeName', 'StoreName']);
+    const desc = field(row, ['itemDesc', 'ItemDesc']);
     if (Number.isFinite(priceA) && priceA > 0) out.priceA = priceA;
     if (Number.isFinite(priceE) && priceE > 0) out.priceE = priceE;
     if (typeof store === 'string' && store.trim()) out.storeCode = store.trim();
+    if (typeof storeName === 'string' && storeName.trim()) out.storeName = storeName.trim();
+    if (typeof desc === 'string' && desc.trim()) out.desc = desc.trim();
     return out;
   });
 }

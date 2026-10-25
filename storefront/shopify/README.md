@@ -49,3 +49,16 @@ The same iframe, in a page template or a shortcode block — the markup and the 
 
 The portal needs Relay to be reachable from the public internet. Until it is deployed, the pages can
 be installed and configured, but the frame will be empty for anyone outside the office.
+
+# Website merchandising (cross-sells, upgrades, pop-ups)
+
+Placements are chosen and published in the console (Stock & buying → Website merch). Each storefront
+loads them with one line, once:
+
+1. Copy `dh-merch.liquid` into the theme's `snippets/`.
+2. In `layout/theme.liquid`, before `</body>`:
+   `{% render 'dh-merch', store_id: 'labesny-web', console: 'https://<console address>' %}`
+3. Optional: put `<div data-dh-merch></div>` in the product section where the row should sit.
+
+Publishing, pausing or ending a placement then changes the shop within a minute, with no theme
+release. The two apps read the same placements from `GET /api/merch/<store_id>?product=<handle>`.

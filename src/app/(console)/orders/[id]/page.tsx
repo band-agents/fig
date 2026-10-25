@@ -5,6 +5,7 @@ import { requireUser } from '@/lib/auth/session';
 import { orderDetail } from '@/lib/order-detail';
 import { CHANNEL, channelLabel } from '@/lib/channels';
 import { ORDER_STAGE, type OrderStage } from '@/lib/domain/stages';
+import { can, READ_ONLY_ROLES } from '@/lib/domain/perms';
 import { money, when } from '@/lib/format';
 import { aramexTrackingUrl } from '@/lib/connectors/aramex-map';
 import { ChannelChip, Payment, ReturnPill, StagePill } from '@/components/ui/bits';
@@ -14,6 +15,13 @@ import { Timeline } from '@/components/order/timeline';
 import { NoteComposer } from '@/components/order/composer';
 import { ActionBar } from '@/components/order/action-bar';
 import { CopyButton } from '@/components/ui/copy';
+import { shipFromOptions } from '@/lib/ship-from';
+import { ShipFrom } from '@/components/order/ship-from';
+import { StoreStatus } from '@/components/order/store-status';
+import { changesToResend } from '@/lib/writeback';
+import { CourierChoice } from '@/components/order/courier-choice';
+import { areaFromAddress } from '@/lib/connectors/kuwait-areas';
+import { gmtcConfigured } from '@/lib/connectors';
 
 export async function generateMetadata(props: PageProps<'/orders/[id]'>) {
   const me = await requireUser();
@@ -27,6 +35,8 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
   const d = await orderDetail(me, id);
   if (!d) notFound();
   const o = d.order;
+  const shipFrom = await shipFromOptions(o.id);
+  const canSetBranch = (['fulfilment', 'orders', 'intake', 'shipping'] as const).some((a) => can(me, a, 2)) && !me.previewing && !READ_ONLY_ROLES.includes(me.role) && !['cancelled', 'settled', 'rto_closed'].includes(o.stage);
   const meta = ORDER_STAGE[o.stage as OrderStage];
   const ch = CHANNEL[o.channelId];
   const first = o.customerName.split(' ')[0];
@@ -35,7 +45,7 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
 
   return (
     <div className="space-y-5">
-      <Link href="/orders" className="inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink">
+      <Link href="/orders" className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-3 hover:text-ink">
         <ArrowLeft className="size-4" /> Orders
       </Link>
 
@@ -43,30 +53,31 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
         <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="font-mono text-[28px] font-medium tracking-tight">{o.number}</h1>
+              <h1 className="font-mono text-[21px] font-medium tracking-tight">{o.number}</h1>
               <StagePill stage={o.stage} held={o.onHold} />
               <SlaChip due={o.dueAt} since={o.stageAt} held={o.onHold} big />
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-ink-3">
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-ink-3">
               <ChannelChip id={o.channelId} />
               <span>Placed {when(o.placedAt)}</span>
               <span>{meta?.verb}</span>
               {o.source !== 'demo' && <span className="text-good">● synced {o.syncedAt ? when(o.syncedAt) : ''}</span>}
             </div>
-            {o.onHold && <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[color-mix(in_oklab,var(--warn)_12%,transparent)] px-3 py-1.5 text-[13px] text-[var(--warn)]">On hold · {o.holdReason}</div>}
+            {o.onHold && <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[color-mix(in_oklab,var(--warn)_12%,transparent)] px-3 py-1.5 text-[12.5px] text-[var(--warn)]">On hold · {o.holdReason}</div>}
             {o.exception && (
-              <div className="mt-3 flex items-center gap-2 text-[13px] text-critical">
+              <div className="mt-3 flex items-center gap-2 text-[12.5px] text-critical">
                 <TriangleAlert className="size-4" /> {o.exception}
                 {o.attempts > 0 && <span className="text-ink-3">· {o.attempts} failed attempt{o.attempts > 1 ? 's' : ''}</span>}
               </div>
             )}
           </div>
+          <StoreStatus orderId={o.id} {...changesToResend(o.writeBack)} canRetry={can(me, 'orders', 2) && !me.previewing && !READ_ONLY_ROLES.includes(me.role)} />
           {d.autopilotNext && !o.onHold && (
-            <div className="flex max-w-sm items-start gap-2.5 rounded-xl border border-line bg-elev-2 px-3 py-2.5 text-[12.5px]">
-              <Bot className="mt-0.5 size-4 shrink-0 text-ink-2" />
-              <span className="text-ink-2">
-                Autopilot would move this to <b className="font-medium text-ink">{ORDER_STAGE[d.autopilotNext.to].label}</b>: {d.autopilotNext.why.toLowerCase()}.
-              </span>
+            <div className="flex items-center gap-2 rounded-full bg-elev-2 px-3 py-1.5 text-[11.5px]" title={d.autopilotNext.why}>
+              <Bot className="size-3.5 shrink-0 text-ink-3" />
+              <span className="text-ink-3">Next</span>
+              <b className="font-medium text-ink">{ORDER_STAGE[d.autopilotNext.to].label}</b>
+              <span className="max-w-[220px] truncate text-ink-3">{d.autopilotNext.why}</span>
             </div>
           )}
         </div>
@@ -97,10 +108,10 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
         <div className="space-y-5">
           <section className="panel">
             <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
-              <h2 className="text-[15px] font-medium">
+              <h2 className="text-[14px] font-medium">
                 {o.items} item{o.items === 1 ? '' : 's'}
               </h2>
-              {ch && <span className="text-[12px] text-ink-3">ships from {ch.warehouse === 'fig-cairo' ? 'FIG warehouse, New Cairo' : 'D&H warehouse, Kuwait'}</span>}
+              {ch && <span className="text-[11.5px] text-ink-3">ships from {ch.warehouse === 'fig-cairo' ? 'FIG warehouse, New Cairo' : 'D&H warehouse, Kuwait'}</span>}
             </header>
             <ul className="divide-y divide-[var(--line)]">
               {d.lines.map((l) => (
@@ -108,9 +119,9 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {l.image ? <img src={l.image} alt="" className="h-20 w-16 shrink-0 rounded-lg object-cover" /> : <span className="h-20 w-16 shrink-0 rounded-lg bg-elev-3" />}
                   <div className="min-w-0 flex-1">
-                    <div className="text-[11.5px] uppercase tracking-[0.06em] text-ink-3">{l.brand}</div>
-                    <div className="mt-0.5 text-[14px] leading-snug">{l.title}</div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-3">
+                    <div className="text-[11px] uppercase tracking-[0.06em] text-ink-3">{l.brand}</div>
+                    <div className="mt-0.5 text-[13px] leading-snug">{l.title}</div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-ink-3">
                       {l.size && (
                         <span>
                           Size <b className="font-medium text-ink">{l.size}</b>
@@ -127,28 +138,28 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
                       )}
                     </div>
                   </div>
-                  {l.unitPrice != null && <div className="text-right font-mono text-[13px]">{money(l.unitPrice * l.quantity, o.currency)}</div>}
+                  {l.unitPrice != null && <div className="text-right font-mono text-[12.5px]">{money(l.unitPrice * l.quantity, o.currency)}</div>}
                 </li>
               ))}
             </ul>
             {o.total != null && (
-              <div className="space-y-1.5 border-t border-line px-5 py-4 text-[13px]">
+              <div className="space-y-1.5 border-t border-line px-5 py-4 text-[12.5px]">
                 <Row label="Subtotal" value={money(o.subtotal!, o.currency)} />
                 {o.discount ? <Row label="Discount" value={`−${money(o.discount, o.currency)}`} /> : null}
                 <Row label="Delivery" value={o.shipping ? money(o.shipping, o.currency) : 'Free'} />
                 <div className="flex items-baseline justify-between pt-1.5">
                   <span className="text-ink-2">Total</span>
-                  <span className="font-display text-[26px] tabular">{money(o.total, o.currency)}</span>
+                  <span className="font-display text-[16px] tabular">{money(o.total, o.currency)}</span>
                 </div>
               </div>
             )}
-            {o.note && <div className="border-t border-line px-5 py-3 text-[13px] text-ink-2">Customer note: “{o.note}”</div>}
+            {o.note && <div className="border-t border-line px-5 py-3 text-[12.5px] text-ink-2">Customer note: “{o.note}”</div>}
           </section>
 
           <section className="panel">
             <header className="border-b border-line px-5 py-3.5">
-              <h2 className="text-[15px] font-medium">Timeline</h2>
-              <p className="text-[12px] text-ink-3">Every hand-off, call, note and courier scan, for everyone.</p>
+              <h2 className="text-[14px] font-medium">Timeline</h2>
+              <p className="text-[11.5px] text-ink-3">Every hand-off, call, note and courier scan, for everyone.</p>
             </header>
             <div className="p-5">
               {d.can.note && (
@@ -166,7 +177,7 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
             <div className="flex items-start justify-between">
               <div>
                 <div className="eyebrow mb-1.5">Customer</div>
-                <div className="flex items-center gap-2 text-[16px] font-medium">
+                <div className="flex items-center gap-2 text-[14.5px] font-medium">
                   {o.customerName}
                   {d.customer?.vip && (
                     <span className="pill" data-tint="amber">
@@ -176,7 +187,7 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
                 </div>
               </div>
             </div>
-            <div className="mt-3 space-y-2 text-[13px]">
+            <div className="mt-3 space-y-2 text-[12.5px]">
               {o.phone && (
                 <div className="flex items-center gap-2">
                   <Phone className="size-3.5 text-ink-3" />
@@ -217,11 +228,11 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
             )}
             {d.others.length > 0 && (
               <div className="mt-4 border-t border-line pt-3">
-                <div className="mb-2 text-[11.5px] text-ink-3">Across every FIG store</div>
+                <div className="mb-2 text-[11px] text-ink-3">Across every FIG store</div>
                 <ul className="space-y-1">
                   {d.others.map((x) => (
                     <li key={x.id}>
-                      <Link href={`/orders/${x.id}`} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12.5px] hover:bg-elev-2">
+                      <Link href={`/orders/${x.id}`} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] hover:bg-elev-2">
                         <span className="font-mono">{x.number}</span>
                         <span className="text-ink-4">{channelLabel(x.channelId)}</span>
                         <span className="ml-auto">
@@ -235,11 +246,13 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
             )}
           </section>
 
+          {shipFrom && <ShipFrom orderId={o.id} data={shipFrom} canSet={canSetBranch} />}
+
           <section className="panel p-5">
             <div className="eyebrow mb-3">Payment</div>
             <Payment method={o.paymentMethod} status={o.paymentStatus} />
             {o.paymentMethod === 'cod' && o.total != null && (
-              <p className="mt-2 text-[12.5px] text-ink-3">
+              <p className="mt-2 text-[12px] text-ink-3">
                 Courier collects <b className="font-mono text-ink">{money(o.total, o.currency)}</b> at the door
                 {o.settlementId ? ', in an Aramex remittance batch.' : '.'}
               </p>
@@ -248,22 +261,22 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
 
           <section className="panel p-5">
             <div className="eyebrow mb-3">Delivery</div>
-            <div className="flex items-center gap-2 text-[13px]">
+            <div className="flex items-center gap-2 text-[12.5px]">
               <Truck className="size-4 text-ink-3" />
               {o.courier ?? '—'}
             </div>
             {o.tracking ? (
               <div className="mt-2 flex items-center gap-2">
-                <span className="font-mono text-[14px]">{o.tracking}</span>
+                <span className="font-mono text-[13px]">{o.tracking}</span>
                 <CopyButton text={o.tracking} />
-                <a href={o.trackingUrl ?? aramexTrackingUrl(o.tracking, ch?.country === 'KW' ? 'kw' : 'eg')} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm !h-7 !px-2" aria-label="Track on the courier site">
+                <a href={o.courier === 'UPS Kuwait' ? `/orders/${o.id}/label` : (o.trackingUrl ?? aramexTrackingUrl(o.tracking, ch?.country === 'KW' ? 'kw' : 'eg'))} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm !h-7 !px-2" aria-label="Track on the courier site">
                   <ExternalLink className="size-3.5" />
                 </a>
               </div>
             ) : (
-              <p className="mt-2 text-[12.5px] text-ink-3">No waybill yet. Shipping adds it at courier handover.</p>
+              <p className="mt-2 text-[12px] text-ink-3">No waybill yet. Shipping adds it at courier handover.</p>
             )}
-            <div className="mt-3 grid grid-cols-2 gap-2 text-[12px]">
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[11.5px]">
               <Mini label="Packed" at={o.packedAt} />
               <Mini label="Shipped" at={o.shippedAt} />
               <Mini label="Delivered" at={o.deliveredAt} />
@@ -271,16 +284,20 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
             </div>
           </section>
 
+          {ch?.country === 'KW' && o.total != null && !o.tracking && ['new', 'confirming', 'finance', 'ready', 'picking', 'packed'].includes(o.stage) && (
+            <CourierChoice country={o.address?.country ?? 'KW'} area={areaFromAddress(o.address)} pieces={o.items} cod={o.paymentMethod === 'cod' && !['paid', 'cod_collected'].includes(o.paymentStatus) ? o.total : 0} deliveryPaid={o.shipping} apis={gmtcConfigured('KW') ? ['UPS'] : []} />
+          )}
+
           <section className="panel p-5">
             <div className="flex items-center justify-between">
               <div className="eyebrow">Delivery risk</div>
-              <span className={`inline-flex items-center gap-1 text-[12px] font-medium ${o.riskLevel === 'high' ? 'text-critical' : o.riskLevel === 'medium' ? 'text-[var(--warn)]' : 'text-good'}`}>
+              <span className={`inline-flex items-center gap-1 text-[11.5px] font-medium ${o.riskLevel === 'high' ? 'text-critical' : o.riskLevel === 'medium' ? 'text-[var(--warn)]' : 'text-good'}`}>
                 {o.riskLevel === 'low' ? <ShieldCheck className="size-3.5" /> : <ShieldAlert className="size-3.5" />}
                 {o.riskLevel[0].toUpperCase() + o.riskLevel.slice(1)}
               </span>
             </div>
             <div className="mt-3 flex items-end gap-3">
-              <span className="font-display text-[44px] leading-none tabular">{o.risk}</span>
+              <span className="font-display text-[22px] leading-none tabular">{o.risk}</span>
               <div className="mb-1.5 flex-1">
                 <div className="relative h-1.5 rounded-full bg-[linear-gradient(90deg,var(--good)_0%,var(--good)_30%,var(--warn)_30%,var(--warn)_55%,var(--critical)_55%)] opacity-80">
                   <span className="absolute -top-1 h-3.5 w-1 rounded-full bg-ink ring-2 ring-[var(--bg-elev)]" style={{ left: `calc(${Math.min(100, o.risk)}% - 2px)` }} />
@@ -296,9 +313,9 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
             {o.riskReasons.length > 0 ? (
               <ul className="mt-3 space-y-1.5">
                 {o.riskReasons.map((r) => (
-                  <li key={r.code} className="flex items-center justify-between gap-3 text-[12.5px]">
+                  <li key={r.code} className="flex items-center justify-between gap-3 text-[12px]">
                     <span className="text-ink-2">{r.label}</span>
-                    <span className={`font-mono text-[11.5px] ${r.weight > 0 ? 'text-ink-3' : 'text-good'}`}>
+                    <span className={`font-mono text-[11px] ${r.weight > 0 ? 'text-ink-3' : 'text-good'}`}>
                       {r.weight > 0 ? '+' : ''}
                       {r.weight}
                     </span>
@@ -306,9 +323,9 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-[12.5px] text-ink-3">Nothing unusual about this order.</p>
+              <p className="mt-2 text-[12px] text-ink-3">Nothing unusual about this order.</p>
             )}
-            <p className="mt-3 flex items-start gap-1.5 text-[11.5px] text-ink-4">
+            <p className="mt-3 flex items-start gap-1.5 text-[11px] text-ink-4">
               <Sparkles className="mt-0.5 size-3 shrink-0" /> Learned from this floor’s own refusals and returns. Every point has a reason.
             </p>
           </section>
@@ -319,10 +336,10 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
               <ul className="space-y-2">
                 {d.returns.map((r) => (
                   <li key={r.id}>
-                    <Link href={`/returns/${r.id}`} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-[13px] hover:border-line-3">
+                    <Link href={`/returns/${r.id}`} className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-[12.5px] hover:border-line-3">
                       <span className="font-mono">{r.number}</span>
                       <ReturnPill stage={r.stage} />
-                      {d.can.money && <span className="ml-auto font-mono text-[12px] text-ink-3">{money(r.amount, r.currency)}</span>}
+                      {d.can.money && <span className="ml-auto font-mono text-[11.5px] text-ink-3">{money(r.amount, r.currency)}</span>}
                     </Link>
                   </li>
                 ))}
@@ -347,7 +364,7 @@ function Row({ label, value }: { label: string; value: string }) {
 function Stat({ n, label, alert }: { n: number; label: string; alert?: boolean }) {
   return (
     <div>
-      <div className={`font-display text-[24px] leading-none tabular ${alert ? 'text-critical' : ''}`}>{n}</div>
+      <div className={`font-display text-[16px] leading-none tabular ${alert ? 'text-critical' : ''}`}>{n}</div>
       <div className="mt-1 text-[10.5px] text-ink-3">{label}</div>
     </div>
   );

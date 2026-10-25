@@ -23,7 +23,7 @@ export type Insight = {
 
 export async function insightsFor(p: Principal): Promise<Insight[]> {
   const db = await getDb();
-  const s = scope(p);
+  const s = scope(p, sql`channel_id`, sql`orders.id`);
   const out: Insight[] = [];
 
   // 1. Bottleneck: where late work piles up
@@ -42,7 +42,7 @@ export async function insightsFor(p: Principal): Promise<Insight[]> {
       kicker: 'Bottleneck',
       title: `${meta.label} is holding things up`,
       body: `${top.n} order${top.n > 1 ? 's are' : ' is'} past target here, the oldest by ${span(Date.now() - new Date(top.oldest).getTime())}.${total > top.n ? ` ${total - top.n} more are late elsewhere.` : ''}`,
-      href: dept === 'none' ? '/orders?sla=late' : dept === 'care' ? '/queue/care' : `/queue/${dept}`,
+      href: dept === 'none' || dept === 'care' ? '/orders?sla=late' : `/queue/${dept}`,
       action: 'Open the queue',
       metric: String(top.n),
     });
@@ -95,12 +95,12 @@ export async function insightsFor(p: Principal): Promise<Insight[]> {
     with sold as (
       select i.title, max(i.brand) as brand, max(i.image) as image, sum(i.quantity)::int as sold
       from order_items i join orders o on o.id = i.order_id
-      where ${scope(p, sql`o.channel_id`)} and o.stage in ('delivered','settled') and o.placed_at > now() - interval '45 days'
+      where ${scope(p, sql`o.channel_id`, sql`o.id`)} and o.stage in ('delivered','settled') and o.placed_at > now() - interval '45 days'
       group by i.title
     ), back as (
       select i.title, r.reason, count(*)::int as n
       from return_items ri join returns r on r.id = ri.return_id join order_items i on i.id = ri.order_item_id
-      where ${scope(p, sql`r.channel_id`)} and r.requested_at > now() - interval '45 days'
+      where ${scope(p, sql`r.channel_id`, sql`r.order_id`)} and r.requested_at > now() - interval '45 days'
       group by i.title, r.reason
     )
     select back.title, sold.brand, back.reason, back.n, sold.sold, sold.image from back join sold using (title)
@@ -159,16 +159,16 @@ export async function insightsFor(p: Principal): Promise<Insight[]> {
 
   // 6. Try-at-home baskets waiting for a call
   const bracket = await db.execute<{ n: number }>(sql`
-    select count(*)::int as n from orders where ${s} and stage in ('new','confirming') and risk_reasons @> '[{"code":"bracketing"}]'::jsonb`);
+    select count(*)::int as n from orders where ${s} and stage in ('new','confirming','finance','ready') and risk_reasons @> '[{"code":"bracketing"}]'::jsonb`);
   if (bracket.rows[0].n > 0) {
     out.push({
       key: 'bracketing',
       severity: 'info',
-      kicker: 'Confirmation',
+      kicker: 'Before it ships',
       title: `${bracket.rows[0].n} basket${bracket.rows[0].n > 1 ? 's have' : ' has'} one item in several sizes`,
       body: 'Classic try-on-and-return. Ask which size they want before it ships: it saves a return trip both ways.',
-      href: '/queue/care',
-      action: 'Call them',
+      href: '/orders?stage=ready',
+      action: 'See the orders',
       metric: String(bracket.rows[0].n),
     });
   }
@@ -190,9 +190,9 @@ export async function insightsFor(p: Principal): Promise<Insight[]> {
 
   // 8. Autopilot: hand-offs nobody had to touch this week
   const auto = await db.execute<{ auto: number; all: number }>(sql`
-    select count(*) filter (where e.actor_name = 'Relay Autopilot')::int as auto, count(*)::int as all
+    select count(*) filter (where e.actor_name in ('Autopilot', 'Relay Autopilot'))::int as auto, count(*)::int as all
     from events e join orders o on o.id = e.order_id
-    where ${scope(p, sql`o.channel_id`)} and e.kind = 'stage' and e.at > now() - interval '7 days'
+    where ${scope(p, sql`o.channel_id`, sql`o.id`)} and e.kind = 'stage' and e.at > now() - interval '7 days'
       and e.to_stage in ('confirming','finance','ready','settled')`);
   const a = auto.rows[0];
   if (a.all > 0 && a.auto > 0) {

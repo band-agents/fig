@@ -1,21 +1,38 @@
-// Every storefront Relay listens to. Credentials never live here: each channel reads its own
+// Every storefront the console listens to. Credentials never live here: each channel reads its own
 // RELAY_<PREFIX>_* variables (see .env.example), and a channel without them runs on demo data.
+// The list below ships with the code; more are added from Setup → Channels and kept in the
+// channels table (custom = true), then registered into the same list at start-up.
 
 export type Platform = 'shopify' | 'medusa' | 'woo';
-export type Country = 'EG' | 'KW' | 'JO';
+export type Country = 'EG' | 'KW' | 'JO' | 'SA' | 'AE' | 'QA' | 'BH' | 'OM';
+export type Currency = 'EGP' | 'KWD' | 'JOD' | 'SAR' | 'AED' | 'QAR' | 'BHD' | 'OMR';
+
+export const COUNTRIES: { code: Country; name: string; currency: Currency }[] = [
+  { code: 'EG', name: 'Egypt', currency: 'EGP' },
+  { code: 'KW', name: 'Kuwait', currency: 'KWD' },
+  { code: 'JO', name: 'Jordan', currency: 'JOD' },
+  { code: 'SA', name: 'Saudi Arabia', currency: 'SAR' },
+  { code: 'AE', name: 'United Arab Emirates', currency: 'AED' },
+  { code: 'QA', name: 'Qatar', currency: 'QAR' },
+  { code: 'BH', name: 'Bahrain', currency: 'BHD' },
+  { code: 'OM', name: 'Oman', currency: 'OMR' },
+];
 
 export type ChannelDef = {
   id: string;
   envPrefix: string;
-  brand: 'FIG' | 'Labesny' | "Women'secret";
+  brand: string; // FIG · Labesny · Women'secret · any brand added later
   name: string; // "Women'secret Egypt"
   surface: 'Website' | 'App';
   platform: Platform;
   country: Country;
-  currency: 'EGP' | 'KWD' | 'JOD';
+  currency: Currency;
+  company?: 'DH' | 'DCO' | 'FIG';
+  domain?: string; // the public address, for the merchandising embed
+  custom?: boolean; // added from the console
   store?: string; // Shopify handle (<store>.myshopify.com)
   baseUrl?: string; // Medusa / Woo base
-  warehouse: 'fig-cairo' | 'dh-kuwait';
+  warehouse: string; // a location id: fig-cairo, dh-kuwait, or one added later
   carrier: string;
   parked?: boolean; // known but intentionally not wired yet
   notes?: string;
@@ -127,13 +144,30 @@ export const CHANNELS: ChannelDef[] = [
     currency: 'JOD',
     store: 'd0kb1v-p9',
     warehouse: 'dh-kuwait',
-    carrier: '—',
-    parked: true,
-    notes: 'Parked: no stock source or catalogue decision yet.',
+    carrier: 'Aramex JO',
+    notes: 'Paid by card through HyperPay or cash on delivery; Aramex Amman delivers inside Jordan on its own account (ARAMEX_JO_*). The stock source is not decided yet, so fulfilment still points at the Kuwait warehouse.',
   },
 ];
 
 export const CHANNEL = Object.fromEntries(CHANNELS.map((c) => [c.id, c])) as Record<string, ChannelDef>;
+
+/**
+ * Adds storefronts defined in the database to the shipped list, in place, so every lookup in the
+ * codebase sees them. Idempotent; a definition already present is refreshed. Runs on the server when
+ * the database opens and in the browser from the console layout.
+ */
+export function registerChannels(defs: ChannelDef[]) {
+  for (const d of defs) {
+    const def = { ...d, custom: true };
+    const at = CHANNELS.findIndex((c) => c.id === d.id);
+    if (at >= 0) CHANNELS[at] = def;
+    else CHANNELS.push(def);
+    CHANNEL[d.id] = def;
+  }
+}
+
+/** RELAY_<PREFIX>_* for a storefront id: "etam-kw" reads RELAY_ETAM_KW_TOKEN and friends. */
+export const envPrefixFor = (id: string) => id.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
 
 export const channelLabel = (id: string) => {
   const c = CHANNEL[id];
@@ -141,16 +175,26 @@ export const channelLabel = (id: string) => {
   return c.surface === 'App' ? `${c.name} App` : c.name;
 };
 
-export const WAREHOUSES = {
-  'fig-cairo': { label: 'FIG warehouse · New Cairo', country: 'EG' as Country, tz: 'Africa/Cairo' },
-  'dh-kuwait': { label: 'D&H warehouse · Kuwait', country: 'KW' as Country, tz: 'Asia/Kuwait' },
+export const WAREHOUSES: Record<string, { label: string; country: Country; tz: string }> = {
+  'fig-cairo': { label: 'FIG warehouse · New Cairo', country: 'EG', tz: 'Africa/Cairo' },
+  'dh-kuwait': { label: 'D&H warehouse · Kuwait', country: 'KW', tz: 'Asia/Kuwait' },
 };
 
-export const BRAND_TINT: Record<ChannelDef['brand'], string> = {
+export const warehouseLabel = (id: string) => WAREHOUSES[id]?.label ?? id;
+
+export const BRAND_TINT: Record<string, string> = {
   FIG: '#EB3638',
   Labesny: '#F2A7B0',
   "Women'secret": '#C9B8A6',
 };
+
+/** A brand's dot: the known ones keep their colour, a new one gets a stable hue from its name. */
+export function brandTint(brand: string) {
+  if (BRAND_TINT[brand]) return BRAND_TINT[brand];
+  let h = 0;
+  for (const ch of brand) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return `oklch(0.7 0.11 ${h})`;
+}
 
 /** Reads a channel's credentials from the environment. Nothing is ever logged or sent to the client. */
 export function channelEnv(c: ChannelDef) {

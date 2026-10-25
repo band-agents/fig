@@ -1,6 +1,7 @@
 import { Check, RotateCcw, XCircle } from 'lucide-react';
 import { ORDER_STAGE, ORDER_TRACK, type OrderStage } from '@/lib/domain/stages';
 import { when } from '@/lib/format';
+import { isAutopilot } from '@/lib/domain/actors';
 
 /** The baton's path: every leg it has run, who carried it and when, and where it is now. */
 export function StageTracker({ stage, reached, onHold }: { stage: string; reached: Record<string, { at: Date; by: string }>; onHold: boolean }) {
@@ -26,12 +27,12 @@ export function StageTracker({ stage, reached, onHold }: { stage: string; reache
               >
                 {current ? <span className={`size-2 rounded-full bg-[var(--tint)] ${onHold ? '' : 'animate-pulse'}`} /> : (done || r) && <Check className="size-3.5 text-bg" strokeWidth={3} />}
               </span>
-              <span className={`mt-2 text-[12px] ${current ? 'font-medium text-ink' : r ? 'text-ink-2' : 'text-ink-4'}`}>{m.label}</span>
+              <span className={`mt-2 text-[11.5px] ${current ? 'font-medium text-ink' : r ? 'text-ink-2' : 'text-ink-4'}`}>{m.label}</span>
               {r && !skipped && (
                 <span className="mt-0.5 text-[10.5px] leading-tight text-ink-3">
                   {when(r.at).replace('Today ', '')}
                   <br />
-                  {r.by === 'Relay Autopilot' ? 'Autopilot' : r.by.split(' ')[0]}
+                  {isAutopilot(r.by) ? 'Autopilot' : r.by.split(' ')[0]}
                 </span>
               )}
               {skipped && <span className="mt-0.5 text-[10.5px] text-ink-4">skipped</span>}
@@ -40,7 +41,7 @@ export function StageTracker({ stage, reached, onHold }: { stage: string; reache
         })}
       </ol>
       {off && (
-        <div className={`mt-4 flex items-center gap-2 rounded-xl border px-3 py-2 text-[13px] ${stage === 'cancelled' ? 'border-line-2 text-ink-2' : 'border-[color-mix(in_oklab,var(--t-red)_40%,transparent)] text-critical'}`}>
+        <div className={`mt-4 flex items-center gap-2 rounded-xl border px-3 py-2 text-[12.5px] ${stage === 'cancelled' ? 'border-line-2 text-ink-2' : 'border-[color-mix(in_oklab,var(--t-red)_40%,transparent)] text-critical'}`}>
           {stage === 'cancelled' ? <XCircle className="size-4" /> : <RotateCcw className="size-4" />}
           {ORDER_STAGE[stage as OrderStage].label}
           {reached[stage] && <span className="text-ink-3">· {when(reached[stage].at)} by {reached[stage].by}</span>}

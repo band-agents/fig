@@ -1,11 +1,10 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { desc, sql } from 'drizzle-orm';
 import { CircleAlert, CircleCheck, Clock3 } from 'lucide-react';
-import { requireUser } from '@/lib/auth/session';
+import { requireUser, sendHome } from '@/lib/auth/session';
 import { getDb, schema } from '@/lib/db';
 import { scope } from '@/lib/queries';
-import { can } from '@/lib/domain/perms';
+import { can, canSee } from '@/lib/domain/perms';
 import { money, num, when } from '@/lib/format';
 import { PageHeader } from '@/components/ui/bits';
 import { BarList } from '@/components/charts/barlist';
@@ -15,9 +14,9 @@ export const metadata = { title: 'Cash & refunds' };
 
 export default async function FinancePage() {
   const me = await requireUser();
-  if (!can(me, 'finance', 1) || !can(me, 'money', 2)) notFound();
+  if (!canSee(me, 'cash')) sendHome(me);
   const db = await getDb();
-  const s = scope(me);
+  const s = scope(me, sql`channel_id`, sql`orders.id`);
   const [settlements, withCourier, refunds, mix, rto] = await Promise.all([
     db.select().from(schema.settlements).orderBy(desc(schema.settlements.createdAt)).limit(20),
     db.execute<{ currency: string; n: number; total: number; oldest: string }>(sql`
@@ -25,7 +24,7 @@ export default async function FinancePage() {
       where ${s} and stage = 'delivered' and payment_method = 'cod' group by currency`),
     db.execute<{ stage: string; currency: string; n: number; total: number }>(sql`
       select stage, currency, count(*)::int as n, sum(amount)::bigint as total from returns
-      where ${scope(me, sql`channel_id`)} and (stage in ('refund_pending','inspected','received') or (stage = 'refunded' and closed_at > now() - interval '30 days'))
+      where ${scope(me, sql`channel_id`, sql`returns.order_id`)} and (stage in ('refund_pending','inspected','received') or (stage = 'refunded' and closed_at > now() - interval '30 days'))
       group by stage, currency`),
     db.execute<{ payment_method: string; n: number }>(sql`
       select payment_method, count(*)::int as n from orders where ${s} and placed_at > now() - interval '30 days' and stage <> 'cancelled' group by 1 order by 2 desc`),
@@ -45,44 +44,44 @@ export default async function FinancePage() {
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {withCourier.rows.map((r) => (
           <div key={r.currency} className="panel p-5">
-            <div className="text-[12px] text-ink-3">With the courier · {r.currency}</div>
-            <div className="mt-2 font-display text-[36px] leading-none tabular">{money(Number(r.total), r.currency, { compact: true })}</div>
-            <div className="mt-2 text-[12px] text-ink-3">
+            <div className="text-[11.5px] text-ink-3">With the courier · {r.currency}</div>
+            <div className="mt-2 font-display text-[20px] leading-none tabular">{money(Number(r.total), r.currency, { compact: true })}</div>
+            <div className="mt-2 text-[11.5px] text-ink-3">
               {num(r.n)} delivered cash orders · oldest {when(r.oldest)}
             </div>
           </div>
         ))}
         <div className="panel p-5">
-          <div className="text-[12px] text-ink-3">Refunds to issue</div>
-          <div className="mt-2 font-display text-[36px] leading-none tabular">{num(pending.reduce((a, r) => a + r.n, 0))}</div>
-          <div className="mt-2 text-[12px] text-ink-3">{pending.map((r) => money(Number(r.total), r.currency, { compact: true })).join(' · ') || 'nothing waiting'}</div>
+          <div className="text-[11.5px] text-ink-3">Refunds to issue</div>
+          <div className="mt-2 font-display text-[20px] leading-none tabular">{num(pending.reduce((a, r) => a + r.n, 0))}</div>
+          <div className="mt-2 text-[11.5px] text-ink-3">{pending.map((r) => money(Number(r.total), r.currency, { compact: true })).join(' · ') || 'nothing waiting'}</div>
           {pending.length > 0 && (
-            <Link href="/queue/finance?view=refunds" className="mt-3 inline-block text-[12.5px] hover:underline">
+            <Link href="/queue/finance?view=refunds" className="mt-3 inline-block text-[12px] hover:underline">
               Issue refunds →
             </Link>
           )}
         </div>
         <div className="panel p-5">
-          <div className="text-[12px] text-ink-3">Coming to finance soon</div>
-          <div className="mt-2 font-display text-[36px] leading-none tabular">{num(soon.reduce((a, r) => a + r.n, 0))}</div>
-          <div className="mt-2 text-[12px] text-ink-3">returns at the desk, not yet inspected</div>
+          <div className="text-[11.5px] text-ink-3">Coming to finance soon</div>
+          <div className="mt-2 font-display text-[20px] leading-none tabular">{num(soon.reduce((a, r) => a + r.n, 0))}</div>
+          <div className="mt-2 text-[11.5px] text-ink-3">returns at the desk, not yet inspected</div>
         </div>
         <div className="panel p-5">
-          <div className="text-[12px] text-ink-3">Refunded · 30 days</div>
-          <div className="mt-2 font-display text-[36px] leading-none tabular">{done.map((r) => money(Number(r.total), r.currency, { compact: true })).join(' + ') || '—'}</div>
-          <div className="mt-2 text-[12px] text-ink-3">{num(done.reduce((a, r) => a + r.n, 0))} returns</div>
+          <div className="text-[11.5px] text-ink-3">Refunded · 30 days</div>
+          <div className="mt-2 font-display text-[20px] leading-none tabular">{done.map((r) => money(Number(r.total), r.currency, { compact: true })).join(' + ') || '—'}</div>
+          <div className="mt-2 text-[11.5px] text-ink-3">{num(done.reduce((a, r) => a + r.n, 0))} returns</div>
         </div>
       </section>
 
       <section className="panel overflow-hidden">
         <header className="flex flex-wrap items-end justify-between gap-2 border-b border-line px-5 py-3.5">
           <div>
-            <h2 className="text-[15px] font-medium">Courier remittances</h2>
-            <p className="text-[12px] text-ink-3">Aramex collects cash at the door and remits it on Sundays and Wednesdays. Enter what landed in the bank; a match settles every order in the batch.</p>
+            <h2 className="text-[14px] font-medium">Courier remittances</h2>
+            <p className="text-[11.5px] text-ink-3">Aramex collects cash at the door and remits it on Sundays and Wednesdays. Enter what landed in the bank; a match settles every order in the batch.</p>
           </div>
         </header>
         <div className="scroll-thin overflow-x-auto">
-          <table className="table text-[13px]">
+          <table className="table text-[12.5px]">
             <thead>
               <tr>
                 <th>Remittance</th>
@@ -107,7 +106,7 @@ export default async function FinancePage() {
                     <td className="whitespace-nowrap text-right font-mono">{money(st.expected, st.currency)}</td>
                     <td className="whitespace-nowrap text-right font-mono">
                       {st.remitted != null ? money(st.remitted, st.currency) : '—'}
-                      {diff ? <div className="text-[11.5px] text-critical">{money(diff, st.currency, { sign: true })}</div> : null}
+                      {diff ? <div className="text-[11px] text-critical">{money(diff, st.currency, { sign: true })}</div> : null}
                     </td>
                     <td>
                       {st.status === 'matched' ? (
@@ -135,21 +134,21 @@ export default async function FinancePage() {
 
       <section className="grid gap-5 lg:grid-cols-2">
         <div className="panel p-5">
-          <h2 className="mb-4 text-[15px] font-medium">How customers pay · 30 days</h2>
+          <h2 className="mb-4 text-[14px] font-medium">How customers pay · 30 days</h2>
           <BarList rows={mix.rows.map((r) => ({ label: PAY[r.payment_method] ?? r.payment_method, value: r.n, sub: totalMix ? `${Math.round((r.n / totalMix) * 100)}%` : undefined }))} format={num} />
         </div>
         <div className="panel p-5">
-          <h2 className="mb-1 text-[15px] font-medium">Revenue lost to refusals · 30 days</h2>
-          <p className="mb-4 text-[12px] text-ink-3">Cash orders packed, shipped and brought back without a sale.</p>
+          <h2 className="mb-1 text-[14px] font-medium">Revenue lost to refusals · 30 days</h2>
+          <p className="mb-4 text-[11.5px] text-ink-3">Cash orders packed, shipped and brought back without a sale.</p>
           {rto.rows.length ? (
             rto.rows.map((r) => (
               <div key={r.currency} className="flex items-baseline justify-between border-b border-line py-2 last:border-0">
                 <span className="text-ink-2">{num(r.n)} parcels</span>
-                <span className="font-display text-[28px] tabular text-critical">{money(Number(r.total), r.currency, { compact: true })}</span>
+                <span className="font-display text-[16px] tabular text-critical">{money(Number(r.total), r.currency, { compact: true })}</span>
               </div>
             ))
           ) : (
-            <p className="text-[13px] text-ink-3">No refusals this month.</p>
+            <p className="text-[12.5px] text-ink-3">No refusals this month.</p>
           )}
         </div>
       </section>

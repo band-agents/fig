@@ -1,0 +1,19 @@
+{%- comment -%}
+  Website merchandising from the DH & DCO console: cross-sells under the add-to-bag form, upgrades,
+  and the store's pop-up, exactly as published in Stock & buying → Website merch.
+
+  Install once, in layout/theme.liquid just before </body>:
+    {% render 'dh-merch', store_id: 'labesny-web', console: 'https://ops.example.com' %}
+
+  store_id is the storefront's channel id (see README.md). To choose where the row sits on the
+  product page, put <div data-dh-merch></div> in the product section; without it, the row goes
+  after the add-to-bag form. Nothing else in the theme changes when a placement is published.
+{%- endcomment -%}
+{%- if store_id != blank and console != blank -%}
+  <script
+    src="{{ console }}/merch/embed.js"
+    data-store="{{ store_id }}"
+    {% if template contains 'product' %}data-product="{{ product.handle }}"{% endif %}
+    defer
+  ></script>
+{%- endif -%}

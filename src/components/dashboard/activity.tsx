@@ -3,6 +3,7 @@ import { ActorAvatar } from '@/components/ui/avatar';
 import { ChannelChip } from '@/components/ui/bits';
 import { ago } from '@/lib/format';
 import { ORDER_STAGE, RETURN_STAGE, type OrderStage, type ReturnStage } from '@/lib/domain/stages';
+import { actorLabel, isAutopilot } from '@/lib/domain/actors';
 
 export type FeedRow = {
   id: string;
@@ -21,7 +22,7 @@ export type FeedRow = {
 function line(e: FeedRow) {
   if (e.kind === 'stage' && e.toStage) {
     const m = ORDER_STAGE[e.toStage as OrderStage] ?? RETURN_STAGE[e.toStage as ReturnStage];
-    if (e.actorName === 'Relay Autopilot') return <>cleared it to <b className="font-medium">{m?.label}</b></>;
+    if (isAutopilot(e.actorName)) return <>cleared it to <b className="font-medium">{m?.label}</b></>;
     if (e.returnId) return <>{e.message}</>;
     return (
       <>
@@ -40,11 +41,11 @@ export function ActivityFeed({ rows }: { rows: FeedRow[] }) {
       {rows.map((e, i) => (
         <li key={e.id} className={`relative flex gap-3 rounded-lg px-2 py-2 ${i === 0 ? 'flash' : ''}`}>
           <ActorAvatar name={e.actorName} hue={e.actorHue} size={26} />
-          <div className="min-w-0 flex-1 text-[12.5px] leading-snug">
+          <div className="min-w-0 flex-1 text-[12px] leading-snug">
             <div className="text-ink-2">
-              <span className="font-medium text-ink">{e.actorName}</span> {line(e)}
+              <span className="font-medium text-ink">{actorLabel(e.actorName)}</span> {line(e)}
             </div>
-            <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-ink-3">
+            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-ink-3">
               {e.number && (
                 <Link href={e.returnId ? `/returns/${e.returnId}` : `/orders/${e.orderId}`} className="font-mono text-ink-2 hover:text-ink hover:underline">
                   {e.number}

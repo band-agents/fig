@@ -1,10 +1,12 @@
 import 'server-only';
 // Shopify Admin GraphQL (2025-07): pulls orders by updated_at, maps order webhooks, and, only when
-// RELAY_WRITE_BACK=true, tags stages, fulfils with tracking and marks COD orders paid.
+// RELAY_WRITE_BACK=true (or =dry, to see without sending), writes what the console does back to the
+// store: stage tags, holds, fulfilment with tracking, delivery steps, payment, cancels and refunds.
 import { channelEnv, type ChannelDef } from '../channels';
 import type { Connector, IncomingOrder, WriteBackChange, WriteBackResult } from './types';
 import { backoff, ConnectorError, errorText, fetchRetry, sleep } from './http';
 import { str } from './map-util';
+import { cancelReason, holdReason, matchLines, refundTransactions, type SuggestedTransaction } from './shopify-writeback';
 import {
   checkNote,
   customerDataHidden,
@@ -126,10 +128,21 @@ async function gql<T>(c: ChannelDef, query: string, variables: Record<string, un
   }
 }
 
+/**
+ * A read-only Admin GraphQL query, for callers outside the connector (the shopping concierge reads
+ * products, pages and policies through this). Mutations go through `mutate` and stay in this file.
+ */
+export async function shopifyRead<T>(c: ChannelDef, query: string, variables: Record<string, unknown> = {}): Promise<T> {
+  if (/^\s*mutation\b/i.test(query)) throw new ConnectorError('shopifyRead only reads.');
+  const body = await gql<T>(c, query, variables, { tries: 3, timeoutMs: 15_000 });
+  return body.data as T;
+}
+
 /** A mutation whose userErrors (HTTP 200) count as failure. */
 async function mutate(c: ChannelDef, query: string, variables: Record<string, unknown>, field: string) {
-  const body = await gql<Record<string, { userErrors?: { field?: string[] | null; message: string }[] } | null>>(c, query, variables);
-  const errs = body.data?.[field]?.userErrors ?? [];
+  type Errs = { field?: string[] | null; message: string }[];
+  const body = await gql<Record<string, { userErrors?: Errs; orderCancelUserErrors?: Errs } | null>>(c, query, variables);
+  const errs = [...(body.data?.[field]?.userErrors ?? []), ...(body.data?.[field]?.orderCancelUserErrors ?? [])];
   if (errs.length) throw new ConnectorError(`Shopify refused ${field}: ${errs.map((e) => `${(e.field ?? []).join('.')} ${e.message}`.trim()).join('; ')}`);
   return body.data?.[field];
 }
@@ -188,11 +201,14 @@ async function fetchOrder(c: ChannelDef, id: string, opts: { tries?: number; tim
 }
 
 // ── Write-back ─────────────────────────────────────────────────────────────────────────────────
+// Every change reads the order first and does nothing when the store already shows it (fulfilled,
+// held, cancelled, refunded), so a retry or a replayed event never doubles anything. With
+// RELAY_WRITE_BACK=dry the reads still happen and nothing is sent: the timeline says what would be.
 
 const TAGS_ADD = `mutation RelayTagsAdd($id: ID!, $tags: [String!]!) { tagsAdd(id: $id, tags: $tags) { node { id } userErrors { field message } } }`;
 const TAGS_REMOVE = `mutation RelayTagsRemove($id: ID!, $tags: [String!]!) { tagsRemove(id: $id, tags: $tags) { node { id } userErrors { field message } } }`;
 const FULFILMENT_ORDERS = `query RelayFulfilmentOrders($id: ID!) {
-  order(id: $id) { fulfillmentOrders(first: 10) { nodes { id status assignedLocation { location { id } } } } }
+  order(id: $id) { fulfillmentOrders(first: 10) { nodes { id status assignedLocation { location { id } } fulfillmentHolds { id handle reason } } } }
 }`;
 const FULFILMENT_CREATE = `mutation RelayFulfil($fulfillment: FulfillmentInput!) {
   fulfillmentCreate(fulfillment: $fulfillment) { fulfillment { id status } userErrors { field message } }
@@ -200,25 +216,71 @@ const FULFILMENT_CREATE = `mutation RelayFulfil($fulfillment: FulfillmentInput!)
 const MARK_PAID = `mutation RelayMarkPaid($input: OrderMarkAsPaidInput!) {
   orderMarkAsPaid(input: $input) { order { id displayFinancialStatus } userErrors { field message } }
 }`;
+const HOLD = `mutation RelayHold($id: ID!, $hold: FulfillmentOrderHoldInput!) {
+  fulfillmentOrderHold(id: $id, fulfillmentHold: $hold) { fulfillmentOrder { id status } userErrors { field message } }
+}`;
+const RELEASE = `mutation RelayRelease($id: ID!, $holdIds: [ID!]) {
+  fulfillmentOrderReleaseHold(id: $id, holdIds: $holdIds) { fulfillmentOrder { id status } userErrors { field message } }
+}`;
+const FULFILMENTS = `query RelayFulfilments($id: ID!) { order(id: $id) { fulfillments(first: 10) { id status createdAt } } }`;
+const EVENT = `mutation RelayEvent($event: FulfillmentEventInput!) {
+  fulfillmentEventCreate(fulfillmentEvent: $event) { fulfillmentEvent { id status } userErrors { field message } }
+}`;
+const CANCEL = `mutation RelayCancel($orderId: ID!, $reason: OrderCancelReason!, $notify: Boolean, $note: String) {
+  orderCancel(orderId: $orderId, reason: $reason, restock: true, notifyCustomer: $notify, staffNote: $note, refundMethod: { originalPaymentMethodsRefund: false }) {
+    job { id done } orderCancelUserErrors { field message code }
+  }
+}`;
+const ORDER_FOR_REFUND = `query RelayRefundable($id: ID!) {
+  order(id: $id) {
+    currencyCode cancelledAt displayFinancialStatus customer { id }
+    lineItems(first: 100) { nodes { id sku title quantity refundableQuantity variant { barcode } } }
+  }
+}`;
+const SUGGEST = `query RelaySuggest($id: ID!, $lines: [RefundLineItemInput!], $full: Boolean) {
+  order(id: $id) {
+    suggestedRefund(refundLineItems: $lines, suggestFullRefund: $full) {
+      amountSet { presentmentMoney { amount currencyCode } }
+      refundLineItems { lineItem { id } quantity }
+      suggestedTransactions { gateway kind parentTransaction { id } amountSet { presentmentMoney { amount } } maximumRefundableSet { presentmentMoney { amount } } }
+    }
+  }
+}`;
+const REFUND = `mutation RelayRefund($input: RefundInput!) {
+  refundCreate(input: $input) { refund { id totalRefundedSet { presentmentMoney { amount currencyCode } } } userErrors { field message } }
+}`;
+const CREDIT = `mutation RelayCredit($id: ID!, $credit: StoreCreditAccountCreditInput!) {
+  storeCreditAccountCredit(id: $id, creditInput: $credit) { storeCreditAccountTransaction { amount { amount currencyCode } } userErrors { field message } }
+}`;
 
-async function tagStage(c: ChannelDef, id: string, stage: string): Promise<WriteBackResult> {
+/** Holds this console placed carry this handle, so releasing never lifts a hold someone set in Shopify. */
+const HOLD_HANDLE = 'relay';
+
+type Send = (query: string, variables: Record<string, unknown>, field: string) => Promise<unknown>;
+const would = (dry: boolean, done: string) => (dry ? `dry run, would have ${done}` : done);
+const decimalsOf = (currency: string) => (currency === 'KWD' || currency === 'JOD' || currency === 'BHD' || currency === 'OMR' ? 3 : 2);
+const money = (minor: number, currency: string) => (minor / 10 ** decimalsOf(currency)).toFixed(decimalsOf(currency));
+
+async function tagStage(c: ChannelDef, id: string, stage: string, send: Send, dry: boolean): Promise<WriteBackResult> {
   const tag = `relay:${stage}`;
   const cur = await gql<{ order: { tags: string[] } | null }>(c, 'query RelayTags($id: ID!) { order(id: $id) { tags } }', { id });
   if (!cur.data?.order) return { ok: false, note: 'Shopify has no such order' };
   // tagsAdd/tagsRemove only touch the named tags; orderUpdate(tags) would replace the whole list.
-  await mutate(c, TAGS_ADD, { id, tags: [tag] }, 'tagsAdd');
+  await send(TAGS_ADD, { id, tags: [tag] }, 'tagsAdd');
   const stale = cur.data.order.tags.filter((t) => t.startsWith('relay:') && t !== tag);
-  if (stale.length) await mutate(c, TAGS_REMOVE, { id, tags: stale }, 'tagsRemove');
-  return { ok: true, note: `tagged ${tag} on Shopify` };
+  if (stale.length) await send(TAGS_REMOVE, { id, tags: stale }, 'tagsRemove');
+  return { ok: true, note: would(dry, `tagged ${tag}`) };
 }
 
-async function fulfil(c: ChannelDef, id: string, change: Extract<WriteBackChange, { kind: 'fulfil' }>): Promise<WriteBackResult> {
-  type Fo = { id: string; status: string; assignedLocation?: { location?: { id: string } | null } | null };
-  const body = await gql<{ order: { fulfillmentOrders: { nodes: Fo[] } } | null }>(c, FULFILMENT_ORDERS, { id });
-  const all = body.data?.order?.fulfillmentOrders.nodes ?? [];
+type Fo = { id: string; status: string; assignedLocation?: { location?: { id: string } | null } | null; fulfillmentHolds?: { id: string; handle: string | null; reason: string }[] };
+const fulfilmentOrders = async (c: ChannelDef, id: string) => (await gql<{ order: { fulfillmentOrders: { nodes: Fo[] } } | null }>(c, FULFILMENT_ORDERS, { id })).data?.order?.fulfillmentOrders.nodes ?? [];
+
+async function fulfil(c: ChannelDef, id: string, change: Extract<WriteBackChange, { kind: 'fulfil' }>, send: Send, dry: boolean): Promise<WriteBackResult> {
+  const all = await fulfilmentOrders(c, id);
   const open = all.filter((f) => f.status === 'OPEN' || f.status === 'IN_PROGRESS');
   if (!open.length) {
-    return all.some((f) => f.status === 'CLOSED') ? { ok: true, note: 'already fulfilled on Shopify' } : { ok: false, note: 'Shopify has nothing open to fulfil on this order' };
+    if (all.some((f) => f.status === 'ON_HOLD')) return { ok: false, note: 'the order is on hold in Shopify: release it there or here first' };
+    return all.some((f) => f.status === 'CLOSED') ? { ok: true, note: 'already fulfilled in Shopify' } : { ok: false, note: 'Shopify has nothing open to fulfil on this order' };
   }
   const company = /aramex/i.test(change.company) ? 'Aramex' : change.company;
   // One fulfilment per location; the customer is notified once.
@@ -229,8 +291,7 @@ async function fulfil(c: ChannelDef, id: string, change: Extract<WriteBackChange
   }
   let first = true;
   for (const group of byLocation.values()) {
-    await mutate(
-      c,
+    await send(
       FULFILMENT_CREATE,
       {
         fulfillment: {
@@ -243,15 +304,107 @@ async function fulfil(c: ChannelDef, id: string, change: Extract<WriteBackChange
     );
     first = false;
   }
-  return { ok: true, note: `fulfilled on Shopify with ${company} ${change.tracking}` };
+  return { ok: true, note: would(dry, `fulfilled with ${company} ${change.tracking}${change.notifyCustomer ? ', customer emailed' : ''}`) };
 }
 
-async function markPaid(c: ChannelDef, id: string): Promise<WriteBackResult> {
+async function markPaid(c: ChannelDef, id: string, send: Send, dry: boolean): Promise<WriteBackResult> {
   const cur = await gql<{ order: { displayFinancialStatus: string | null } | null }>(c, 'query RelayPaid($id: ID!) { order(id: $id) { displayFinancialStatus } }', { id });
   if (!cur.data?.order) return { ok: false, note: 'Shopify has no such order' };
-  if (cur.data.order.displayFinancialStatus === 'PAID') return { ok: true, note: 'already paid on Shopify' };
-  await mutate(c, MARK_PAID, { input: { id } }, 'orderMarkAsPaid');
-  return { ok: true, note: 'marked paid on Shopify' };
+  if (cur.data.order.displayFinancialStatus === 'PAID') return { ok: true, note: 'already paid in Shopify' };
+  await send(MARK_PAID, { input: { id } }, 'orderMarkAsPaid');
+  return { ok: true, note: would(dry, 'marked paid') };
+}
+
+async function hold(c: ChannelDef, id: string, reason: string, send: Send, dry: boolean): Promise<WriteBackResult> {
+  const all = await fulfilmentOrders(c, id);
+  const open = all.filter((f) => f.status === 'OPEN' || f.status === 'IN_PROGRESS' || f.status === 'SCHEDULED');
+  if (!open.length) return all.some((f) => f.status === 'ON_HOLD') ? { ok: true, note: 'already on hold in Shopify' } : { ok: true, skipped: true, note: 'nothing left to fulfil in Shopify' };
+  for (const f of open) await send(HOLD, { id: f.id, hold: { reason: holdReason(reason), reasonNotes: reason.slice(0, 250), handle: HOLD_HANDLE, notifyMerchant: false } }, 'fulfillmentOrderHold');
+  return { ok: true, note: would(dry, `put the fulfilment on hold (${reason})`) };
+}
+
+async function release(c: ChannelDef, id: string, send: Send, dry: boolean): Promise<WriteBackResult> {
+  const all = await fulfilmentOrders(c, id);
+  const held = all.filter((f) => f.status === 'ON_HOLD' && (f.fulfillmentHolds ?? []).some((h) => h.handle === HOLD_HANDLE));
+  if (!held.length) return { ok: true, note: 'no hold from the console in Shopify' };
+  for (const f of held) await send(RELEASE, { id: f.id, holdIds: (f.fulfillmentHolds ?? []).filter((h) => h.handle === HOLD_HANDLE).map((h) => h.id) }, 'fulfillmentOrderReleaseHold');
+  return { ok: true, note: would(dry, 'released the hold') };
+}
+
+const EVENT_TEXT = { OUT_FOR_DELIVERY: 'out for delivery', DELIVERED: 'delivered', FAILURE: 'delivery failed' } as const;
+
+async function delivery(c: ChannelDef, id: string, change: Extract<WriteBackChange, { kind: 'delivery' }>, send: Send, dry: boolean): Promise<WriteBackResult> {
+  const body = await gql<{ order: { fulfillments: { id: string; status: string; createdAt: string }[] } | null }>(c, FULFILMENTS, { id });
+  const shipment = (body.data?.order?.fulfillments ?? []).filter((f) => f.status !== 'CANCELLED').sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (!shipment) return { ok: false, note: 'no shipment in Shopify yet to mark' };
+  await send(EVENT, { event: { fulfillmentId: shipment.id, status: change.status, happenedAt: new Date().toISOString(), ...(change.message ? { message: change.message.slice(0, 250) } : {}) } }, 'fulfillmentEventCreate');
+  return { ok: true, note: would(dry, `marked the shipment ${EVENT_TEXT[change.status]}`) };
+}
+
+async function cancel(c: ChannelDef, id: string, change: Extract<WriteBackChange, { kind: 'cancel' }>, send: Send, dry: boolean): Promise<WriteBackResult> {
+  const cur = await gql<{ order: { cancelledAt: string | null } | null }>(c, 'query RelayCancelled($id: ID!) { order(id: $id) { cancelledAt } }', { id });
+  if (!cur.data?.order) return { ok: false, note: 'Shopify has no such order' };
+  if (cur.data.order.cancelledAt) return { ok: true, note: 'already cancelled in Shopify' };
+  await send(CANCEL, { orderId: id, reason: cancelReason(change.reason), notify: change.notifyCustomer, note: `From the console: ${change.reason}`.slice(0, 250) }, 'orderCancel');
+  return { ok: true, note: would(dry, `cancelled and restocked, no refund (${change.reason})${change.notifyCustomer ? ', customer emailed' : ''}`) };
+}
+
+type RefundOrder = { currencyCode: string; cancelledAt: string | null; displayFinancialStatus: string | null; customer: { id: string } | null; lineItems: { nodes: { id: string; sku: string | null; title: string; quantity: number; refundableQuantity: number; variant: { barcode: string | null } | null }[] } };
+type Suggested = {
+  amountSet: { presentmentMoney: { amount: string; currencyCode: string } };
+  refundLineItems: { lineItem: { id: string }; quantity: number }[];
+  suggestedTransactions: SuggestedTransaction[];
+};
+
+async function refund(c: ChannelDef, id: string, change: Extract<WriteBackChange, { kind: 'refund' }>, send: Send, dry: boolean): Promise<WriteBackResult> {
+  const order = (await gql<{ order: RefundOrder | null }>(c, ORDER_FOR_REFUND, { id })).data?.order;
+  if (!order) return { ok: false, note: 'Shopify has no such order' };
+  const { lines, missing } = matchLines(order.lineItems.nodes, change.lines);
+  if (!lines.length) return { ok: missing.length === 0, note: missing.length ? `no refundable line in Shopify for ${missing.join(', ')}` : 'already refunded in Shopify' };
+  const cur = order.currencyCode || change.currency;
+  const dec = decimalsOf(cur);
+  const note = `${change.returnNumber} from the console`;
+  if (change.method === 'cash_at_store') {
+    await send(REFUND, { input: { orderId: id, note: `${note}: paid in cash at the store`, notify: false, refundLineItems: lines } }, 'refundCreate');
+    return { ok: true, note: would(dry, `recorded ${change.returnNumber} as refunded in cash at the store`) };
+  }
+  if (change.method === 'store_credit') {
+    const value = Math.max(0, change.amount - change.bonus);
+    await send(REFUND, { input: { orderId: id, note, notify: change.notifyCustomer, refundLineItems: lines, refundMethods: [{ storeCreditRefund: { amount: { amount: money(value, cur), currencyCode: cur } } }] } }, 'refundCreate');
+    // the bonus is more than the goods were worth, so it goes on the account as credit of its own
+    if (change.bonus > 0 && order.customer?.id) await send(CREDIT, { id: order.customer.id, credit: { creditAmount: { amount: money(change.bonus, cur), currencyCode: cur }, notify: change.notifyCustomer } }, 'storeCreditAccountCredit');
+    return { ok: true, note: would(dry, `refunded ${change.returnNumber} as store credit, ${cur} ${money(change.amount, cur)}${change.bonus ? ` with the ${cur} ${money(change.bonus, cur)} bonus` : ''}`) };
+  }
+  const suggestion = (await gql<{ order: { suggestedRefund: Suggested | null } | null }>(c, SUGGEST, { id, lines })).data?.order?.suggestedRefund;
+  const want = Number(money(change.amount, cur));
+  const transactions = refundTransactions(id, suggestion?.suggestedTransactions ?? [], want, dec);
+  if (!transactions.length) {
+    if (['PAID', 'PARTIALLY_PAID', 'PARTIALLY_REFUNDED'].includes(order.displayFinancialStatus ?? '')) {
+      // paid online, yet Shopify suggests no money for these pieces (a free or zero-priced line?)
+      return { ok: false, note: `Shopify sees nothing to pay back for ${change.returnNumber}'s pieces: refund it by hand in Shopify` };
+    }
+    // nothing was paid through a gateway (cash on delivery not collected): the pieces are marked refunded only
+    await send(REFUND, { input: { orderId: id, note: `${note}: nothing paid online to send back`, notify: false, refundLineItems: lines } }, 'refundCreate');
+    return { ok: true, note: would(dry, `marked ${change.returnNumber} refunded; nothing was paid online to send back`) };
+  }
+  await send(REFUND, { input: { orderId: id, note, notify: change.notifyCustomer, refundLineItems: lines, transactions } }, 'refundCreate');
+  const sent = transactions.reduce((a, t) => a + Number(t.amount), 0).toFixed(dec);
+  return { ok: true, note: would(dry, `refunded ${change.returnNumber}: ${cur} ${sent} back through ${[...new Set(transactions.map((t) => t.gateway))].join(' and ')}`) };
+}
+
+async function refundOrder(c: ChannelDef, id: string, change: Extract<WriteBackChange, { kind: 'refund_order' }>, send: Send, dry: boolean): Promise<WriteBackResult> {
+  const order = (await gql<{ order: RefundOrder | null }>(c, ORDER_FOR_REFUND, { id })).data?.order;
+  if (!order) return { ok: false, note: 'Shopify has no such order' };
+  if (order.displayFinancialStatus === 'REFUNDED') return { ok: true, note: 'already refunded in Shopify' };
+  const cur = order.currencyCode;
+  const suggestion = (await gql<{ order: { suggestedRefund: Suggested | null } | null }>(c, SUGGEST, { id, full: true })).data?.order?.suggestedRefund;
+  const total = Number(suggestion?.amountSet.presentmentMoney.amount ?? 0);
+  const transactions = refundTransactions(id, suggestion?.suggestedTransactions ?? [], total, decimalsOf(cur));
+  if (!transactions.length) return { ok: true, note: 'nothing paid online to refund in Shopify' };
+  const lines = (suggestion?.refundLineItems ?? []).filter((l) => l.quantity > 0).map((l) => ({ lineItemId: l.lineItem.id, quantity: l.quantity, restockType: 'NO_RESTOCK' as const }));
+  await send(REFUND, { input: { orderId: id, note: 'Cancelled order, refunded from the console', notify: change.notifyCustomer, refundLineItems: lines, transactions } }, 'refundCreate');
+  const sent = transactions.reduce((a, t) => a + Number(t.amount), 0).toFixed(decimalsOf(cur));
+  return { ok: true, note: would(dry, `refunded the cancelled order: ${cur} ${sent} back through ${[...new Set(transactions.map((t) => t.gateway))].join(' and ')}`) };
 }
 
 // ── Connector ──────────────────────────────────────────────────────────────────────────────────
@@ -329,13 +482,34 @@ export const shopify: Connector = {
   },
 
   async writeBack(c, order, change) {
-    if (process.env.RELAY_WRITE_BACK !== 'true') return { ok: false, skipped: true, note: 'write-back is off' };
+    const mode = process.env.RELAY_WRITE_BACK;
+    if (mode !== 'true' && mode !== 'dry') return { ok: false, skipped: true, note: 'write-back is off' };
     const id = order.externalId;
     if (!id.startsWith('gid://shopify/Order/')) return { ok: false, skipped: true, note: `${order.number} is not a Shopify order` };
+    const dry = mode === 'dry';
+    // a dry run reads the store as usual and sends nothing
+    const send: Send = dry ? async () => null : (query, variables, field) => mutate(c, query, variables, field);
     try {
-      if (change.kind === 'stage_tag') return await tagStage(c, id, change.stage);
-      if (change.kind === 'fulfil') return await fulfil(c, id, change);
-      return await markPaid(c, id);
+      switch (change.kind) {
+        case 'stage_tag':
+          return await tagStage(c, id, change.stage, send, dry);
+        case 'fulfil':
+          return await fulfil(c, id, change, send, dry);
+        case 'mark_paid':
+          return await markPaid(c, id, send, dry);
+        case 'hold':
+          return await hold(c, id, change.reason, send, dry);
+        case 'release':
+          return await release(c, id, send, dry);
+        case 'delivery':
+          return await delivery(c, id, change, send, dry);
+        case 'cancel':
+          return await cancel(c, id, change, send, dry);
+        case 'refund':
+          return await refund(c, id, change, send, dry);
+        case 'refund_order':
+          return await refundOrder(c, id, change, send, dry);
+      }
     } catch (err) {
       return { ok: false, note: message(err) };
     }
@@ -428,4 +602,154 @@ export async function draftProduct(c: ChannelDef, id: string) {
 export async function publishProduct(c: ChannelDef, id: string) {
   await mutate(c, SET_STATUS, { input: { id, status: 'ACTIVE' } }, 'productUpdate');
   await mutate(c, TAGS_REMOVE, { id, tags: [OOS_TAG] }, 'tagsRemove');
+}
+
+// ── Order webhooks ─────────────────────────────────────────────────────────────────────────────
+
+/** The topics the webhook route reads (see Setup → Channels). Without them orders wait for the next sync. */
+export const ORDER_WEBHOOK_TOPICS = ['ORDERS_CREATE', 'ORDERS_UPDATED', 'ORDERS_PAID', 'ORDERS_CANCELLED', 'ORDERS_FULFILLED'] as const;
+
+const WEBHOOKS = `{ webhookSubscriptions(first: 100) { nodes { id topic uri format } } }`;
+const WEBHOOK_CREATE = `mutation RelayWebhook($topic: WebhookSubscriptionTopic!, $sub: WebhookSubscriptionInput!) {
+  webhookSubscriptionCreate(topic: $topic, webhookSubscription: $sub) { webhookSubscription { id topic uri } userErrors { field message } }
+}`;
+
+/** This app's webhook subscriptions on the store. Another app's webhooks are not visible here. */
+export async function orderWebhooks(c: ChannelDef) {
+  const body = await gql<{ webhookSubscriptions: { nodes: { id: string; topic: string; uri: string; format: string }[] } }>(c, WEBHOOKS);
+  return body.data?.webhookSubscriptions.nodes ?? [];
+}
+
+/**
+ * Points the store's order webhooks at `address` (…/api/webhooks/shopify/<channel>), so an order shows
+ * within seconds instead of at the next sync. Shopify signs them with the app's client secret, which the
+ * route already checks. Topics already sent to `address` are left alone; with `apply` false nothing is written.
+ */
+export async function registerOrderWebhooks(c: ChannelDef, address: string, apply: boolean) {
+  const have = await orderWebhooks(c);
+  const missing = ORDER_WEBHOOK_TOPICS.filter((t) => !have.some((w) => w.topic === t && w.uri === address));
+  const created: string[] = [];
+  if (apply) for (const topic of missing) {
+    await mutate(c, WEBHOOK_CREATE, { topic, sub: { uri: address, format: 'JSON' } }, 'webhookSubscriptionCreate');
+    created.push(topic);
+  }
+  return { have, missing, created };
+}
+
+// ── Catalogue and stock, for the stockroom ─────────────────────────────────────────────────────
+
+const BULK_CATALOGUE = `{
+  productVariants(query: "product_status:active") {
+    edges {
+      node {
+        id sku barcode price compareAtPrice inventoryQuantity
+        selectedOptions { name value }
+        product { id title handle vendor productType tags createdAt featuredImage { url } }
+      }
+    }
+  }
+}`;
+
+export type CatalogueVariant = {
+  id: string;
+  sku: string | null;
+  barcode: string | null;
+  price: string;
+  compareAtPrice: string | null;
+  inventoryQuantity: number | null;
+  selectedOptions: { name: string; value: string }[];
+  product: { id: string; title: string; handle: string; vendor: string; productType: string; tags: string[]; createdAt: string; featuredImage: { url: string } | null };
+};
+
+const START_BULK = `mutation RelayCatalogueExport($query: String!) {
+  bulkOperationRunQuery(query: $query) { bulkOperation { id status } userErrors { field message } }
+}`;
+const BULK_STATUS = `query RelayBulkStatus($id: ID!) { node(id: $id) { ... on BulkOperation { id status errorCode objectCount url } } }`;
+
+/**
+ * Every active variant with its product and the stock Shopify holds for it, in one read.
+ *
+ * A catalogue of tens of thousands of sizes is too big to page through quickly, so this asks Shopify
+ * for a bulk export: a background job that reads the catalogue and hands back a file. It changes
+ * nothing in the store; it is the read Shopify recommends for a whole catalogue.
+ */
+export async function exportCatalogue(c: ChannelDef, log: (m: string) => void = () => {}): Promise<CatalogueVariant[]> {
+  return (await runBulk(c, BULK_CATALOGUE, log)).map((l) => JSON.parse(l) as CatalogueVariant).filter((v) => v.product);
+}
+
+/** Starts a bulk export, waits for it, and hands back its lines (JSONL). Read-only towards the store. */
+async function runBulk(c: ChannelDef, query: string, log: (m: string) => void): Promise<string[]> {
+  const started = await mutate(c, START_BULK, { query }, 'bulkOperationRunQuery');
+  const id = (started as { bulkOperation?: { id: string } } | null)?.bulkOperation?.id;
+  if (!id) throw new ConnectorError('Shopify did not start the catalogue export.');
+  let url: string | null = null;
+  for (let i = 0; i < 360; i++) {
+    await sleep(i < 5 ? 2000 : 5000);
+    const body = await gql<{ node: { status: string; errorCode: string | null; objectCount: string; url: string | null } | null }>(c, BULK_STATUS, { id });
+    const op = body.data?.node;
+    if (!op) continue;
+    if (i % 4 === 0) log(`  Shopify export ${op.status.toLowerCase()} · ${op.objectCount} rows`);
+    if (op.status === 'COMPLETED') {
+      url = op.url;
+      break;
+    }
+    if (['FAILED', 'CANCELED', 'EXPIRED'].includes(op.status)) throw new ConnectorError(`Shopify's catalogue export ${op.status.toLowerCase()}${op.errorCode ? ` (${op.errorCode})` : ''}.`);
+  }
+  if (!url) return [];
+  const res = await fetchRetry(url, {}, { label: 'Shopify export file', timeoutMs: 180_000 });
+  if (!res.ok) throw new ConnectorError(`Could not download Shopify's export (${res.status}).`);
+  return (await res.text()).split('\n').filter((l) => l.trim());
+}
+
+// ── Every product, live or not, for the website-against-Lucida comparison ─────────────────────
+
+const BULK_WEBSITE = `{
+  products {
+    edges {
+      node {
+        id handle title vendor status productType tags
+        description(truncateAt: 40)
+        featuredImage { url }
+        variants {
+          edges { node { id sku barcode price compareAtPrice inventoryQuantity selectedOptions { name value } } }
+        }
+      }
+    }
+  }
+}`;
+
+export type WebsiteProduct = {
+  id: string;
+  handle: string;
+  title: string;
+  vendor: string;
+  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED' | string;
+  productType: string;
+  tags: string[];
+  description: string;
+  featuredImage: { url: string } | null;
+  variants: { id: string; sku: string | null; barcode: string | null; price: string; compareAtPrice: string | null; inventoryQuantity: number | null; selectedOptions: { name: string; value: string }[] }[];
+};
+
+/** Every product the store holds, whatever its status, with its sizes. One bulk export. */
+export async function exportWebsiteItems(c: ChannelDef, log: (m: string) => void = () => {}): Promise<WebsiteProduct[]> {
+  const lines = await runBulk(c, BULK_WEBSITE, log);
+  const products = new Map<string, WebsiteProduct>();
+  const orphans: { parent: string; v: WebsiteProduct['variants'][number] }[] = [];
+  for (const l of lines) {
+    const o = JSON.parse(l) as Record<string, unknown> & { id: string; __parentId?: string };
+    if (o.__parentId) orphans.push({ parent: o.__parentId, v: o as unknown as WebsiteProduct['variants'][number] });
+    else products.set(o.id, { ...(o as unknown as WebsiteProduct), variants: [] });
+  }
+  for (const { parent, v } of orphans) products.get(parent)?.variants.push(v);
+  return [...products.values()];
+}
+
+/** The store's stock locations, the one that ships website orders first. */
+export async function stockLocations(c: ChannelDef) {
+  const body = await gql<{ locations: { nodes: { id: string; name: string; isActive: boolean; fulfillsOnlineOrders: boolean; address: { city: string | null } }[] } }>(
+    c,
+    `{ locations(first: 50) { nodes { id name isActive fulfillsOnlineOrders address { city } } } }`,
+  );
+  return (body.data?.locations.nodes ?? []).filter((l) => l.isActive).sort((a, b) => Number(b.fulfillsOnlineOrders) - Number(a.fulfillsOnlineOrders));
 }

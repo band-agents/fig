@@ -52,10 +52,12 @@ describe('matching a shop to what is coming back', () => {
     expect(shops.map((b) => b.id)).toContain('celio-marina');
   });
 
-  it('falls back to every shop for a brand with no counter of its own', () => {
-    /* bebe and Springfield sell on Labesny but have no Kuwait shop on the list; a customer is shown
-       the whole set rather than an empty one, and the desk settles it on approval. */
-    expect(branchesForReturn('Labesny', 'KW', ['BEBE'])).toHaveLength(27);
+  it('shows no shop at all for a brand with no counter of its own', () => {
+    /* bebe and Springfield sell on Labesny but have no Kuwait shop on the list. Another brand's
+       counter cannot take them back, so the customer is shown none and the desk settles it. */
+    expect(branchesForReturn('Labesny', 'KW', ['BEBE'])).toEqual([]);
+    // A mixed basket still gets the shops of the brand that has them.
+    expect(branchesForReturn('Labesny', 'KW', ['BEBE', 'YAMAMAY']).map((b) => b.id)).toEqual(['yamamay-avenues', 'yamamay-kout']);
   });
 
   it('accepts only an id from that market', () => {

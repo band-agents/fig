@@ -5,7 +5,7 @@ import { EventEmitter } from 'node:events';
 // SSE (/api/stream). One instance per server process, which is what a single Relay deployment runs.
 
 export type LiveEvent = {
-  kind: 'order' | 'return' | 'sync' | 'presence';
+  kind: 'order' | 'return' | 'sync' | 'presence' | 'stock';
   id?: string;
   number?: string;
   channelId?: string;

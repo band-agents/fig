@@ -52,10 +52,25 @@ export type ConnectionCheck = {
   missing?: string[]; // scopes Relay needs and the token lacks
 };
 
+/**
+ * What the console tells the store (Dan, 24 Oct: "when we take action here it affects Shopify").
+ * Stock and prices are not here on purpose: Lucida keeps those in Shopify, and two writers would fight.
+ */
 export type WriteBackChange =
   | { kind: 'stage_tag'; stage: string }
   | { kind: 'fulfil'; tracking: string; company: string; url?: string | null; notifyCustomer: boolean }
-  | { kind: 'mark_paid' };
+  | { kind: 'mark_paid' }
+  /** the order's fulfilment held in the store, with the reason, or released */
+  | { kind: 'hold'; reason: string }
+  | { kind: 'release' }
+  /** a step on the shipment: the customer's order page follows */
+  | { kind: 'delivery'; status: 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILURE'; message?: string }
+  /** cancelled and restocked; money is refunded separately, from Finance */
+  | { kind: 'cancel'; reason: string; notifyCustomer: boolean }
+  /** a return refunded: back to the card, to store credit (bonus on top), or recorded as cash paid at a store */
+  | { kind: 'refund'; returnNumber: string; lines: { sku: string | null; barcode: string | null; title: string; quantity: number }[]; amount: number; bonus: number; currency: string; method: 'original' | 'store_credit' | 'cash_at_store'; notifyCustomer: boolean }
+  /** a cancelled order that had been paid: everything back the way it was paid */
+  | { kind: 'refund_order'; notifyCustomer: boolean };
 
 export type WriteBackResult = { ok: boolean; note: string; skipped?: boolean };
 

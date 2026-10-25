@@ -1,8 +1,8 @@
 import 'server-only';
-import { and, eq, inArray, isNotNull, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, ne, or } from 'drizzle-orm';
 import { getDb, schema } from './db';
 import { CHANNEL, CHANNELS, channelConfigured, type ChannelDef } from './channels';
-import { connectorFor, aramexConfigured, classifyUpdate, trackShipments } from './connectors';
+import { connectorFor, aramexConfigured, classifyUpdate, trackShipments, type TrackUpdate } from './connectors';
 import type { ConnectionCheck } from './connectors/types';
 import { flagException, ingestOrder, moveOrder, type Actor } from './engine';
 import { publish } from './bus';
@@ -14,7 +14,7 @@ import { publish } from './bus';
 const OVERLAP = 10 * 60_000;
 const running = new Set<string>();
 
-export async function syncChannel(c: ChannelDef, opts: { days?: number } = {}) {
+export async function syncChannel(c: ChannelDef, opts: { days?: number; full?: boolean } = {}) {
   if (running.has(c.id)) return { ok: false, note: 'Already syncing' };
   const connector = connectorFor(c);
   if (!connector || !channelConfigured(c)) return { ok: false, note: 'Not connected' };
@@ -23,7 +23,8 @@ export async function syncChannel(c: ChannelDef, opts: { days?: number } = {}) {
   const started = new Date();
   const [run] = await db.insert(schema.syncRuns).values({ channelId: c.id, startedAt: started }).returning();
   const [row] = await db.select().from(schema.channels).where(eq(schema.channels.id, c.id));
-  const since = row?.cursor ? new Date(new Date(row.cursor).getTime() - OVERLAP) : null;
+  // a full pull ignores the high-water mark and reads back `days`: for a store's whole history
+  const since = row?.cursor && !opts.full ? new Date(new Date(row.cursor).getTime() - OVERLAP) : null;
   let fetched = 0;
   let created = 0;
   let updated = 0;
@@ -72,18 +73,44 @@ export async function checkChannel(c: ChannelDef): Promise<ConnectionCheck> {
   }
 }
 
-/** Asks Aramex about every live parcel still on the road and moves orders when the courier says so. */
+/** Every courier in one pass: Aramex for its parcels, UPS (GMTC) for Kuwait's. */
 export async function trackCouriers() {
+  const { trackUps } = await import('./gmtc-shipments');
+  const [aramex, ups] = await Promise.all([
+    trackAramex().catch((e) => ({ ok: false, note: `Aramex: ${e instanceof Error ? e.message : e}` })),
+    trackUps().catch((e) => ({ ok: false, note: `UPS: ${e instanceof Error ? e.message : e}` })),
+  ]);
+  return { ok: aramex.ok || ups.ok, note: [aramex.note, ups.note].join(' · ') };
+}
+
+/** Asks Aramex about every live parcel still on the road and moves orders when the courier says so. */
+async function trackAramex() {
   if (!aramexConfigured()) return { ok: false, note: 'Aramex is not configured' };
   const db = await getDb();
   const open = await db
     .select()
     .from(schema.orders)
-    .where(and(inArray(schema.orders.stage, ['shipped', 'delivering']), isNotNull(schema.orders.tracking), ne(schema.orders.source, 'demo')));
+    .where(and(inArray(schema.orders.stage, ['shipped', 'delivering']), isNotNull(schema.orders.tracking), ne(schema.orders.source, 'demo'), or(isNull(schema.orders.courier), ne(schema.orders.courier, 'UPS Kuwait'))));
   if (!open.length) return { ok: true, note: 'Nothing on the road' };
-  const updates = await trackShipments(open.map((o) => o.tracking!));
-  let moved = 0;
+  // Each country's parcels go to its own Aramex account (ARAMEX_JO_* for Jordan), else the default one.
+  const byCountry = new Map<string, typeof open>();
   for (const o of open) {
+    const cc = CHANNEL[o.channelId]?.country ?? '';
+    byCountry.set(cc, [...(byCountry.get(cc) ?? []), o]);
+  }
+  const updates = new Map<string, TrackUpdate[]>();
+  const tracked: typeof open = [];
+  const skipped: string[] = [];
+  for (const [cc, group] of byCountry) {
+    if (!aramexConfigured(cc || null)) {
+      skipped.push(`${group.length} in ${cc || 'unknown country'}`);
+      continue;
+    }
+    for (const [awb, list] of await trackShipments(group.map((o) => o.tracking!), cc || null)) updates.set(awb, list);
+    tracked.push(...group);
+  }
+  let moved = 0;
+  for (const o of tracked) {
     const list = updates.get(o.tracking!) ?? [];
     const last = [...list].sort((a, b) => b.at.getTime() - a.at.getTime())[0];
     if (!last) continue;
@@ -106,5 +133,6 @@ export async function trackCouriers() {
       // a stage rule refused the move (e.g. the order is on hold); the next run will try again
     }
   }
-  return { ok: true, note: `${open.length} parcels checked · ${moved} moved` };
+  const left = skipped.length ? ` · no Aramex account for ${skipped.join(', ')}` : '';
+  return { ok: true, note: `${tracked.length} parcels checked · ${moved} moved${left}` };
 }

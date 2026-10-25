@@ -12,6 +12,7 @@ export type OrderFilters = {
   pay?: string;
   risk?: string;
   sla?: string;
+  from?: string; // the branch it ships from, or "none" for not decided
   sort?: string; // new | old | due | value | risk
   page?: number;
   limit?: number;
@@ -29,7 +30,7 @@ export const VIEWS = [
 ] as const;
 
 export function filterSql(p: Principal, f: OrderFilters): SQL {
-  const parts: SQL[] = [scope(p, sql`o.channel_id`)];
+  const parts: SQL[] = [scope(p, sql`o.channel_id`, sql`o.id`)];
   switch (f.view ?? 'open') {
     case 'open':
       parts.push(sql`o.stage not in ('settled','cancelled','rto_closed','delivered')`);
@@ -57,6 +58,7 @@ export function filterSql(p: Principal, f: OrderFilters): SQL {
       break;
   }
   if (f.channel) parts.push(sql`o.channel_id = ${f.channel}`);
+  if (f.from) parts.push(f.from === 'none' ? sql`o.ship_from is null` : sql`o.ship_from = ${f.from}`);
   if (f.stage) parts.push(sql`o.stage = ${f.stage}`);
   if (f.pay) parts.push(sql`o.payment_method = ${f.pay}`);
   if (f.risk) parts.push(sql`o.risk_level = ${f.risk}`);
@@ -104,9 +106,11 @@ export type OrderRow = {
   riskReasons: { code: string; label: string; weight: number }[];
   items: number;
   images: (string | null)[];
-  lines: { title: string; size: string | null; image: string | null; quantity: number; sku: string | null; brand: string | null }[];
+  lines: { title: string; size: string | null; image: string | null; quantity: number; sku: string | null; barcode: string | null; brand: string | null }[];
   tracking: string | null;
   courier: string | null;
+  /** The branch it leaves from, once someone has set it. */
+  shipFrom: string | null;
   assignee: string | null;
   vip: boolean;
   history: { orders: number; delivered: number; refused: number; returned: number } | null;
@@ -121,7 +125,7 @@ export async function listOrders(p: Principal, f: OrderFilters) {
   const [rows, count] = await Promise.all([
     db.execute<Record<string, unknown>>(sql`
       select o.*, u.name as assignee_name, c.vip, c.orders as c_orders, c.delivered as c_delivered, c.refused as c_refused, c.returned as c_returned,
-        coalesce((select json_agg(json_build_object('title', i.title, 'size', i.size, 'image', i.image, 'quantity', i.quantity, 'sku', i.sku, 'brand', i.brand) order by i.id) from order_items i where i.order_id = o.id), '[]') as lines
+        coalesce((select json_agg(json_build_object('title', i.title, 'size', i.size, 'image', i.image, 'quantity', i.quantity, 'sku', i.sku, 'barcode', i.barcode, 'brand', i.brand) order by i.id) from order_items i where i.order_id = o.id), '[]') as lines
       from orders o
       left join users u on u.id = o.assignee_id
       left join customers c on c.id = o.customer_id
@@ -160,6 +164,7 @@ export async function listOrders(p: Principal, f: OrderFilters) {
       lines,
       tracking: (r.tracking as string) ?? null,
       courier: (r.courier as string) ?? null,
+      shipFrom: (r.ship_from_name as string) ?? (r.ship_from as string) ?? null,
       assignee: (r.assignee_name as string) ?? null,
       vip: Boolean(r.vip),
       history: r.c_orders != null ? { orders: Number(r.c_orders), delivered: Number(r.c_delivered), refused: Number(r.c_refused), returned: Number(r.c_returned) } : null,
@@ -170,7 +175,7 @@ export async function listOrders(p: Principal, f: OrderFilters) {
 
 export async function viewCounts(p: Principal) {
   const db = await getDb();
-  const s = scope(p, sql`o.channel_id`);
+  const s = scope(p, sql`o.channel_id`, sql`o.id`);
   const r = await db.execute<Record<string, number>>(sql`
     select
       count(*) filter (where o.stage not in ('settled','cancelled','rto_closed','delivered'))::int as open,

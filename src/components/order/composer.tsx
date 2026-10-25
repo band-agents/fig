@@ -24,7 +24,7 @@ export function NoteComposer({ target, placeholder = 'Add a note for the team…
         }}
         rows={1}
         placeholder={placeholder}
-        className="max-h-32 min-h-[34px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[13.5px] outline-none placeholder:text-ink-4"
+        className="max-h-32 min-h-[34px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[12.5px] outline-none placeholder:text-ink-4"
       />
       <button onClick={submit} disabled={pending || !text.trim()} className="btn btn-quiet btn-sm !size-8 !p-0" aria-label="Post note">
         {pending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-3.5" />}

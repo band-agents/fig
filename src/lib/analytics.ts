@@ -4,14 +4,14 @@ import { getDb } from './db';
 import { scope } from './queries';
 import type { Principal } from './domain/perms';
 import { inEgp } from './format';
-import { CHANNEL } from './channels';
+import { CHANNEL, CHANNELS } from './channels';
 import { slaTargets } from './engine';
 
 const BRAND_OF = (id: string) => CHANNEL[id]?.brand ?? 'FIG';
 
 export async function analytics(p: Principal, days: number) {
   const db = await getDb();
-  const s = scope(p, sql`o.channel_id`);
+  const s = scope(p, sql`o.channel_id`, sql`o.id`);
   const since = sql`now() - (${days} || ' days')::interval`;
 
   const [daily, heat, dwell, rto, reasons, products, perChannel, team] = await Promise.all([
@@ -37,12 +37,12 @@ export async function analytics(p: Principal, days: number) {
       from orders o where ${s} and o.payment_method = 'cod' and o.stage in ('delivered','settled','rto','rto_closed') and o.placed_at > now() - interval '60 days'
       group by 1 having count(*) >= 6 order by rate desc limit 12`),
     db.execute<{ reason: string; n: number }>(sql`
-      select r.reason, count(*)::int as n from returns r where ${scope(p, sql`r.channel_id`)} and r.requested_at > ${since} group by 1 order by 2 desc`),
+      select r.reason, count(*)::int as n from returns r where ${scope(p, sql`r.channel_id`, sql`r.order_id`)} and r.requested_at > ${since} group by 1 order by 2 desc`),
     db.execute<{ title: string; brand: string; image: string | null; back: number; sold: number; top_reason: string }>(sql`
       with back as (
         select i.title, count(*)::int as back, mode() within group (order by r.reason) as top_reason
         from return_items ri join returns r on r.id = ri.return_id join order_items i on i.id = ri.order_item_id
-        where ${scope(p, sql`r.channel_id`)} and r.requested_at > ${since} group by i.title
+        where ${scope(p, sql`r.channel_id`, sql`r.order_id`)} and r.requested_at > ${since} group by i.title
       ), sold as (
         select i.title, max(i.brand) as brand, max(i.image) as image, sum(i.quantity)::int as sold
         from order_items i join orders o on o.id = i.order_id where ${s} and o.placed_at > ${since} - interval '14 days' group by i.title
@@ -67,7 +67,8 @@ export async function analytics(p: Principal, days: number) {
 
   // daily by brand
   const dayKeys = Array.from({ length: days }, (_, i) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(Date.now() - (days - 1 - i) * 86400000)));
-  const brands = ['FIG', "Women'secret", 'Labesny'] as const;
+  // Every brand with a storefront, in the order they were added: series colour follows the brand.
+  const brands = [...new Set(CHANNELS.filter((c) => !c.parked).map((c) => c.brand))].slice(0, 6);
   const byDay = dayKeys.map((k) => ({
     label: new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date(`${k}T12:00:00`)),
     values: brands.map((b) => daily.rows.filter((r) => r.d === k && BRAND_OF(r.channel_id) === b).reduce((a, r) => a + r.n, 0)),

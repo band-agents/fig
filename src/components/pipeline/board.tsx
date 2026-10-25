@@ -6,16 +6,14 @@ import Link from 'next/link';
 import { Crown, PauseCircle, TriangleAlert } from 'lucide-react';
 import type { OrderRow } from '@/lib/order-query';
 import type { Scopes } from '@/lib/domain/perms';
-import { CANCEL_REASONS, isAllowed, ORDER_FLOW, ORDER_STAGE, RTO_REASONS, type OrderStage, type Transition } from '@/lib/domain/stages';
+import { CANCEL_REASONS, isAllowed, mayTake, ORDER_FLOW, ORDER_STAGE, RTO_REASONS, type OrderStage, type Transition } from '@/lib/domain/stages';
 import { money } from '@/lib/format';
 import { ChannelChip, RiskBadge } from '@/components/ui/bits';
 import { SlaChip } from '@/components/ui/sla';
 import { ReasonModal, useMover } from '@/components/queues/shared';
 
 const COLUMNS: { stages: OrderStage[]; drop: OrderStage; label: string }[] = [
-  { stages: ['new', 'confirming'], drop: 'confirming', label: 'Confirming' },
-  { stages: ['finance'], drop: 'finance', label: 'Finance check' },
-  { stages: ['ready'], drop: 'ready', label: 'Ready to pick' },
+  { stages: ['new', 'confirming', 'finance', 'ready'], drop: 'ready', label: 'Ready to pick' },
   { stages: ['picking'], drop: 'picking', label: 'Picking' },
   { stages: ['packed'], drop: 'packed', label: 'Packed' },
   { stages: ['shipped'], drop: 'shipped', label: 'Shipped' },
@@ -41,7 +39,7 @@ export function Board({ orders, scopes, channels, channel }: { orders: OrderRow[
     if (!o || o.onHold) return null;
     const t = isAllowed(ORDER_FLOW, o.stage as OrderStage, to);
     if (!t) return null;
-    return (scopes[t.area] ?? 0) >= (t.level ?? 2) ? t : null;
+    return mayTake(scopes, t) ? t : null;
   };
 
   const drop = (to: OrderStage) => {
@@ -59,7 +57,7 @@ export function Board({ orders, scopes, channels, channel }: { orders: OrderRow[
     <div>
       <div className="mb-3 flex items-center gap-2">
         <select
-          className="field !h-9 !w-auto text-[13px]"
+          className="field !h-9 !w-auto text-[12.5px]"
           value={channel ?? ''}
           onChange={(e) => router.replace(e.target.value ? `${pathname}?channel=${e.target.value}` : pathname)}
           aria-label="Storefront"
@@ -71,7 +69,7 @@ export function Board({ orders, scopes, channels, channel }: { orders: OrderRow[
             </option>
           ))}
         </select>
-        {drag && <span className="text-[12.5px] text-ink-3">Drop on a highlighted column to hand it on</span>}
+        {drag && <span className="text-[12px] text-ink-3">Drop on a highlighted column to hand it on</span>}
       </div>
       <div className="scroll-thin -mx-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex gap-3" style={{ minWidth: COLUMNS.length * 272 }}>
@@ -96,8 +94,8 @@ export function Board({ orders, scopes, channels, channel }: { orders: OrderRow[
               >
                 <header className="flex items-center gap-2 px-3 py-3">
                   <span className="size-2 rounded-full bg-[var(--tint)]" />
-                  <span className="text-[13px] font-medium">{col.label}</span>
-                  <span className="font-mono text-[11.5px] text-ink-3">{items.length}</span>
+                  <span className="text-[12.5px] font-medium">{col.label}</span>
+                  <span className="font-mono text-[11px] text-ink-3">{items.length}</span>
                   {late > 0 && <span className="ml-auto font-mono text-[11px] text-critical">{late} late</span>}
                 </header>
                 <div className="scroll-thin flex max-h-[calc(100dvh-300px)] min-h-[120px] flex-col gap-2 overflow-y-auto px-2 pb-2">
@@ -118,7 +116,7 @@ export function Board({ orders, scopes, channels, channel }: { orders: OrderRow[
                       className={`group block rounded-xl border border-line bg-elev-2 p-2.5 transition hover:border-line-3 ${drag?.id === o.id ? 'opacity-40' : ''} ${o.onHold ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                     >
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[12.5px]">{o.number}</span>
+                        <span className="font-mono text-[12px]">{o.number}</span>
                         {o.vip && <Crown className="size-3 text-[var(--t-amber)]" />}
                         <span className="ml-auto">
                           <RiskBadge level={o.riskLevel} score={o.risk} compact />
@@ -126,7 +124,7 @@ export function Board({ orders, scopes, channels, channel }: { orders: OrderRow[
                       </div>
                       <div className="mt-1 flex items-center gap-2">
                         <ChannelChip id={o.channelId} compact />
-                        {o.total != null && <span className="ml-auto font-mono text-[11.5px] text-ink-3">{money(o.total, o.currency, { compact: true })}</span>}
+                        {o.total != null && <span className="ml-auto font-mono text-[11px] text-ink-3">{money(o.total, o.currency, { compact: true })}</span>}
                       </div>
                       <div className="mt-2 flex items-center gap-2">
                         <div className="flex -space-x-1.5">
@@ -135,7 +133,7 @@ export function Board({ orders, scopes, channels, channel }: { orders: OrderRow[
                             <img key={i} src={src!} alt="" className="size-7 rounded-md object-cover ring-2 ring-[var(--bg-elev-2)]" />
                           ))}
                         </div>
-                        <span className="min-w-0 flex-1 truncate text-[12px] text-ink-2">{o.customer}</span>
+                        <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink-2">{o.customer}</span>
                       </div>
                       <div className="mt-2 flex items-center justify-between">
                         <SlaChip due={o.dueAt} since={o.stageAt} held={o.onHold} />
@@ -153,7 +151,7 @@ export function Board({ orders, scopes, channels, channel }: { orders: OrderRow[
                       )}
                     </Link>
                   ))}
-                  {items.length === 0 && <div className="px-2 py-6 text-center text-[12px] text-ink-4">Empty</div>}
+                  {items.length === 0 && <div className="px-2 py-6 text-center text-[11.5px] text-ink-4">Empty</div>}
                 </div>
               </section>
             );

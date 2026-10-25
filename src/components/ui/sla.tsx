@@ -12,7 +12,7 @@ export function SlaChip({ due, since, held, big = false }: { due: string | Date 
   if (!d && !held) return <span className="text-xs text-ink-4">—</span>;
   if (now == null) return <span className="inline-block h-4 w-12" />;
   const state = slaState(d, s, new Date(now), held);
-  const cls = big ? 'text-[13px] gap-1.5' : 'text-[12px] gap-1';
+  const cls = big ? 'text-[12.5px] gap-1.5' : 'text-[11.5px] gap-1';
   if (state === 'held')
     return (
       <span className={`inline-flex items-center font-mono text-[var(--warn)] ${cls}`}>

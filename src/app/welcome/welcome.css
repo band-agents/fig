@@ -1,0 +1,418 @@
+/* The front door: one navy screen. Its own colours, so a teammate's dark-mode choice never reaches
+   it: porcelain type, a champagne accent (the Ghattas family), hairlines instead of boxes. Motion is
+   slow and quiet, and stops for anyone who asks for reduced motion. */
+
+.wl {
+  --navy: #081b2d;
+  --navy-2: #0c2a44;
+  --paper: #f5efe6;
+  --paper-2: rgb(245 239 230 / 0.62);
+  --paper-3: rgb(245 239 230 / 0.32);
+  --gold: #e3c08b;
+  --gold-2: #b8895d;
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--navy-2) 0%, var(--navy) 64%);
+  color: var(--paper);
+  font-size: 14px;
+}
+/* :where keeps this at zero weight, so a button's own colour always wins over it */
+:where(.wl) a {
+  color: inherit;
+  text-decoration: none;
+}
+.wl-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(720px 420px at 78% 34%, rgb(227 192 139 / 0.1), transparent 70%),
+    radial-gradient(900px 500px at 8% 110%, rgb(57 135 229 / 0.07), transparent 70%);
+  animation: wl-breathe 14s ease-in-out infinite alternate;
+}
+@keyframes wl-breathe {
+  to {
+    opacity: 0.55;
+    transform: scale(1.04);
+  }
+}
+
+/* ── Buttons ── */
+.wl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+.wl-btn:hover {
+  transform: translateY(-1px);
+}
+.wl-btn-gold {
+  background: var(--gold);
+  color: var(--navy);
+}
+.wl-btn-gold:hover {
+  background: #ecd0a4;
+}
+.wl-btn-line {
+  height: 32px;
+  padding: 0 13px;
+  color: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--paper-3);
+}
+.wl-btn-line:hover {
+  box-shadow: inset 0 0 0 1px var(--gold);
+  color: var(--gold);
+}
+.wl-btn-google {
+  height: 38px;
+  padding: 0 15px;
+}
+
+/* ── Header ── */
+.wl-head {
+  width: min(1180px, 100% - 40px);
+  margin: 0 auto;
+  height: 68px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgb(245 239 230 / 0.08);
+}
+.wl-staff {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--paper-2);
+}
+
+/* ── The one statement ── */
+.wl-body {
+  flex: 1;
+  width: min(1180px, 100% - 40px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  align-items: center;
+  gap: 64px;
+  padding: 48px 0 16px;
+}
+.wl-kicker {
+  margin: 0 0 20px;
+  font-size: 11.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  animation: wl-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.wl-copy h1 {
+  margin: 0;
+  font-size: clamp(44px, 6vw, 84px);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+  animation: wl-rise 0.9s 0.08s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.wl-gild {
+  display: block;
+  background: linear-gradient(90deg, var(--gold) 0%, #f3dcb6 45%, var(--gold-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.wl-lede {
+  max-width: 400px;
+  margin: 24px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--paper-2);
+  animation: wl-rise 0.9s 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.wl-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 32px;
+  animation: wl-rise 0.9s 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes wl-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* ── The glimpse: a drawn impression of the console ── */
+.wl-glimpse {
+  animation: wl-rise 1.1s 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.wl-win {
+  border-radius: 10px;
+  background: rgb(245 239 230 / 0.04);
+  box-shadow:
+    inset 0 0 0 1px rgb(245 239 230 / 0.1),
+    0 40px 80px -40px rgb(0 0 0 / 0.7);
+  overflow: hidden;
+  animation: wl-float 10s ease-in-out infinite alternate;
+}
+@keyframes wl-float {
+  to {
+    transform: translateY(-8px);
+  }
+}
+.wl-win-bar {
+  display: flex;
+  gap: 6px;
+  padding: 11px 12px;
+  border-bottom: 1px solid rgb(245 239 230 / 0.07);
+}
+.wl-win-bar i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(245 239 230 / 0.16);
+}
+.wl-win-body {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+}
+.wl-side {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 16px 12px;
+  border-right: 1px solid rgb(245 239 230 / 0.07);
+}
+.wl-side b {
+  height: 5px;
+  border-radius: 3px;
+  background: rgb(245 239 230 / 0.12);
+}
+.wl-side b:nth-child(odd) {
+  width: 78%;
+}
+.wl-side b.on {
+  background: var(--gold);
+  opacity: 0.85;
+}
+.wl-main {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+.wl-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.wl-tile {
+  border-radius: 6px;
+  padding: 9px 9px 6px;
+  box-shadow: inset 0 0 0 1px rgb(245 239 230 / 0.08);
+  display: grid;
+  gap: 6px;
+}
+.wl-tile b {
+  width: 50%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(245 239 230 / 0.16);
+}
+.wl-tile strong {
+  height: 9px;
+  border-radius: 3px;
+  background: rgb(245 239 230 / 0.55);
+}
+.wl-tile svg {
+  width: 100%;
+  height: 18px;
+}
+.wl-spark {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 1.4;
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+  vector-effect: non-scaling-stroke;
+  animation: wl-draw 7s ease-in-out infinite;
+}
+@keyframes wl-draw {
+  40%,
+  80% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+.wl-chart {
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgb(245 239 230 / 0.08);
+  padding: 10px 0 0;
+  overflow: hidden;
+}
+.wl-chart svg {
+  display: block;
+  width: 100%;
+  height: 120px;
+}
+.wl-area {
+  fill: rgb(227 192 139 / 0.08);
+}
+.wl-line {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+.wl-runner {
+  fill: var(--paper);
+  filter: drop-shadow(0 0 6px rgb(227 192 139 / 0.9));
+}
+.wl-rows {
+  display: grid;
+  gap: 7px;
+}
+.wl-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 5px;
+  background: rgb(245 239 230 / 0.03);
+}
+.wl-row i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgb(245 239 230 / 0.16);
+}
+.wl-row b {
+  height: 5px;
+  border-radius: 3px;
+  background: rgb(245 239 230 / 0.2);
+}
+.wl-row em {
+  margin-left: auto;
+  width: 46px;
+  height: 12px;
+  border-radius: 99px;
+  box-shadow: inset 0 0 0 1px rgb(245 239 230 / 0.14);
+  position: relative;
+}
+.wl-row em::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 3.5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #7aa7e8;
+  animation: wl-stage 8s steps(1) infinite;
+  animation-delay: inherit;
+}
+@keyframes wl-stage {
+  0% {
+    background: #a99be8;
+  }
+  25% {
+    background: #7aa7e8;
+  }
+  50% {
+    background: #e3c08b;
+  }
+  75% {
+    background: #6fcf8a;
+  }
+}
+
+/* ── The relay along the foot ── */
+.wl-relay {
+  flex: none;
+  width: min(1180px, 100% - 40px);
+  margin: 8px auto 0;
+}
+.wl-relay svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.wl-relay-line {
+  fill: none;
+  stroke: rgb(245 239 230 / 0.14);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 7;
+}
+.wl-relay-node {
+  fill: var(--navy);
+  stroke: rgb(227 192 139 / 0.7);
+  stroke-width: 1.4;
+}
+.wl-relay-dot {
+  fill: var(--gold);
+  filter: drop-shadow(0 0 5px rgb(227 192 139 / 0.85));
+}
+.wl-relay-label {
+  fill: var(--paper-2);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.wl-foot {
+  flex: none;
+  width: min(1180px, 100% - 40px);
+  margin: 0 auto;
+  padding: 18px 0 22px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--paper-3);
+}
+
+/* ── Smaller screens ── */
+@media (max-width: 1000px) {
+  .wl-body {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    padding-top: 40px;
+  }
+  .wl-glimpse {
+    max-width: 560px;
+  }
+}
+@media (max-width: 640px) {
+  .wl-staff span {
+    display: none;
+  }
+  .wl-relay-label {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-relay-dot,
+  .wl-runner {
+    display: none;
+  }
+}

@@ -77,15 +77,19 @@ describe('the three choices', () => {
     expect(credit.detail).toMatch(/does not apply again/);
   });
 
-  it('offers all three however the order was paid, account credit first', () => {
-    for (const p of ['cod', 'card', 'store_credit'] as const) {
-      expect(optionsFor(p).map((x) => x.method)).toEqual(['store_credit', 'original', 'cash_at_store']);
+  it('offers all three however the order was paid: account credit, then a branch, then the original method', () => {
+    for (const p of ['cod', 'card', 'knet', 'store_credit'] as const) {
+      expect(optionsFor(p).map((x) => x.method)).toEqual(['store_credit', 'cash_at_store', 'original']);
     }
+  });
+
+  it('names KNET as either kind of card', () => {
+    expect(optionsFor('knet').find((x) => x.method === 'original')!.label).toBe('Back to your KNET debit or credit card');
   });
 
   it('calls it account credit, which is what the customer sees everywhere else', () => {
     const [credit] = optionsFor('card');
-    expect(credit.label).toBe('Account credit, plus 5% extra');
+    expect(credit.label).toBe('Account credit, and gain 5% extra');
     expect(optionsFor('store_credit')[0].label).toBe('Account credit');
   });
 

@@ -61,27 +61,27 @@ describe('risk', () => {
 });
 
 describe('autopilot', () => {
+  // Dan, 21 Oct 2026: no confirmation call and no finance check; every order goes to Pick & pack
   const o = { stage: 'new', paymentMethod: 'card', paymentStatus: 'paid', risk: 5, riskLevel: 'low', total: 100_000, currency: 'EGP' };
-  it('sends a paid online order straight past confirmation and finance', () => {
-    const steps = autopilotRun(o, null);
-    expect(steps.map((s) => s.to)).toEqual(['finance', 'ready']);
+  it('sends a paid online order straight to Pick & pack', () => {
+    expect(autopilotRun(o, null).map((s) => s.to)).toEqual(['ready']);
   });
-  it('always stops at confirmation for cash from a stranger', () => {
-    const steps = autopilotRun({ ...o, paymentMethod: 'cod', paymentStatus: 'cod_due' }, null);
-    expect(steps.map((s) => s.to)).toEqual(['confirming']);
+  it('sends cash from a stranger, and a high-risk basket, straight to Pick & pack too', () => {
+    expect(autopilotRun({ ...o, paymentMethod: 'cod', paymentStatus: 'cod_due' }, null).map((s) => s.to)).toEqual(['ready']);
+    expect(nextAutoStep({ ...o, paymentMethod: 'cod', paymentStatus: 'cod_due', riskLevel: 'high', risk: 70 }, null)?.to).toBe('ready');
   });
-  it('lets a trusted cash customer skip the call, but not a high-risk one', () => {
-    const h = { orders: 5, delivered: 5, refused: 0, returned: 0 };
-    expect(nextAutoStep({ ...o, paymentMethod: 'cod', paymentStatus: 'cod_due' }, h)?.to).toBe('finance');
-    expect(nextAutoStep({ ...o, paymentMethod: 'cod', paymentStatus: 'cod_due', riskLevel: 'high', risk: 70 }, h)?.to).toBe('confirming');
+  it('sends on an order left in a retired step', () => {
+    expect(nextAutoStep({ ...o, stage: 'confirming' }, null)?.to).toBe('ready');
+    expect(nextAutoStep({ ...o, stage: 'finance', paymentMethod: 'cod', paymentStatus: 'cod_due', total: toMinor(9000, 'EGP') }, null)?.to).toBe('ready');
   });
-  it('keeps big cash orders for a person in finance', () => {
-    expect(nextAutoStep({ ...o, stage: 'finance', paymentMethod: 'cod', paymentStatus: 'cod_due', total: toMinor(9000, 'EGP') }, null)).toBeNull();
-    expect(nextAutoStep({ ...o, stage: 'finance', paymentMethod: 'cod', paymentStatus: 'cod_due', total: toMinor(900, 'EGP') }, null)?.to).toBe('ready');
-  });
-  it('does nothing when switched off or on hold', () => {
-    expect(nextAutoStep(o, null, { ...DEFAULT_AUTOPILOT, enabled: false })).toBeNull();
+  it('releases new orders even with the other rules off, and never an order on hold', () => {
+    expect(nextAutoStep(o, null, { ...DEFAULT_AUTOPILOT, enabled: false })?.to).toBe('ready');
     expect(nextAutoStep({ ...o, onHold: true }, null)).toBeNull();
+  });
+  it('still settles a paid order when delivered, but only with the rules on', () => {
+    expect(nextAutoStep({ ...o, stage: 'delivered' }, null)?.to).toBe('settled');
+    expect(nextAutoStep({ ...o, stage: 'delivered' }, null, { ...DEFAULT_AUTOPILOT, enabled: false })).toBeNull();
+    expect(nextAutoStep({ ...o, stage: 'delivered', paymentMethod: 'cod', paymentStatus: 'cod_collected' }, null)).toBeNull();
   });
 });
 

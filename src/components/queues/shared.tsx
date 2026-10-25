@@ -51,7 +51,7 @@ export function Spin({ on }: { on: boolean }) {
 
 export function OrderLink({ id, number }: { id: string; number: string }) {
   return (
-    <Link href={`/orders/${id}`} className="font-mono text-[13.5px] hover:underline">
+    <Link href={`/orders/${id}`} className="font-mono text-[12.5px] hover:underline">
       {number}
     </Link>
   );
@@ -74,7 +74,7 @@ export function ReasonModal({ title, reasons, cta, danger, onClose, onSubmit, wi
       {reasons.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {reasons.map((r) => (
-            <button key={r} onClick={() => setPick(r)} className={`h-8 rounded-lg border px-2.5 text-[12.5px] ${pick === r ? 'border-ink bg-elev-3 text-ink' : 'border-line-2 text-ink-2'}`}>
+            <button key={r} onClick={() => setPick(r)} className={`h-8 rounded-lg border px-2.5 text-[12px] ${pick === r ? 'border-ink bg-elev-3 text-ink' : 'border-line-2 text-ink-2'}`}>
               {r}
             </button>
           ))}

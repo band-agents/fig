@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { AlertTriangle, Banknote, CreditCard, ShieldAlert, ShieldCheck, Smartphone, Wallet, type LucideIcon } from 'lucide-react';
-import { CHANNEL } from '@/lib/channels';
+import { brandTint, CHANNEL } from '@/lib/channels';
 import { ORDER_STAGE, RETURN_STAGE, type OrderStage, type ReturnStage } from '@/lib/domain/stages';
 
 export function StagePill({ stage, held, className = '' }: { stage: string; held?: boolean; className?: string }) {
   const m = ORDER_STAGE[stage as OrderStage];
   if (!m) return <span className="pill">{stage}</span>;
   return (
-    <span className={`pill ${className}`} data-tint={held ? 'amber' : m.tint}>
+    <span className={`pill ${className}`} data-tone={held ? 'warning' : m.badge}>
       <span className="dot" />
       {held ? `On hold · ${m.label}` : m.label}
     </span>
@@ -17,7 +17,7 @@ export function StagePill({ stage, held, className = '' }: { stage: string; held
 export function ReturnPill({ stage }: { stage: string }) {
   const m = RETURN_STAGE[stage as ReturnStage];
   return (
-    <span className="pill" data-tint={m?.tint ?? 'neutral'}>
+    <span className="pill" data-tone={m?.badge ?? 'neutral'}>
       <span className="dot" />
       {m?.label ?? stage}
     </span>
@@ -25,14 +25,15 @@ export function ReturnPill({ stage }: { stage: string }) {
 }
 
 const BRAND_DOT: Record<string, string> = { FIG: 'var(--signal)', Labesny: '#f2a7b0', "Women'secret": '#c9b8a6' };
+const dotFor = (brand: string) => BRAND_DOT[brand] ?? brandTint(brand);
 
 export function ChannelChip({ id, compact = false }: { id: string; compact?: boolean }) {
   const c = CHANNEL[id];
   if (!c) return <span className="text-xs text-ink-3">{id}</span>;
   const label = c.brand === "Women'secret" ? `WS ${c.country === 'EG' ? 'Egypt' : c.country === 'KW' ? 'Kuwait' : 'Jordan'}` : c.name.replace(' (legacy)', '');
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-ink-2">
-      <span className="size-1.5 rounded-full" style={{ background: BRAND_DOT[c.brand] }} />
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11.5px] text-ink-2">
+      <span className="size-1.5 rounded-full" style={{ background: dotFor(c.brand) }} />
       {label}
       {c.surface === 'App' && (
         <span className="inline-flex items-center gap-0.5 rounded border border-line-2 px-1 text-[10px] uppercase tracking-wide text-ink-3">
@@ -83,14 +84,27 @@ const PAY_STATUS: Record<string, string> = {
   voided: 'voided',
 };
 
+const PAY_TONE: Record<string, string> = { paid: 'neutral', cod_collected: 'neutral', refunded: 'neutral', voided: 'neutral', pending: 'warning', cod_due: 'warning', partially_refunded: 'neutral' };
+const PAY_BADGE: Record<string, string> = { paid: 'Paid', cod_collected: 'With courier', refunded: 'Refunded', voided: 'Voided', pending: 'Payment pending', cod_due: 'COD to collect', partially_refunded: 'Partly refunded' };
+
+/** The payment state as a badge (Shopify's "Paid" / "Payment pending"). */
+export function PayBadge({ status }: { status: string }) {
+  return (
+    <span className="pill" data-tone={PAY_TONE[status] ?? 'neutral'}>
+      <span className="dot" />
+      {PAY_BADGE[status] ?? status}
+    </span>
+  );
+}
+
 export function Payment({ method, status, short = false }: { method: string; status: string; short?: boolean }) {
   const p = PAY[method] ?? { label: method, icon: CreditCard };
   const Icon = p.icon;
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-ink-2">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] text-ink-2">
       <Icon className="size-3.5 text-ink-3" />
       {short ? (method === 'cod' ? 'COD' : p.label) : p.label}
-      <span className={`text-[11.5px] ${status === 'paid' ? 'text-good' : status.includes('refund') ? 'text-critical' : 'text-ink-3'}`}>· {PAY_STATUS[status] ?? status}</span>
+      <span className={`text-[11px] ${status === 'paid' ? 'text-good' : status.includes('refund') ? 'text-critical' : 'text-ink-3'}`}>· {PAY_STATUS[status] ?? status}</span>
     </span>
   );
 }
@@ -100,20 +114,24 @@ export function SectionTitle({ eyebrow, title, right, className = '' }: { eyebro
     <div className={`flex items-end justify-between gap-4 ${className}`}>
       <div>
         {eyebrow && <div className="eyebrow mb-1">{eyebrow}</div>}
-        <h2 className="text-[15px] font-medium tracking-tight">{title}</h2>
+        <h2 className="text-[14px] font-medium tracking-tight">{title}</h2>
       </div>
       {right}
     </div>
   );
 }
 
+/**
+ * The page's title in the header row: a large title and one grey line under it, on the left of the
+ * search pill and round buttons (which sit at the top right of every page on a wide screen).
+ */
 export function PageHeader({ eyebrow, title, sub, right }: { eyebrow?: React.ReactNode; title: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode }) {
+  void eyebrow;
   return (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div data-page-header className="mb-4 flex flex-row items-center justify-between gap-3 sm:mb-6 sm:gap-4">
       <div className="min-w-0">
-        {eyebrow && <div className="eyebrow mb-2">{eyebrow}</div>}
-        <h1 className="font-display text-[34px] leading-[1.05] tracking-tight sm:text-[40px]">{title}</h1>
-        {sub && <p className="mt-2 max-w-2xl text-[14px] text-ink-2">{sub}</p>}
+        <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.4px] sm:text-[23px]">{title}</h1>
+        {sub && <p className="mt-1 hidden max-w-2xl text-[12.5px] leading-snug text-ink-3 sm:block">{sub}</p>}
       </div>
       {right && <div className="flex flex-wrap items-center gap-2">{right}</div>}
     </div>
@@ -126,8 +144,8 @@ export function Empty({ icon: Icon, title, body, action }: { icon: LucideIcon; t
       <span className="grid size-12 place-items-center rounded-2xl border border-line bg-elev-2">
         <Icon className="size-5 text-ink-3" strokeWidth={1.6} />
       </span>
-      <div className="mt-4 font-display text-2xl">{title}</div>
-      {body && <p className="mt-1.5 max-w-sm text-[13.5px] text-ink-3">{body}</p>}
+      <div className="mt-4 font-display text-xl">{title}</div>
+      {body && <p className="mt-1.5 max-w-sm text-[12.5px] text-ink-3">{body}</p>}
       {action && (
         <Link href={action.href} className="btn btn-quiet btn-sm mt-5">
           {action.label}
