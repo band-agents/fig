@@ -1,7 +1,7 @@
 import 'server-only';
 import { sql } from 'drizzle-orm';
 import { getDb } from './db';
-import { seesBrand, type Principal } from './domain/perms';
+import { canSee, seesBrand, type Principal } from './domain/perms';
 import { addWeeks, weekOf, weekRange, type Market } from './domain/stock/calendar';
 import { CATEGORY_LABEL, type Category } from './domain/stock/categories';
 import { VELOCITY_LABEL, type Velocity } from './domain/stock/classify';
@@ -113,7 +113,7 @@ const BANDS: Record<Market, { upTo: number; label: string }[]> = {
   ],
 };
 
-const keyOf = (p: Principal, what: string, extra: unknown[] = []) => `brands:${what}:${JSON.stringify([p.channels, p.brands ?? [], sees(p).money, sees(p).cost, ...extra])}`;
+const keyOf = (p: Principal, what: string, extra: unknown[] = []) => `brands:${what}:${JSON.stringify([p.channels, p.brands ?? [], sees(p).money, sees(p).cost, canSee(p, 'webItems'), ...extra])}`;
 
 /** The reading behind every brand report, for one person's access and one period: shared by the brand list,
  * every brand's page and the movers, so opening a second brand does not read the sales again. */
@@ -130,6 +130,8 @@ async function readNow(p: Principal, weeks: Period) {
   const prevFrom = addWeeks(from, -weeks);
   const prevTo = addWeeks(from, -1);
   const where = inMarkets(markets, sql`p.market`, { who: p, brand: sql`p.brand` });
+  // the listing's gaps are work for whoever keeps the websites' listings, not reading for a brand manager
+  const website = canSee(p, 'webItems');
 
   const [cur, prev, weekly, rets, web] = await Promise.all([
     db.execute<{ id: string; currency: string; units: number; revenue: number; cost: number; md: number }>(sql`
@@ -152,7 +154,7 @@ async function readNow(p: Principal, weeks: Period) {
       where ${scope(p, sql`o.channel_id`, sql`o.id`)} and ${brandMatch(p.brands, sql`oi.brand`)} and o.placed_at >= ${from}::date and o.stage <> 'cancelled' and oi.brand is not null
       group by 1`),
     // the website side, per brand: the store's own listing (Website vs Lucida keeps it)
-    db.execute<{ brand: string; live: number; sold_out_live: number; stock_not_live: number; no_photo: number }>(sql`
+    db.execute<{ brand: string; live: number; sold_out_live: number; stock_not_live: number; no_photo: number }>(website ? sql`
       select coalesce(w.brand, '') as brand,
         count(distinct w.handle) filter (where w.status = 'active')::int as live,
         count(distinct w.handle) filter (where w.status = 'active' and coalesce(w.web_qty, 0) <= 0)::int as sold_out_live,
@@ -160,7 +162,7 @@ async function readNow(p: Principal, weeks: Period) {
         count(distinct w.handle) filter (where w.status = 'active' and w.has_photo is false)::int as no_photo
       from web_items w
       where ${p.channels.length ? sql`w.channel_id in (${sql.join(p.channels.map((c) => sql`${c}`), sql`, `)})` : sql`true`} and ${brandMatch(p.brands, sql`w.brand`)}
-      group by 1`),
+      group by 1` : sql`select null as brand where false`),
   ]);
 
   const sale = new Map<string, Sale>();
@@ -209,7 +211,7 @@ async function readNow(p: Principal, weeks: Period) {
     };
   });
 
-  return { s, markets, currency: viewCurrency(p), weeks, from, to: now, ps, styles, sale, before, weekly: weekly.rows, rets: rets.rows, web: web.rows };
+  return { s, markets, currency: viewCurrency(p), weeks, from, to: now, ps, styles, sale, before, weekly: weekly.rows, rets: rets.rows, web: web.rows, website };
 }
 
 type Reading = Awaited<ReturnType<typeof readNow>>;
@@ -341,7 +343,7 @@ export function brandsOverview(p: Principal, weeks: Period) {
       value: keys.map((k) => (r.s.money ? r.weekly.filter((w) => w.week === k && tiers.get(w.brand) === t).reduce((a, w) => a + egpMinor(Number(w.revenue), w.currency), 0) : 0)),
     })).filter((t) => rows.some((x) => x.tier === t.tier));
     const totals = rows.reduce((a, x) => ({ units: a.units + x.units, value: a.value + x.value, prevUnits: a.prevUnits + x.prevUnits, prevValue: a.prevValue + x.prevValue, onHand: a.onHand + x.onHand, stockValue: a.stockValue + x.stockValue }), { units: 0, value: 0, prevUnits: 0, prevValue: 0, onHand: 0, stockValue: 0 });
-    return { money: r.s.money, currency: r.currency, weeks, from: r.from, to: r.to, markets: r.markets, rows, totals, tiers: tierRows(rows), bands: bandRows(r, r.styles), trend: { weeks: keys, series: trend } };
+    return { money: r.s.money, website: r.website, currency: r.currency, weeks, from: r.from, to: r.to, markets: r.markets, rows, totals, tiers: tierRows(rows), bands: bandRows(r, r.styles), trend: { weeks: keys, series: trend } };
   });
 }
 
@@ -388,6 +390,7 @@ export function brandDetail(p: Principal, brand: string, weeks: Period) {
     return {
       month: monthTarget,
       money: r.s.money,
+      website: r.website,
       currency: r.currency,
       weeks,
       from: r.from,

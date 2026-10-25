@@ -142,6 +142,7 @@ const byProduct: Report = {
 
 const cancellations: Report = {
   id: 'cancellations',
+  floor: true,
   wholeOrders: true,
   group: 'returns',
   title: 'Cancellations and refusals',

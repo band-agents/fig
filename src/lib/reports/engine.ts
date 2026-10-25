@@ -56,6 +56,8 @@ export type Report = {
   needs?: ('money' | 'payments' | 'cost' | 'customers')[];
   /** Reads whole orders (payments, totals, every brand in the basket): not offered to someone limited to brands. */
   wholeOrders?: boolean;
+  /** The websites' order handling (payments to chase, couriers, deadlines, refunds): only for the people who work the orders. */
+  floor?: boolean;
   /** Reads no period (a stock snapshot): the period chips are hidden. */
   snapshot?: boolean;
   run: (c: Ctx) => Promise<Result>;

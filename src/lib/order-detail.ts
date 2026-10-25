@@ -8,6 +8,8 @@ import { DEPTS, ORDER_STAGE, type OrderStage } from './domain/stages';
 import { autopilotPreview } from './engine';
 
 export async function orderDetail(p: Principal, id: string) {
+  // an order opens for the people who handle orders (a brand manager reads the numbers, not the orders)
+  if (!can(p, 'orders', 1)) return null;
   const db = await getDb();
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
   if (!o || !seesChannel(p, o.channelId)) return null;

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireUser, sendHome } from '@/lib/auth/session';
 import { analytics } from '@/lib/analytics';
-import { can, canSee } from '@/lib/domain/perms';
+import { can, canSee, worksOrders } from '@/lib/domain/perms';
 import { ORDER_STAGE, RETURN_REASONS, type OrderStage, type ReturnReason } from '@/lib/domain/stages';
 import { money, num, pct } from '@/lib/format';
 import { span } from '@/lib/domain/sla';
@@ -21,6 +21,8 @@ export default async function InsightsPage(props: PageProps<'/insights'>) {
   const days = sp.days === '7' ? 7 : sp.days === '90' ? 90 : 30;
   const a = await analytics(me, days);
   const seesMoney = can(me, 'money', 1);
+  // the hand-offs, cash refusals and who did what are the floor's own; everyone else reads the selling
+  const floor = worksOrders(me);
   const totalReturns = a.reasons.reduce((s, r) => s + r.n, 0);
   const STAGE_ORDER = ['confirming', 'finance', 'ready', 'picking', 'packed', 'shipped', 'delivering', 'delivered'];
 
@@ -28,8 +30,8 @@ export default async function InsightsPage(props: PageProps<'/insights'>) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Insights"
-        title="How the floor is running"
-        sub="Volumes, speed at every hand-off, refusals and returns, from the same data the queues run on."
+        title={floor ? 'How the floor is running' : 'How the websites are selling'}
+        sub={floor ? 'Volumes, speed at every hand-off, refusals and returns, from the same data the queues run on.' : 'Orders by day and by hour, and what comes back, from the websites’ orders.'}
         right={
           <div className="flex gap-1 rounded-xl border border-line bg-elev p-1">
             {[7, 30, 90].map((d) => (
@@ -52,24 +54,26 @@ export default async function InsightsPage(props: PageProps<'/insights'>) {
         <StackedDays days={a.byDay} series={a.brands.map((name, i) => ({ name, color: `var(--s${i + 1})` }))} />
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-[1.1fr_1fr]">
-        <div className="panel p-5">
-          <div className="eyebrow mb-1">Speed</div>
-          <h2 className="mb-1 text-[14px] font-medium">Average time at each hand-off</h2>
-          <p className="mb-4 text-[11.5px] text-ink-3">Red means slower than the stage target. Autopilot clears some stages in seconds, which pulls their average down.</p>
-          <BarList
-            rows={STAGE_ORDER.map((s) => a.dwell.find((d) => d.stage === s))
-              .filter(Boolean)
-              .map((d) => ({
-                label: ORDER_STAGE[d!.stage as OrderStage].label,
-                value: d!.hours,
-                sub: d!.target != null ? `target ${span(d!.target * 3600_000)}` : undefined,
-                tone: d!.target != null && d!.hours > d!.target ? ('alert' as const) : undefined,
-              }))}
-            format={(v) => span(v * 3600_000)}
-            color="var(--t-blue)"
-          />
-        </div>
+      <section className={floor ? 'grid gap-5 lg:grid-cols-[1.1fr_1fr]' : 'grid gap-5'}>
+        {floor && (
+          <div className="panel p-5">
+            <div className="eyebrow mb-1">Speed</div>
+            <h2 className="mb-1 text-[14px] font-medium">Average time at each hand-off</h2>
+            <p className="mb-4 text-[11.5px] text-ink-3">Red means slower than the stage target. Autopilot clears some stages in seconds, which pulls their average down.</p>
+            <BarList
+              rows={STAGE_ORDER.map((s) => a.dwell.find((d) => d.stage === s))
+                .filter(Boolean)
+                .map((d) => ({
+                  label: ORDER_STAGE[d!.stage as OrderStage].label,
+                  value: d!.hours,
+                  sub: d!.target != null ? `target ${span(d!.target * 3600_000)}` : undefined,
+                  tone: d!.target != null && d!.hours > d!.target ? ('alert' as const) : undefined,
+                }))}
+              format={(v) => span(v * 3600_000)}
+              color="var(--t-blue)"
+            />
+          </div>
+        )}
         <div className="panel p-5">
           <div className="eyebrow mb-1">Rhythm</div>
           <h2 className="mb-4 text-[14px] font-medium">When customers order (Cairo time)</h2>
@@ -77,13 +81,15 @@ export default async function InsightsPage(props: PageProps<'/insights'>) {
         </div>
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-2">
-        <div className="panel p-5" id="refusals">
-          <div className="eyebrow mb-1">Refusals</div>
-          <h2 className="mb-1 text-[14px] font-medium">Cash parcels refused at the door, by governorate</h2>
-          <p className="mb-4 text-[11.5px] text-ink-3">Last 60 days, areas with at least 6 cash deliveries. The tick is the average ({pct(a.rtoBaseline, 1)}). Risk scoring uses these numbers.</p>
-          <BarList rows={a.rto.map((r) => ({ label: r.region || 'Unknown', value: r.rate, sub: `${r.n} parcels`, tone: r.rate > a.rtoBaseline * 1.8 ? ('alert' as const) : undefined }))} format={(v) => pct(v, 0)} color="var(--t-amber)" max={Math.max(0.05, ...a.rto.map((r) => r.rate))} mark={{ value: a.rtoBaseline, label: 'average' }} />
-        </div>
+      <section className={floor ? 'grid gap-5 lg:grid-cols-2' : 'grid gap-5'}>
+        {floor && (
+          <div className="panel p-5" id="refusals">
+            <div className="eyebrow mb-1">Refusals</div>
+            <h2 className="mb-1 text-[14px] font-medium">Cash parcels refused at the door, by governorate</h2>
+            <p className="mb-4 text-[11.5px] text-ink-3">Last 60 days, areas with at least 6 cash deliveries. The tick is the average ({pct(a.rtoBaseline, 1)}). Risk scoring uses these numbers.</p>
+            <BarList rows={a.rto.map((r) => ({ label: r.region || 'Unknown', value: r.rate, sub: `${r.n} parcels`, tone: r.rate > a.rtoBaseline * 1.8 ? ('alert' as const) : undefined }))} format={(v) => pct(v, 0)} color="var(--t-amber)" max={Math.max(0.05, ...a.rto.map((r) => r.rate))} mark={{ value: a.rtoBaseline, label: 'average' }} />
+          </div>
+        )}
         <div className="panel p-5" id="returns">
           <div className="eyebrow mb-1">Returns</div>
           <h2 className="mb-4 text-[14px] font-medium">Why things come back</h2>
@@ -129,10 +135,9 @@ export default async function InsightsPage(props: PageProps<'/insights'>) {
                   { key: 'store', label: 'Storefront' },
                   { key: 'n', label: 'Orders', kind: 'int' },
                   ...(seesMoney ? [{ key: 'currency', label: 'Currency' }, { key: 'revenue', label: 'Sales', kind: 'num' as const, decimals: 3 }, { key: 'aov', label: 'Average order', kind: 'num' as const, decimals: 3 }] : []),
-                  { key: 'cod', label: 'Cash share', kind: 'pct' },
-                  { key: 'rto', label: 'Refused', kind: 'pct' },
+                  ...(floor ? [{ key: 'cod', label: 'Cash share', kind: 'pct' as const }, { key: 'rto', label: 'Refused', kind: 'pct' as const }] : []),
                   { key: 'ret', label: 'Returned', kind: 'pct' },
-                  { key: 'ship', label: 'Hours order to shipped', kind: 'num', decimals: 1 },
+                  ...(floor ? [{ key: 'ship', label: 'Hours order to shipped', kind: 'num' as const, decimals: 1 }] : []),
                 ],
                 rows: a.channels.map((c) => ({
                   store: channelLabel(c.channel_id),
@@ -157,10 +162,10 @@ export default async function InsightsPage(props: PageProps<'/insights'>) {
                 <th className="text-right">Orders</th>
                 {seesMoney && <th className="text-right">Sales</th>}
                 {seesMoney && <th className="text-right">Avg order</th>}
-                <th className="text-right">Cash share</th>
-                <th className="text-right">Refused</th>
+                {floor && <th className="text-right">Cash share</th>}
+                {floor && <th className="text-right">Refused</th>}
                 <th className="text-right">Returned</th>
-                <th className="text-right">Order → shipped</th>
+                {floor && <th className="text-right">Order → shipped</th>}
               </tr>
             </thead>
             <tbody>
@@ -172,10 +177,10 @@ export default async function InsightsPage(props: PageProps<'/insights'>) {
                   <td className="text-right font-mono">{num(c.n)}</td>
                   {seesMoney && <td className="whitespace-nowrap text-right font-mono">{money(Number(c.revenue), c.currency, { compact: true })}</td>}
                   {seesMoney && <td className="whitespace-nowrap text-right font-mono">{money(Math.round(c.aov), c.currency)}</td>}
-                  <td className="text-right font-mono">{c.n ? pct(c.cod / c.n) : '—'}</td>
-                  <td className={`text-right font-mono ${c.rtoRate && c.rtoRate > 0.1 ? 'text-critical' : ''}`}>{c.rtoRate == null ? '—' : pct(c.rtoRate, 1)}</td>
+                  {floor && <td className="text-right font-mono">{c.n ? pct(c.cod / c.n) : '—'}</td>}
+                  {floor && <td className={`text-right font-mono ${c.rtoRate && c.rtoRate > 0.1 ? 'text-critical' : ''}`}>{c.rtoRate == null ? '—' : pct(c.rtoRate, 1)}</td>}
                   <td className="text-right font-mono">{c.returnRate == null ? '—' : pct(c.returnRate, 1)}</td>
-                  <td className="text-right font-mono">{c.ship_h == null ? '—' : span(c.ship_h * 3600_000)}</td>
+                  {floor && <td className="text-right font-mono">{c.ship_h == null ? '—' : span(c.ship_h * 3600_000)}</td>}
                 </tr>
               ))}
             </tbody>
@@ -183,7 +188,7 @@ export default async function InsightsPage(props: PageProps<'/insights'>) {
         </div>
       </section>
 
-      {a.team.length > 0 && (
+      {floor && a.team.length > 0 && (
         <section className="panel p-5">
           <div className="eyebrow mb-1">The team</div>
           <h2 className="mb-4 text-[14px] font-medium">Who carried the baton this week</h2>

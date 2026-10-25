@@ -101,6 +101,7 @@ const bridge: Report = {
 
 const status: Report = {
   id: 'payment-status',
+  floor: true,
   wholeOrders: true,
   group: 'finance',
   title: 'Payments: paid, waiting, owed',
@@ -177,6 +178,7 @@ const status: Report = {
 
 const cod: Report = {
   id: 'cod-cash',
+  floor: true,
   wholeOrders: true,
   group: 'finance',
   title: 'Cash on delivery and courier settlements',
@@ -237,6 +239,7 @@ const cod: Report = {
 
 const refunds: Report = {
   id: 'refunds',
+  floor: true,
   wholeOrders: true,
   group: 'finance',
   title: 'Refunds issued',

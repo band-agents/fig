@@ -22,6 +22,7 @@ export const metadata = { title: 'Return' };
 
 export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
   const me = await requireUser();
+  if (!can(me, 'returns', 1) && !can(me, 'orders', 1)) notFound();
   const { id } = await props.params;
   const db = await getDb();
   const [r] = await db.select().from(schema.returns).where(eq(schema.returns.id, id));

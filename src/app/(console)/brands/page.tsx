@@ -26,7 +26,7 @@ export default async function BrandsPage(props: PageProps<'/brands'>) {
   const c = d.currency;
   const m = (v: number | null) => moneyIn(v, c, { compact: true });
   const t = d.totals;
-  const sheets = [brandSheet(d.rows, { money: d.money, currency: c, weeks }), ...(d.money ? [tierSheet(d.tiers, { currency: c, weeks })] : [])];
+  const sheets = [brandSheet(d.rows, { money: d.money, currency: c, weeks, website: d.website }), ...(d.money ? [tierSheet(d.tiers, { currency: c, weeks })] : [])];
   const gaps = d.rows.reduce((a, r) => ({ soldOut: a.soldOut + (r.web?.soldOutLive ?? 0), stock: a.stock + (r.web?.stockNotLive ?? 0), photo: a.photo + (r.web?.noPhoto ?? 0) }), { soldOut: 0, stock: 0, photo: 0 });
   const top = d.rows.slice(0, 12);
 
@@ -34,7 +34,7 @@ export default async function BrandsPage(props: PageProps<'/brands'>) {
     <div className="space-y-5">
       <PageHeader
         title="Brands"
-        sub={`Each brand's sales, pace, stock and website, ${PERIOD_LABEL[weeks]} to this week. Websites' orders; shop sales are in Lucida.`}
+        sub={`Each brand's sales, pace${d.website ? ', stock and website' : ' and stock'}, ${PERIOD_LABEL[weeks]} to this week. Websites' orders; shop sales are in Lucida.`}
         right={
           <>
             <MeasureToggle money={d.money} />
@@ -45,12 +45,12 @@ export default async function BrandsPage(props: PageProps<'/brands'>) {
       />
       <Chips items={PERIODS.map((w) => ({ href: `/brands?weeks=${w}`, label: PERIOD_LABEL[w], active: w === weeks }))} />
 
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
+      <section className={`grid grid-cols-2 gap-3 sm:gap-4 ${d.website ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
         <Figure label="Sales" value={<ByMeasure value={m(t.value)} units={`${num(t.units)} pcs`} />} note={<ByMeasure value={deltaText(t.value, t.prevValue)} units={deltaText(t.units, t.prevUnits)} />} tone={t.units >= t.prevUnits ? 'good' : 'bad'} />
         {d.money && <Figure label="Average selling price" value={t.units ? m(Math.round(t.value / t.units)) : '—'} note="per piece sold" />}
         <Figure label="Sell-through" value={t.units + t.onHand > 0 ? share(t.units / (t.units + t.onHand)) : '—'} note={`sold of sold + on hand`} />
         <Figure label="Stock on hand" value={<ByMeasure value={d.money ? m(t.stockValue) : undefined} units={`${num(t.onHand)} pcs`} />} note={d.money ? `${num(t.onHand)} pieces at retail` : 'pieces'} />
-        <Figure label="Website gaps" value={num(gaps.soldOut + gaps.stock + gaps.photo)} note={`${num(gaps.soldOut)} sold out live · ${num(gaps.stock)} stock not live · ${num(gaps.photo)} no photo`} tone={gaps.soldOut + gaps.stock + gaps.photo ? 'bad' : undefined} />
+        {d.website && <Figure label="Website gaps" value={num(gaps.soldOut + gaps.stock + gaps.photo)} note={`${num(gaps.soldOut)} sold out live · ${num(gaps.stock)} stock not live · ${num(gaps.photo)} no photo`} tone={gaps.soldOut + gaps.stock + gaps.photo ? 'bad' : undefined} />}
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
@@ -118,7 +118,7 @@ export default async function BrandsPage(props: PageProps<'/brands'>) {
                   <th className="text-right">Slow</th>
                   <th className="text-right">Not selling</th>
                   <th className="text-right">Returned</th>
-                  <th className="text-right" title="Live but sold out · stock but not live · live without a photo">Website gaps</th>
+                  {d.website && <th className="text-right" title="Live but sold out · stock but not live · live without a photo">Website gaps</th>}
                 </tr>
               </thead>
               <tbody>
@@ -158,7 +158,7 @@ export default async function BrandsPage(props: PageProps<'/brands'>) {
                     <td className="text-right font-mono text-[var(--warn)]">{r.slow || '—'}</td>
                     <td className="text-right font-mono text-critical">{r.dead || '—'}</td>
                     <td className="text-right font-mono text-ink-3">{r.returnRate == null ? '—' : pct(r.returnRate)}</td>
-                    <td className="text-right font-mono text-ink-3">{r.web ? `${r.web.soldOutLive} · ${r.web.stockNotLive} · ${r.web.noPhoto}` : '—'}</td>
+                    {d.website && <td className="text-right font-mono text-ink-3">{r.web ? `${r.web.soldOutLive} · ${r.web.stockNotLive} · ${r.web.noPhoto}` : '—'}</td>}
                   </tr>
                 ))}
               </tbody>

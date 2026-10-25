@@ -139,27 +139,29 @@ export default async function BrandPage(props: PageProps<'/brands/[brand]'>) {
             </table>
           </Card>
         ))}
-        <Card
-          title="On the website"
-          sub="From the last website reading"
-          right={
-            <Link href={`/stock/web-items?brand=${encodeURIComponent(r.brand)}`} className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-ink-3 hover:bg-elev-2 hover:text-ink">
-              Open the list <ArrowRight className="size-3.5" />
-            </Link>
-          }
-        >
-          {r.web ? (
-            <dl className="grid grid-cols-2 gap-3 text-[12.5px]">
-              <Fact label="Live styles" value={num(r.web.live)} />
-              <Fact label="Live but sold out" value={num(r.web.soldOutLive)} bad={r.web.soldOutLive > 0} />
-              <Fact label="Stock but not live" value={num(r.web.stockNotLive)} bad={r.web.stockNotLive > 0} />
-              <Fact label="Live without a photo" value={num(r.web.noPhoto)} bad={r.web.noPhoto > 0} />
-              <div className="col-span-2 text-[11.5px] text-ink-3">{gaps ? `${num(gaps)} to fix` : 'Nothing to fix.'}</div>
-            </dl>
-          ) : (
-            <p className="text-[12.5px] text-ink-3">The website has not been read for this brand yet.</p>
-          )}
-        </Card>
+        {d.website && (
+          <Card
+            title="On the website"
+            sub="From the last website reading"
+            right={
+              <Link href={`/stock/web-items?brand=${encodeURIComponent(r.brand)}`} className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11.5px] font-medium text-ink-3 hover:bg-elev-2 hover:text-ink">
+                Open the list <ArrowRight className="size-3.5" />
+              </Link>
+            }
+          >
+            {r.web ? (
+              <dl className="grid grid-cols-2 gap-3 text-[12.5px]">
+                <Fact label="Live styles" value={num(r.web.live)} />
+                <Fact label="Live but sold out" value={num(r.web.soldOutLive)} bad={r.web.soldOutLive > 0} />
+                <Fact label="Stock but not live" value={num(r.web.stockNotLive)} bad={r.web.stockNotLive > 0} />
+                <Fact label="Live without a photo" value={num(r.web.noPhoto)} bad={r.web.noPhoto > 0} />
+                <div className="col-span-2 text-[11.5px] text-ink-3">{gaps ? `${num(gaps)} to fix` : 'Nothing to fix.'}</div>
+              </dl>
+            ) : (
+              <p className="text-[12.5px] text-ink-3">The website has not been read for this brand yet.</p>
+            )}
+          </Card>
+        )}
       </section>
     </div>
   );

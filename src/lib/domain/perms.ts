@@ -140,10 +140,12 @@ export const ROLES = {
     blurb: 'Reads the numbers and proposes what the websites push. Never sees customer names.',
     scopes: { customers: 0, money: 1, insights: 1, stock: 1, merch: 2 },
   },
+  // Dan, 25 Oct: brand managers follow their brands' sales (the shops first), stock and buying, and read
+  // the websites' numbers; the websites' order handling (queues, couriers, returns desk, listings) is not theirs
   brand: {
     label: 'Brand manager',
-    blurb: 'Sees everything for the brands they look after, from stock and buying to orders and money, and changes nothing.',
-    scopes: Object.fromEntries(AREAS.map((a) => [a, a === 'money' ? 2 : a === 'team' || a === 'channels' ? 0 : 1])) as Scopes,
+    blurb: 'Their brands’ sales, stock and buying, and the websites’ numbers. No order handling; changes nothing.',
+    scopes: { overview: 0, orders: 0, intake: 0, finance: 0, fulfilment: 0, shipping: 0, returns: 0, customers: 0, money: 2, insights: 1, channels: 0, team: 0, settings: 0, stock: 1, procurement: 1, warehouse: 0, merch: 0, production: 0 },
   },
   viewer: {
     label: 'Management (read-only)',
@@ -193,16 +195,25 @@ type Lv = (a: Area) => number;
 /** The jobs that look and never change anything, whatever their levels say. */
 export const READ_ONLY_ROLES: string[] = ['viewer', 'brand'];
 
+/** A brand manager's pages: their brands, the reports, stock and buying. Nothing from the order floor. */
+export const BRAND_PAGES: Page[] = ['brands', 'analytics', 'insights', 'financials', 'stockBrief', 'inventory', 'planning', 'purchasing'];
+
 /**
  * Whether this person is offered (and may open) a page. Management read-only sees every page but the
- * team-pulse board, which is for the people who assign work; a brand manager sees the same, less the
- * staff and store-connection pages.
+ * team-pulse board, which is for the people who assign work; a brand manager sees their own pages.
  */
 export const canSee = (p: { role?: string; scopes: Scopes } | null | undefined, page: Page): boolean =>
   Boolean(p) &&
   (PAGES[page].see((a) => p!.scopes?.[a] ?? 0) ||
     (p!.role === 'viewer' && page !== 'teamPulse') ||
-    (p!.role === 'brand' && !['teamPulse', 'team', 'channels'].includes(page)));
+    (p!.role === 'brand' && BRAND_PAGES.includes(page)));
+
+/**
+ * Whether someone works the websites' orders (a queue, or the whole floor). The process side of a page
+ * (deadlines, cash on delivery, couriers, refunds, who did what) is for them; anyone else who opens the
+ * same page reads its numbers only.
+ */
+export const worksOrders = (p: Pick<Principal, 'scopes'> | null | undefined) => canAny(p, ['overview', 'intake', 'finance', 'fulfilment', 'shipping', 'returns']);
 
 /** Where someone lands after signing in: their job's own page, or the Command centre if they run the floor, or the first page they can open. */
 const JOB_LANDING: Partial<Record<Role, Page>> = { brand: 'brands', care: 'orders', finance: 'financeQueue', fulfilment: 'pick', shipping: 'shipping', returns: 'returns', warehouse: 'warehouse', buyer: 'purchasing', planner: 'stockBrief', merchandiser: 'merch', marketing: 'insights' };
