@@ -1,4 +1,4 @@
-import { Activity, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
+import { Activity, ArrowDownUp, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
 import { canSee, type Page, type Role, type Scopes } from '@/lib/domain/perms';
 
 export type Me = {
@@ -57,6 +57,10 @@ export const NAV: { group: string | null; items: NavItem[] }[] = [
     ],
   },
   {
+    group: 'Catalogue',
+    items: [{ href: '/catalog', label: 'Import & export', icon: ArrowDownUp, page: 'catalog', hint: 'Products into every website from Excel: dry run, import, undo', tint: 'violet' }],
+  },
+  {
     group: 'Business',
     items: [
       { href: '/analytics', label: 'Reports', icon: FileBarChart, page: 'analytics', hint: 'Every report for finance and brands' },
@@ -81,6 +85,7 @@ export const SECTION: Record<string, { label: string; short: string; icon: Lucid
   Queues: { label: 'Queues', short: 'Queues', icon: Layers },
   Brands: { label: 'Brands', short: 'Brands', icon: Tags },
   'Stock & buying': { label: 'Stock & buying', short: 'Stock', icon: Package },
+  Catalogue: { label: 'Catalogue', short: 'Catalogue', icon: ArrowDownUp },
   Business: { label: 'Business', short: 'Business', icon: Landmark },
   Setup: { label: 'Setup', short: 'Setup', icon: Settings2 },
 };

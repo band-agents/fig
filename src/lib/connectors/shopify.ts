@@ -2,8 +2,9 @@ import 'server-only';
 // Shopify Admin GraphQL (2025-07): pulls orders by updated_at, maps order webhooks, and, only when
 // RELAY_WRITE_BACK=true (or =dry, to see without sending), writes what the console does back to the
 // store: stage tags, holds, fulfilment with tracking, delivery steps, payment, cancels and refunds.
-import { channelEnv, type ChannelDef } from '../channels';
+import { channelEnv, storeWriteBack, type ChannelDef } from '../channels';
 import type { Connector, IncomingOrder, WriteBackChange, WriteBackResult } from './types';
+import type { StoreProduct, Write } from '../catalog/plan';
 import { backoff, ConnectorError, errorText, fetchRetry, sleep } from './http';
 import { str } from './map-util';
 import { cancelReason, holdReason, matchLines, refundTransactions, type SuggestedTransaction } from './shopify-writeback';
@@ -482,8 +483,8 @@ export const shopify: Connector = {
   },
 
   async writeBack(c, order, change) {
-    const mode = process.env.RELAY_WRITE_BACK;
-    if (mode !== 'true' && mode !== 'dry') return { ok: false, skipped: true, note: 'write-back is off' };
+    const mode = storeWriteBack(c);
+    if (mode === 'off') return { ok: false, skipped: true, note: c.readOnly ? `${c.name} is read-only` : 'write-back is off' };
     const id = order.externalId;
     if (!id.startsWith('gid://shopify/Order/')) return { ok: false, skipped: true, note: `${order.number} is not a Shopify order` };
     const dry = mode === 'dry';
@@ -593,13 +594,20 @@ export async function* searchProducts(c: ChannelDef, query: string): AsyncGenera
  * whole list — on a catalogue where the tags carry the gender, the category and the sub-category,
  * that would quietly strip the menu off the product.
  */
+/** A read-only store takes no product changes, whoever asks (the stock rule filters it out first). */
+const assertWritable = (c: ChannelDef) => {
+  if (c.readOnly && storeWriteBack(c) === 'off') throw new ConnectorError(`${c.name} is connected read-only: nothing is changed in its store.`);
+};
+
 export async function draftProduct(c: ChannelDef, id: string) {
+  assertWritable(c);
   await mutate(c, SET_STATUS, { input: { id, status: 'DRAFT' } }, 'productUpdate');
   await mutate(c, TAGS_ADD, { id, tags: [OOS_TAG] }, 'tagsAdd');
 }
 
 /** Puts a product the rule drafted back on the shop, and takes its mark off. */
 export async function publishProduct(c: ChannelDef, id: string) {
+  assertWritable(c);
   await mutate(c, SET_STATUS, { input: { id, status: 'ACTIVE' } }, 'productUpdate');
   await mutate(c, TAGS_REMOVE, { id, tags: [OOS_TAG] }, 'tagsRemove');
 }
@@ -752,4 +760,300 @@ export async function stockLocations(c: ChannelDef) {
     `{ locations(first: 50) { nodes { id name isActive fulfillsOnlineOrders address { city } } } }`,
   );
   return (body.data?.locations.nodes ?? []).filter((l) => l.isActive).sort((a, b) => Number(b.fulfillsOnlineOrders) - Number(a.fulfillsOnlineOrders));
+}
+
+// ── Catalogue import & export (Dan, 27 Oct: Matrixify inside the console) ───────────────────────
+// Products read by handle for the dry run, a whole catalogue read for an export, and one product
+// written at a time for an import: productSet creates or updates the product with its options,
+// variants and photos together; metafields, the Online Store and stock follow. Every write is a
+// product someone asked for in an import they ran; nothing here runs on its own.
+
+type CatalogNode = {
+  id: string;
+  handle: string;
+  title: string;
+  descriptionHtml: string;
+  vendor: string;
+  productType: string;
+  tags: string[];
+  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+  templateSuffix: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  seo: { title: string | null; description: string | null } | null;
+  options: { name: string; position: number }[];
+  onlineStore?: boolean;
+  media?: { pageInfo?: { hasNextPage: boolean }; nodes: CatalogMedia[] };
+  variants?: { pageInfo?: { hasNextPage: boolean }; nodes: CatalogVariantNode[] };
+  metafields?: { nodes: CatalogMetafield[] };
+};
+type CatalogMedia = { id?: string; alt?: string | null; image?: { url: string } | null };
+type CatalogMetafield = { namespace: string; key: string; type: string; value: string };
+type CatalogVariantNode = {
+  id: string;
+  sku: string | null;
+  barcode: string | null;
+  price: string;
+  compareAtPrice: string | null;
+  taxable: boolean;
+  position: number;
+  inventoryQuantity: number | null;
+  inventoryPolicy: 'DENY' | 'CONTINUE';
+  selectedOptions: { name: string; value: string }[];
+  inventoryItem: { id?: string; unitCost: { amount: string } | null } | null;
+  image: { url: string } | null;
+  metafields?: { nodes: CatalogMetafield[] };
+};
+export type ExportedProduct = StoreProduct & { createdAt?: string; updatedAt?: string };
+
+const publicationCache = new Map<string, { at: number; id: string | null }>();
+
+/** The store's Online Store sales channel (where "Published" puts a product), or null without access to channels. */
+export async function onlineStorePublication(c: ChannelDef): Promise<string | null> {
+  const store = storeOf(c);
+  const hit = publicationCache.get(store);
+  if (hit && Date.now() - hit.at < HOUR) return hit.id;
+  const body = await gql<{ publications: { nodes: { id: string; name: string }[] } }>(c, `{ publications(first: 25) { nodes { id name } } }`, {}, { soft: true });
+  const id = body.data?.publications?.nodes.find((p) => /online store/i.test(p.name))?.id ?? null;
+  publicationCache.set(store, { at: Date.now(), id });
+  return id;
+}
+
+/** Whether a store can be read and written for catalogue work, from the app's granted scopes. */
+export async function catalogAccess(c: ChannelDef) {
+  const scopes = await grantedScopes(c);
+  const has = (s: string) => scopes.includes(s);
+  const missing = ['write_products', 'write_publications', 'write_files'].filter((s) => !has(s));
+  return { read: has('read_products') || has('write_products'), write: has('write_products'), publish: has('write_publications'), stock: has('write_inventory'), missing };
+}
+
+function toStoreProduct(n: CatalogNode, opts: { variants: CatalogVariantNode[]; media: CatalogMedia[]; metafields: CatalogMetafield[]; truncated?: boolean }): ExportedProduct {
+  const optionNames = [...(n.options ?? [])].sort((a, b) => a.position - b.position).map((o) => o.name);
+  return {
+    id: n.id,
+    handle: n.handle,
+    title: n.title,
+    bodyHtml: n.descriptionHtml ?? '',
+    vendor: n.vendor ?? '',
+    type: n.productType ?? '',
+    tags: n.tags ?? [],
+    status: n.status,
+    published: typeof n.onlineStore === 'boolean' ? n.onlineStore : null,
+    templateSuffix: n.templateSuffix || null,
+    seoTitle: n.seo?.title || null,
+    seoDescription: n.seo?.description || null,
+    optionNames,
+    variants: [...opts.variants]
+      .sort((a, b) => a.position - b.position)
+      .map((v) => ({
+        id: v.id,
+        options: optionNames.map((name) => v.selectedOptions.find((o) => o.name === name)?.value ?? ''),
+        sku: v.sku || null,
+        barcode: v.barcode || null,
+        price: v.price,
+        compareAt: v.compareAtPrice || null,
+        taxable: v.taxable,
+        cost: v.inventoryItem?.unitCost?.amount ?? null,
+        inventoryPolicy: v.inventoryPolicy,
+        inventoryQty: v.inventoryQuantity,
+        inventoryItemId: v.inventoryItem?.id ?? null,
+        position: v.position,
+        image: v.image?.url ?? null,
+      })),
+    images: opts.media.filter((m) => m.id && m.image?.url).map((m) => ({ id: m.id!, src: m.image!.url, alt: m.alt ?? null })),
+    metafields: [
+      ...opts.metafields.map((m) => ({ owner: 'product' as const, namespace: m.namespace, key: m.key, type: m.type, value: m.value })),
+      ...opts.variants.flatMap((v) => (v.metafields?.nodes ?? []).map((m) => ({ owner: 'variant' as const, variantId: v.id, namespace: m.namespace, key: m.key, type: m.type, value: m.value }))),
+    ],
+    ...(opts.truncated ? { truncated: true } : {}),
+    ...(n.createdAt ? { createdAt: n.createdAt, updatedAt: n.updatedAt } : {}),
+  };
+}
+
+const catalogFields = (opts: { pub: boolean; meta: boolean; variantMeta: boolean }) => `
+  id handle title descriptionHtml vendor productType tags status templateSuffix
+  seo { title description }
+  options { name position }
+  ${opts.pub ? 'onlineStore: publishedOnPublication(publicationId: $pub)' : ''}
+  media(first: 50) { pageInfo { hasNextPage } nodes { ... on MediaImage { id alt image { url } } } }
+  variants(first: 100) { pageInfo { hasNextPage } nodes {
+    id sku barcode price compareAtPrice taxable position inventoryQuantity inventoryPolicy
+    selectedOptions { name value } inventoryItem { id unitCost { amount } } image { url }
+    ${opts.variantMeta ? 'metafields(first: 20, keys: $vkeys) { nodes { namespace key type value } }' : ''}
+  } }
+  ${opts.meta ? 'metafields(first: 30, keys: $keys) { nodes { namespace key type value } }' : ''}`;
+
+/**
+ * The store's products for a list of handles and IDs, as the dry run compares them: five a call (each
+ * brings up to 100 variants and 50 photos). Products not in the store are absent from the map, which is
+ * keyed `id:<gid>` and `h:<handle>`.
+ */
+export async function catalogFetch(c: ChannelDef, refs: { handle?: string; id?: string }[], keys: { product: string[]; variant: string[] } = { product: [], variant: [] }) {
+  const pub = await onlineStorePublication(c);
+  const opts = { pub: Boolean(pub), meta: keys.product.length > 0, variantMeta: keys.variant.length > 0 };
+  const vars = `${pub ? ', $pub: ID!' : ''}${opts.meta ? ', $keys: [String!]' : ''}${opts.variantMeta ? ', $vkeys: [String!]' : ''}`;
+  const extra = { ...(pub ? { pub } : {}), ...(opts.meta ? { keys: keys.product } : {}), ...(opts.variantMeta ? { vkeys: keys.variant } : {}) };
+  const out = new Map<string, ExportedProduct>();
+  const toProduct = (n: CatalogNode) =>
+    toStoreProduct(n, {
+      variants: n.variants?.nodes ?? [],
+      media: n.media?.nodes ?? [],
+      metafields: n.metafields?.nodes ?? [],
+      truncated: Boolean(n.variants?.pageInfo?.hasNextPage || n.media?.pageInfo?.hasNextPage),
+    });
+  const ids = [...new Set(refs.flatMap((r) => (r.id ? [r.id] : [])))];
+  for (let i = 0; i < ids.length; i += 5) {
+    const body = await gql<{ nodes: (CatalogNode | null)[] }>(c, `query RelayCatalogIds($ids: [ID!]!${vars}) { nodes(ids: $ids) { ... on Product { ${catalogFields(opts)} } } }`, { ids: ids.slice(i, i + 5), ...extra });
+    for (const n of body.data?.nodes ?? []) {
+      if (!n?.id) continue;
+      const p = toProduct(n);
+      out.set(`id:${n.id}`, p);
+      out.set(`h:${n.handle.toLowerCase()}`, p);
+    }
+  }
+  const handles = [...new Set(refs.flatMap((r) => (r.handle && !r.id ? [r.handle.toLowerCase()] : [])))];
+  for (let i = 0; i < handles.length; i += 5) {
+    const batch = handles.slice(i, i + 5);
+    const query = batch.map((h) => `(handle:${JSON.stringify(h)})`).join(' OR ');
+    const body = await gql<{ products: { nodes: CatalogNode[] } }>(c, `query RelayCatalogHandles($q: String!${vars}) { products(first: 5, query: $q) { nodes { ${catalogFields(opts)} } } }`, { q: query, ...extra });
+    for (const n of body.data?.products.nodes ?? []) if (batch.includes(n.handle.toLowerCase())) out.set(`h:${n.handle.toLowerCase()}`, toProduct(n));
+  }
+  return out;
+}
+
+/** Which barcodes the store already has, and on which product: a new variant should not repeat one. */
+export async function barcodesInStore(c: ChannelDef, barcodes: string[]) {
+  const out = new Map<string, { productId: string; handle: string; title: string }>();
+  const list = [...new Set(barcodes.filter((b) => /^[\w.-]+$/.test(b)))];
+  for (let i = 0; i < list.length; i += 40) {
+    const q = list
+      .slice(i, i + 40)
+      .map((b) => `barcode:${b}`)
+      .join(' OR ');
+    const body = await gql<{ productVariants: { nodes: { barcode: string | null; product: { id: string; handle: string; title: string } }[] } }>(
+      c,
+      `query RelayBarcodes($q: String!) { productVariants(first: 100, query: $q) { nodes { barcode product { id handle title } } } }`,
+      { q },
+    );
+    for (const v of body.data?.productVariants.nodes ?? []) if (v.barcode) out.set(v.barcode, { productId: v.product.id, handle: v.product.handle, title: v.product.title });
+  }
+  return out;
+}
+
+/** Every product of the store (or those the filter picks) with variants, photos and metafields: one bulk export. */
+export async function catalogExport(c: ChannelDef, opts: { query?: string; metafields: boolean }, log: (m: string) => void = () => {}): Promise<ExportedProduct[]> {
+  const pub = await onlineStorePublication(c);
+  const filter = opts.query?.trim() ? `(query: ${JSON.stringify(opts.query.trim())})` : '';
+  const query = `{ products${filter} { edges { node {
+    id handle title descriptionHtml vendor productType tags status templateSuffix createdAt updatedAt
+    seo { title description }
+    options { name position }
+    ${pub ? `onlineStore: publishedOnPublication(publicationId: ${JSON.stringify(pub)})` : ''}
+    media { edges { node { ... on MediaImage { id alt image { url } } } } }
+    variants { edges { node { id sku barcode price compareAtPrice taxable position inventoryQuantity inventoryPolicy selectedOptions { name value } inventoryItem { unitCost { amount } } image { url } } } }
+    ${opts.metafields ? 'metafields { edges { node { id namespace key type value } } }' : ''}
+  } } } }`;
+  const lines = await runBulk(c, query, log);
+  const products = new Map<string, { node: CatalogNode; variants: CatalogVariantNode[]; media: CatalogMedia[]; metafields: CatalogMetafield[] }>();
+  for (const l of lines) {
+    const o = JSON.parse(l) as Record<string, unknown> & { id?: string; __parentId?: string };
+    if (!o.__parentId) {
+      if (o.id) products.set(o.id, { node: o as unknown as CatalogNode, variants: [], media: [], metafields: [] });
+      continue;
+    }
+    const p = products.get(o.__parentId);
+    if (!p || !o.id) continue;
+    if (o.id.includes('/ProductVariant/')) p.variants.push(o as unknown as CatalogVariantNode);
+    else if (o.id.includes('/MediaImage/')) p.media.push(o as CatalogMedia);
+    else if (o.id.includes('/Metafield/')) p.metafields.push(o as unknown as CatalogMetafield);
+  }
+  return [...products.values()].map((p) => toStoreProduct(p.node, p));
+}
+
+const PRODUCT_SET = `mutation RelayProductSet($input: ProductSetInput!, $identifier: ProductSetIdentifiers) {
+  productSet(input: $input, identifier: $identifier, synchronous: true) {
+    product { id handle variants(first: 250) { nodes { id selectedOptions { name value } inventoryItem { id } } } }
+    userErrors { field message code }
+  }
+}`;
+const METAFIELDS_SET = `mutation RelayMetafieldsSet($m: [MetafieldsSetInput!]!) { metafieldsSet(metafields: $m) { metafields { id } userErrors { field message code } } }`;
+const PUBLISH = `mutation RelayPublish($id: ID!, $input: [PublicationInput!]!) { publishablePublish(id: $id, input: $input) { userErrors { field message } } }`;
+const UNPUBLISH = `mutation RelayUnpublish($id: ID!, $input: [PublicationInput!]!) { publishableUnpublish(id: $id, input: $input) { userErrors { field message } } }`;
+const STOCK_SET = `mutation RelayStockSet($input: InventorySetQuantitiesInput!) { inventorySetQuantities(input: $input) { userErrors { field message } } }`;
+const PRODUCT_DELETE = `mutation RelayProductDelete($input: ProductDeleteInput!) { productDelete(input: $input) { deletedProductId userErrors { field message } } }`;
+
+/** Whether catalogue imports may write to this store: its own RELAY_<PREFIX>_CATALOG=on|off, else any store not connected read-only. */
+export function catalogWritable(c: ChannelDef) {
+  const own = process.env[`RELAY_${c.envPrefix}_CATALOG`]?.trim().toLowerCase();
+  if (own) return own === 'on' || own === 'true';
+  return !(c.readOnly && storeWriteBack(c) === 'off');
+}
+
+type SavedProduct = { id: string; handle: string; variants: { nodes: { id: string; selectedOptions: { name: string; value: string }[]; inventoryItem: { id: string } | null }[] } };
+
+/**
+ * One product from an import, written: productSet (create or update, with its options, variants and
+ * photos), then its metafields, its stock when the import writes stock, and the Online Store. Returns
+ * the product and what was done; a refusal throws with Shopify's own words.
+ */
+export async function catalogSave(c: ChannelDef, w: Write): Promise<{ productId: string; handle: string; notes: string[] }> {
+  if (!catalogWritable(c)) throw new ConnectorError(`${c.name} is connected read-only: imports are off for it.`);
+  const notes: string[] = [];
+  if (w.kind === 'delete') {
+    await mutate(c, PRODUCT_DELETE, { input: { id: w.productId } }, 'productDelete');
+    return { productId: w.productId!, handle: '', notes: ['deleted'] };
+  }
+  if (w.kind === 'archive') {
+    const r = (await mutate(c, PRODUCT_SET, { input: { status: 'ARCHIVED' }, identifier: { id: w.productId } }, 'productSet')) as { product: SavedProduct };
+    return { productId: r.product.id, handle: r.product.handle, notes: ['archived'] };
+  }
+  // an existing product is named by its ID beside the input (ProductSetInput has no id); a new one by its handle
+  const input = w.input ?? {};
+  const identifier = w.productId ? { id: w.productId } : { handle: String(input.handle ?? '') };
+  let product: SavedProduct;
+  if (Object.keys(input).length || !w.productId) {
+    const r = (await mutate(c, PRODUCT_SET, { input, identifier }, 'productSet')) as { product: SavedProduct | null } | null;
+    if (!r?.product) throw new ConnectorError('Shopify did not return the product.');
+    product = r.product;
+  } else {
+    const body = await gql<{ product: SavedProduct | null }>(c, `query RelayProductVariants($id: ID!) { product(id: $id) { id handle variants(first: 250) { nodes { id selectedOptions { name value } inventoryItem { id } } } } }`, { id: w.productId });
+    if (!body.data?.product) throw new ConnectorError('The product is no longer in the store.');
+    product = body.data.product;
+  }
+  const keyOf = (v: { selectedOptions: { name: string; value: string }[] }) => v.selectedOptions.map((o) => o.value.trim().toLowerCase()).join(' / ');
+  const variantBy = new Map(product.variants.nodes.map((v) => [keyOf(v), v]));
+  const single = product.variants.nodes.length === 1 ? product.variants.nodes[0] : null;
+  const variantFor = (key: string | undefined) => (key != null ? (variantBy.get(key) ?? (single && /^(default title)?$/.test(key) ? single : null)) : null);
+
+  if (w.metafields.length) {
+    const list = w.metafields.flatMap((m) => {
+      const owner = m.owner === 'product' ? product.id : variantFor(m.variantKey)?.id;
+      return owner ? [{ ownerId: owner, namespace: m.namespace, key: m.key, type: m.type, value: m.value }] : [];
+    });
+    for (let i = 0; i < list.length; i += 25) await mutate(c, METAFIELDS_SET, { m: list.slice(i, i + 25) }, 'metafieldsSet');
+    if (list.length) notes.push(`${list.length} metafield${list.length === 1 ? '' : 's'}`);
+  }
+  if (w.stock.length) {
+    const location = (await stockLocations(c))[0]?.id;
+    if (!location) notes.push('stock not written: the store has no active location');
+    else {
+      const quantities = w.stock.flatMap((s) => {
+        const item = variantFor(s.variantKey)?.inventoryItem?.id;
+        return item ? [{ inventoryItemId: item, locationId: location, quantity: s.quantity }] : [];
+      });
+      if (quantities.length) {
+        await mutate(c, STOCK_SET, { input: { name: 'available', reason: 'correction', quantities } }, 'inventorySetQuantities');
+        notes.push(`stock set on ${quantities.length}`);
+      }
+    }
+  }
+  if (w.publish != null) {
+    const pub = await onlineStorePublication(c);
+    if (!pub) notes.push('Online Store not changed: the app cannot see sales channels');
+    else {
+      await mutate(c, w.publish ? PUBLISH : UNPUBLISH, { id: product.id, input: [{ publicationId: pub }] }, w.publish ? 'publishablePublish' : 'publishableUnpublish');
+      notes.push(w.publish ? 'on the Online Store' : 'off the Online Store');
+    }
+  }
+  return { productId: product.id, handle: product.handle, notes };
 }

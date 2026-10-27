@@ -306,6 +306,54 @@ export const syncRuns = pgTable('sync_runs', {
   note: text('note'),
 });
 
+// ── Catalogue import & export (Dan, 27 Oct: Matrixify inside the console) ──────────────────────
+
+/**
+ * One import or export against the websites' Shopify stores. An import is read and checked first (a dry
+ * run: `plan` holds what each store would get), runs only when someone presses Run, and keeps each
+ * product's result and what it was before (`results`), so it can be reverted. Work continues in the
+ * background; `heartbeatAt` lets the next poll pick up a run whose server stopped.
+ */
+export const catalogJobs = pgTable(
+  'catalog_jobs',
+  {
+    id: id(),
+    kind: text('kind').notNull(), // import | export | revert
+    status: text('status').notNull(), // queued | analysing | ready | running | done | failed | cancelled
+    stores: jsonb('stores').$type<string[]>().notNull().default([]), // channel ids
+    fileName: text('file_name'),
+    options: jsonb('options').$type<Record<string, unknown>>().notNull().default({}),
+    plan: jsonb('plan').$type<Record<string, unknown> | null>(),
+    progress: jsonb('progress').$type<Record<string, unknown>>().notNull().default({}),
+    results: jsonb('results').$type<unknown[]>().notNull().default([]),
+    note: text('note'),
+    parentId: text('parent_id'), // a revert points at the import it undoes; an import made from an export at that export
+    createdBy: text('created_by'),
+    createdByName: text('created_by_name'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    startedAt: ts('started_at'),
+    finishedAt: ts('finished_at'),
+    heartbeatAt: ts('heartbeat_at'),
+  },
+  (t) => [index('catalog_jobs_created').on(t.createdAt)],
+);
+
+/** A job's files: the products read from an upload, or an export's workbook (base64), kept apart so the job list stays light. */
+export const catalogFiles = pgTable(
+  'catalog_files',
+  {
+    id: id(),
+    jobId: text('job_id').notNull(),
+    role: text('role').notNull(), // source (the parsed upload, JSON) | export (xlsx/csv, base64)
+    name: text('name').notNull(),
+    mime: text('mime').notNull(),
+    data: text('data').notNull(),
+    bytes: integer('bytes').notNull().default(0),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('catalog_files_job').on(t.jobId)],
+);
+
 export const settings = pgTable('settings', {
   key: text('key').primaryKey(),
   value: jsonb('value').notNull(),

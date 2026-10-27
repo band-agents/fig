@@ -2,7 +2,7 @@ import 'server-only';
 import { keepAlive } from './keep-alive';
 import { eq } from 'drizzle-orm';
 import { getDb, schema } from './db';
-import { CHANNEL, channelConfigured } from './channels';
+import { CHANNEL, channelConfigured, storeWriteBack } from './channels';
 import type { WriteBackChange } from './connectors/types';
 import type { Order } from './db/schema';
 import { changesForStage, type StageInput } from './domain/store-changes';
@@ -22,7 +22,12 @@ export { changesForStage };
 // Stock and prices are never written: Lucida keeps those in Shopify.
 
 export type WriteBackMode = 'live' | 'dry' | 'off';
-export const writeBackMode = (): WriteBackMode => (process.env.RELAY_WRITE_BACK === 'true' ? 'live' : process.env.RELAY_WRITE_BACK === 'dry' ? 'dry' : 'off');
+/** The console-wide switch, or one store's (a read-only store, or its own RELAY_<PREFIX>_WRITE_BACK). */
+export const writeBackMode = (channelId?: string): WriteBackMode => {
+  const c = channelId ? CHANNEL[channelId] : undefined;
+  if (c) return storeWriteBack(c);
+  return process.env.RELAY_WRITE_BACK === 'true' ? 'live' : process.env.RELAY_WRITE_BACK === 'dry' ? 'dry' : 'off';
+};
 export const writeBackEnabled = () => writeBackMode() !== 'off';
 
 /**
@@ -47,7 +52,7 @@ export function queueStoreChanges(orderId: string, changes: WriteBackChange[]) {
 const chains = new Map<string, Promise<void>>();
 
 function queue(orderId: string, build: (o: Order, carrier: string) => WriteBackChange[]) {
-  if (!writeBackEnabled()) return;
+  // whether this order's store takes changes is decided per store in push (a read-only store, or its own switch)
   const prev = chains.get(orderId) ?? Promise.resolve();
   const next = prev
     .then(() => push(orderId, build))
@@ -66,8 +71,10 @@ async function push(orderId: string, build: (o: Order, carrier: string) => Write
   const { connectorFor } = await import('./connectors');
   const connector = connectorFor(channel);
   if (!connector?.writeBack) return;
+  const mode = writeBackMode(o.channelId);
+  if (mode === 'off') return;
   const lines = await db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
-  const dry = writeBackMode() === 'dry';
+  const dry = mode === 'dry';
 
   const done: Record<string, string> = { ...(o.writeBack ?? {}) };
   for (const change of build(o, channel.carrier)) {
@@ -99,8 +106,8 @@ export function failedChanges(writeBack: Record<string, string> | null | undefin
  * What Retry sends: the failed changes, and once write-back is live, the ones only recorded during the
  * dry run (25 Oct: an order cancelled while dry stayed open on Shopify, and Retry said "Nothing failed").
  */
-export function changesToResend(writeBack: Record<string, string> | null | undefined) {
+export function changesToResend(writeBack: Record<string, string> | null | undefined, channelId?: string) {
   // a stage tag from the dry run is history (the order has moved on), not something Shopify is missing
-  const unsent = writeBackMode() === 'live' ? Object.entries(writeBack ?? {}).filter(([k, v]) => v.startsWith('dry') && !k.startsWith('tag:')) : [];
+  const unsent = writeBackMode(channelId) === 'live' ? Object.entries(writeBack ?? {}).filter(([k, v]) => v.startsWith('dry') && !k.startsWith('tag:')) : [];
   return { failed: failedChanges(writeBack), unsent: unsent.map(([k]) => k) };
 }

@@ -75,9 +75,18 @@ describe('pages each job sees', () => {
     expect(sees('planner')).toEqual(['brands', 'analytics', 'stockBrief', 'inventory', 'planning', 'purchasing', 'warehouse', 'merch', 'webItems', 'production', 'insights', 'rules']);
   });
 
+  // Dan, 27 Oct: the people who upload products (Matrixify before) get the catalogue import and the stock, nothing else
+  it('gives the product uploader the catalogue import and the stock, and lands them there', () => {
+    expect(sees('uploader')).toEqual(['inventory', 'catalog']);
+    expect(landingFor(job('uploader'))).toBe('/catalog');
+    expect(worksOrders(job('uploader'))).toBe(false);
+    for (const role of ['admin', 'merchandiser', 'uploader'] as Role[]) expect(scopesFor(role).catalog, role).toBeGreaterThanOrEqual(2);
+    for (const role of ['brand', 'care', 'finance', 'warehouse', 'marketing'] as Role[]) expect(scopesFor(role).catalog ?? 0, role).toBe(0);
+  });
+
   it('gives marketing and the merchandiser the numbers and the website, never orders', () => {
     expect(sees('marketing')).toEqual(['brands', 'analytics', 'stockBrief', 'inventory', 'merch', 'webItems', 'insights']);
-    expect(sees('merchandiser')).toEqual(['brands', 'analytics', 'stockBrief', 'inventory', 'merch', 'webItems', 'teamPulse', 'insights']);
+    expect(sees('merchandiser')).toEqual(['brands', 'analytics', 'stockBrief', 'inventory', 'merch', 'webItems', 'teamPulse', 'insights', 'catalog']);
     expect(canSee(job('marketing'), 'orders')).toBe(false);
   });
 });

@@ -50,6 +50,13 @@
       "when": 1792642132648,
       "tag": "0006_temp_passwords",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793122043100,
+      "tag": "0007_catalog_jobs",
+      "breakpoints": true
     }
   ]
 }

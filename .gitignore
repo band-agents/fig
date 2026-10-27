@@ -19,6 +19,8 @@
 /.next-build/
 /.next-prev/
 /.next-ups/
+/.next-catalog/
+/.next-check/
 /out/
 
 # production
