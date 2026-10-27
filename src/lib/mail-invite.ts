@@ -7,7 +7,9 @@ import type { Mail } from './mail';
  * apps draw it the same; a plain-text copy rides along.
  */
 
-const site = () => (process.env.RELAY_PUBLIC_URL || 'http://localhost:3400').replace(/\/$/, '');
+// RELAY_MAIL_URL: the address the emails link to when it is not the one the console runs on (an address on
+// the sender's own domain, so mail filters see the link and the sender agree)
+const site = () => (process.env.RELAY_MAIL_URL || process.env.RELAY_PUBLIC_URL || 'http://localhost:3400').replace(/\/$/, '');
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function frame(o: { preview: string; title: string; lines: string[]; facts: [string, string][]; button: { label: string; href: string }; foot: string }) {
