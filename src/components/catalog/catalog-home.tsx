@@ -15,6 +15,8 @@ const TEMPLATE = '/catalog/template';
 
 const GROUPS = [
   { key: 'basics', label: 'Basics' },
+  { key: 'menus', label: 'Gender, category, season' },
+  { key: 'arabic', label: 'Arabic' },
   { key: 'variants', label: 'Variants & prices' },
   { key: 'images', label: 'Images' },
   { key: 'stock', label: 'Stock & cost' },
@@ -23,7 +25,7 @@ const GROUPS = [
 ] as const;
 
 /** The catalogue's home: the stores, Export and Import side by side (as in Matrixify), and every job, live. */
-export function CatalogHome({ stores, jobs: first, canImport, canManage, brands }: { stores: StoreCard[]; jobs: JobRow[]; canImport: boolean; canManage: boolean; brands: string[] }) {
+export function CatalogHome({ stores, jobs: first, canImport, canManage, brands, maxMb }: { stores: StoreCard[]; jobs: JobRow[]; canImport: boolean; canManage: boolean; brands: string[]; maxMb: number }) {
   const [jobs, setJobs] = useState(first);
   const [filter, setFilter] = useState<'all' | 'import' | 'export'>('all');
   // a fresh server render (after an action) brings a new list: take it over the polled one
@@ -91,12 +93,12 @@ export function CatalogHome({ stores, jobs: first, canImport, canManage, brands 
                 </span>
                 {s.live > 0 && <span>{num(s.live)} live</span>}
               </div>
-              {s.rules.notes.length > 0 && (
-                <div className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-ink-3">
+              {s.rules.notes.map((n) => (
+                <div key={n} className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-ink-3">
                   <ShieldCheck className="mt-px size-3.5 shrink-0 text-[var(--sage)]" />
-                  {s.rules.notes[0]}
+                  {n}
                 </div>
-              )}
+              ))}
               {s.connected && !s.writable && <div className="mt-2 text-[11px] leading-snug text-ink-3">Connected read-only: imports run as dry runs until it is switched on.</div>}
             </div>
           ))}
@@ -105,7 +107,7 @@ export function CatalogHome({ stores, jobs: first, canImport, canManage, brands 
 
       <div className="grid gap-5 lg:grid-cols-2">
         <ExportPanel stores={connected} brands={brands} />
-        <ImportPanel stores={connected} canImport={canImport} canManage={canManage} />
+        <ImportPanel stores={connected} canImport={canImport} canManage={canManage} maxMb={maxMb} />
       </div>
 
       <section className="space-y-3">
@@ -263,7 +265,7 @@ function ExportPanel({ stores, brands }: { stores: StoreCard[]; brands: string[]
   const [vendor, setVendor] = useState('');
   const [tag, setTag] = useState('');
   const [since, setSince] = useState('');
-  const [groups, setGroups] = useState<string[]>(['basics', 'variants', 'images', 'stock', 'seo']);
+  const [groups, setGroups] = useState<string[]>(['basics', 'menus', 'arabic', 'variants', 'images', 'stock', 'seo']);
   const [metafields, setMetafields] = useState(true);
   const [format, setFormat] = useState<'xlsx' | 'csv'>('xlsx');
   const [pending, start] = useTransition();
@@ -355,7 +357,7 @@ function ExportPanel({ stores, brands }: { stores: StoreCard[]; brands: string[]
   );
 }
 
-function ImportPanel({ stores, canImport, canManage }: { stores: StoreCard[]; canImport: boolean; canManage: boolean }) {
+function ImportPanel({ stores, canImport, canManage, maxMb }: { stores: StoreCard[]; canImport: boolean; canManage: boolean; maxMb: number }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -373,7 +375,7 @@ function ImportPanel({ stores, canImport, canManage }: { stores: StoreCard[]; ca
     setError(null);
     if (!f) return;
     if (!/\.(xlsx|csv|txt)$/i.test(f.name)) return setError('Choose an Excel (.xlsx) or CSV file.');
-    if (f.size > 8 * 1024 * 1024) return setError('That file is over 8 MB: split it and import it in parts.');
+    if (f.size > maxMb * 1024 * 1024) return setError(`That file is over ${maxMb} MB: split it and import it in parts.`);
     setFile(f);
   };
   const go = () =>
@@ -397,7 +399,7 @@ function ImportPanel({ stores, canImport, canManage }: { stores: StoreCard[]; ca
       </Panel>
     );
   return (
-    <Panel icon={ArrowDownToLine} tint="violet" title="Import" sub="Matrixify files, Shopify CSVs and your own sheets (Style, Barcode, RRP, Size, Colour, Arabic headers). The columns are recognised for you.">
+    <Panel icon={ArrowDownToLine} tint="violet" title="Import" sub="Matrixify files, Shopify CSVs and your own sheets (Style, Barcode, RRP, Size, Colour, Gender, Category, Season, Arabic). The columns are recognised for you, the menu tags are made for you, and styles are found by barcode.">
       <div className="flex flex-1 flex-col gap-4">
         <div
           onDragOver={(e) => {
@@ -442,7 +444,7 @@ function ImportPanel({ stores, canImport, canManage }: { stores: StoreCard[]; ca
                 <Upload className="size-5" />
               </span>
               <div className="text-[13.5px] font-semibold">Drop an Excel or CSV file</div>
-              <div className="mt-0.5 text-[12px] text-ink-3">or click to choose · up to 8 MB</div>
+              <div className="mt-0.5 text-[12px] text-ink-3">or click to choose · up to {maxMb} MB</div>
             </>
           )}
         </div>

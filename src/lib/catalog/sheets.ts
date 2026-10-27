@@ -5,7 +5,7 @@ import type { Col, Sheet } from '../sheet';
 import { FIELD, FIELDS, GROUP_LABEL, type FieldKey, type Group } from './fields';
 import type { PlanItem, StoreProduct } from './plan';
 
-export const EXPORT_GROUPS: Group[] = ['basics', 'variants', 'images', 'stock', 'seo', 'commands', 'info'];
+export const EXPORT_GROUPS: Group[] = ['basics', 'menus', 'arabic', 'variants', 'images', 'stock', 'seo', 'commands', 'info'];
 
 const col = (k: FieldKey): Col => {
   const f = FIELD[k];
@@ -48,6 +48,9 @@ export function productsSheet(products: (StoreProduct & { createdAt?: string; up
           createdAt: p.createdAt ?? '',
           updatedAt: p.updatedAt ?? '',
           topRow: 'TRUE',
+          ...menuColumns(p.tags),
+          titleAr: p.translations?.title ?? '',
+          bodyHtmlAr: p.translations?.body_html ?? '',
         });
         for (const m of p.metafields.filter((x) => x.owner === 'product')) r[`mf:product|${m.namespace}.${m.key}|${m.type}`] = m.value;
       }
@@ -79,13 +82,23 @@ export function productsSheet(products: (StoreProduct & { createdAt?: string; up
   return { name: opts.name ?? 'Products', columns, rows };
 }
 
+/** Gender, Category and Season read back from the menu tags, so an export imports again unchanged. */
+function menuColumns(tags: string[]) {
+  const after = (prefix: string) => tags.find((t) => t.toLowerCase().startsWith(`${prefix}:`))?.slice(prefix.length + 1) ?? '';
+  const cat = after('cat');
+  const named = cat ? tags.find((t) => !t.includes(':') && t.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') === cat.toLowerCase()) : undefined;
+  const sub = after('subcat');
+  const subNamed = sub ? tags.find((t) => !t.includes(':') && t.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') === sub.toLowerCase()) : undefined;
+  return { gender: after('gender'), category: named ?? cat, subcategory: subNamed ?? sub, season: after('season').toUpperCase() };
+}
+
 /** The template: the columns most imports need, two example products, and a sheet that explains every column. */
 export function templateSheets(): Sheet[] {
-  const keys: FieldKey[] = ['handle', 'command', 'title', 'bodyHtml', 'vendor', 'type', 'tags', 'status', 'published', 'option1Name', 'option1Value', 'option2Name', 'option2Value', 'sku', 'barcode', 'price', 'compareAt', 'imageSrc', 'imageAlt'];
+  const keys: FieldKey[] = ['handle', 'command', 'title', 'titleAr', 'bodyHtml', 'vendor', 'gender', 'category', 'subcategory', 'type', 'season', 'tags', 'status', 'published', 'option1Name', 'option1Value', 'option2Name', 'option2Value', 'sku', 'barcode', 'price', 'compareAt', 'imageSrc', 'imageAlt'];
   const rows: Record<string, unknown>[] = [
-    { handle: 'lace-push-up-bra-black', command: 'MERGE', title: 'Lace push-up bra', bodyHtml: '<p>Soft lace, padded cups.</p>', vendor: 'Etam', type: 'Bras', tags: 'women, new-in', status: 'Draft', published: 'TRUE', option1Name: 'Size', option1Value: '75B', option2Name: 'Colour', option2Value: 'Black', sku: 'ETM-LPB-75B', barcode: '3612345678901', price: 12.5, compareAt: null, imageSrc: 'https://example.com/photos/lace-bra-front.jpg', imageAlt: 'Lace push-up bra, front' },
-    { handle: 'lace-push-up-bra-black', option1Value: '80B', option2Value: 'Black', sku: 'ETM-LPB-80B', barcode: '3612345678902', price: 12.5, imageSrc: 'https://example.com/photos/lace-bra-back.jpg', imageAlt: 'Lace push-up bra, back' },
-    { handle: 'silk-robe', command: 'MERGE', title: 'Silk robe', vendor: 'Women Secret', type: 'Robes', tags: 'women', status: 'Active', price: 25, compareAt: 32, barcode: '8434567890123', imageSrc: 'https://example.com/photos/silk-robe.jpg' },
+    { handle: 'etam-lace-push-up-bra-black', command: 'MERGE', title: 'Lace Push-Up Bra - Black', titleAr: 'صدرية دانتيل - أسود', bodyHtml: '<p>Soft lace, padded cups.</p>', vendor: 'Etam', gender: 'Women', category: 'Bras', subcategory: 'Push Up Bra', type: 'Push Up Bra', season: 'AW26', tags: 'new-in', status: 'Draft', published: 'TRUE', option1Name: 'Size', option1Value: '75B', option2Name: 'Colour', option2Value: 'Black', sku: 'ETM-LPB-75B', barcode: '3612345678901', price: 12.5, compareAt: null, imageSrc: 'https://example.com/photos/lace-bra-front.jpg', imageAlt: 'Lace push-up bra, front' },
+    { handle: 'etam-lace-push-up-bra-black', option1Value: '80B', option2Value: 'Black', sku: 'ETM-LPB-80B', barcode: '3612345678902', price: 12.5, imageSrc: 'https://example.com/photos/lace-bra-back.jpg', imageAlt: 'Lace push-up bra, back' },
+    { handle: 'women-secret-satin-robe-pink', command: 'MERGE', title: 'Satin Robe - Pink', vendor: 'Women Secret', gender: 'Women', category: 'Sleep & Homewear', subcategory: 'Robe', type: 'Robe', season: 'AW26', status: 'Active', price: 25, compareAt: 32, barcode: '8434567890123', imageSrc: 'https://example.com/photos/silk-robe.jpg' },
   ];
   const help: Sheet = {
     name: 'Read me',
@@ -98,7 +111,9 @@ export function templateSheets(): Sheet[] {
       ...FIELDS.filter((f) => f.level !== 'info').map((f) => ({ col: f.header, group: GROUP_LABEL[f.group], hint: f.hint })),
       { col: 'Metafield: custom.fabric [single_line_text_field]', group: 'Metafields', hint: 'A product metafield: namespace.key, then its type in brackets. "Variant Metafield: …" sets one on the variant.' },
       { col: 'Variant Price @FIG', group: 'Per store', hint: 'Any column followed by @ and a store name applies to that store only (here: FIG’s price). The plain column applies to every store.' },
-      { col: 'Size, Colour', group: 'Your own sheets', hint: 'Columns named Size or Colour become the product’s options. Brand, RRP, Barcode, Style and the Arabic names are understood too.' },
+      { col: 'Size, Colour', group: 'Your own sheets', hint: 'Columns named Size or Colour become the product’s options. Brand, RRP, Barcode, Style and the Arabic names are understood too. A sheet with no handles and a Colour column becomes one product per colour, as the websites list them.' },
+      { col: 'Gender, Category, Sub-category, Season, Colour', group: 'Menus', hint: 'FIG and Labesny build their menus and filters on tags: gender:women, cat:bras + “Bras”, subcat:push-up-bra + “Push Up Bra”, season:aw26 + “AW26”, color:Black, and the brand. They are made from these columns for you.' },
+      { col: 'No handle', group: 'Matching', hint: 'A product without a handle or ID is looked for in the store by its barcodes, so existing styles are updated, not listed twice.' },
       { col: '(empty cell)', group: 'Rules', hint: 'An empty cell leaves that field as it is. A compare-at price of 0 takes the sale off.' },
     ],
   };

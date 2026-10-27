@@ -12,6 +12,12 @@ export type FieldKey =
   | 'bodyHtml'
   | 'vendor'
   | 'type'
+  | 'category'
+  | 'subcategory'
+  | 'gender'
+  | 'season'
+  | 'titleAr'
+  | 'bodyHtmlAr'
   | 'tags'
   | 'tagsCommand'
   | 'status'
@@ -51,10 +57,12 @@ export type FieldKey =
 export type Level = 'product' | 'variant' | 'image' | 'info';
 
 export type FieldDef = { key: FieldKey; header: string; level: Level; group: Group; hint: string; aliases?: string[] };
-export type Group = 'basics' | 'variants' | 'images' | 'seo' | 'commands' | 'stock' | 'info';
+export type Group = 'basics' | 'menus' | 'arabic' | 'variants' | 'images' | 'seo' | 'commands' | 'stock' | 'info';
 
 export const GROUP_LABEL: Record<Group, string> = {
   basics: 'Basics',
+  menus: 'Menus & filters',
+  arabic: 'Arabic',
   variants: 'Variants & prices',
   images: 'Images',
   seo: 'SEO',
@@ -71,7 +79,13 @@ export const FIELDS: FieldDef[] = [
   { key: 'title', header: 'Title', level: 'product', group: 'basics', hint: 'The product name.', aliases: ['product title', 'product name', 'name', 'item name', 'style name', 'الاسم', 'اسم المنتج'] },
   { key: 'bodyHtml', header: 'Body HTML', level: 'product', group: 'basics', hint: 'The description, HTML allowed.', aliases: ['body (html)', 'body', 'description html', 'long description', 'product description', 'الوصف'] },
   { key: 'vendor', header: 'Vendor', level: 'product', group: 'basics', hint: 'The brand.', aliases: ['brand', 'brand name', 'الماركة', 'البراند'] },
-  { key: 'type', header: 'Type', level: 'product', group: 'basics', hint: 'The product type (Bras, Dresses…).', aliases: ['product type', 'category', 'sub category', 'subcategory', 'النوع', 'الفئة'] },
+  { key: 'type', header: 'Type', level: 'product', group: 'basics', hint: 'The product type (Logo Tshirt, Bralettes…). A new product with no Sub-category takes it as its sub-category too.', aliases: ['product type', 'النوع'] },
+  { key: 'category', header: 'Category', level: 'product', group: 'menus', hint: 'The menu category (Tops, Bras, Sleep & Homewear…): becomes the cat: tag and the category name tag.', aliases: ['main category', 'menu category', 'الفئة', 'التصنيف'] },
+  { key: 'subcategory', header: 'Sub-category', level: 'product', group: 'menus', hint: 'The menu sub-category (Boyshort, Logo Tshirt…): becomes the subcat: tag and its name tag. A new product with no Type takes it as its type.', aliases: ['sub category', 'subcategory', 'subcat', 'الفئة الفرعية'] },
+  { key: 'gender', header: 'Gender', level: 'product', group: 'menus', hint: 'Women, Men, Kids, Girls, Boys: becomes the gender: tag the menus are built on.', aliases: ['department', 'dept', 'division', 'القسم', 'الجنس'] },
+  { key: 'season', header: 'Season', level: 'product', group: 'menus', hint: 'AW26, SS26…: becomes the season: tag and the season name tag.', aliases: ['collection season', 'الموسم'] },
+  { key: 'titleAr', header: 'Title [ar]', level: 'product', group: 'arabic', hint: 'The Arabic title (the Arabic site shows it). A Title column written in Arabic is read as this.', aliases: ['title ar', 'arabic title', 'title arabic', 'الاسم بالعربي', 'الاسم بالعربية', 'العنوان بالعربي'] },
+  { key: 'bodyHtmlAr', header: 'Body HTML [ar]', level: 'product', group: 'arabic', hint: 'The Arabic description.', aliases: ['body html ar', 'description ar', 'arabic description', 'الوصف بالعربي', 'الوصف بالعربية'] },
   { key: 'tags', header: 'Tags', level: 'product', group: 'basics', hint: 'Comma separated. They drive the menus and filters, so the import adds to the existing tags unless Tags Command says REPLACE.', aliases: ['tag', 'keywords'] },
   { key: 'tagsCommand', header: 'Tags Command', level: 'product', group: 'commands', hint: 'MERGE (add, the default here) · REPLACE · DELETE (remove the listed tags)' },
   { key: 'status', header: 'Status', level: 'product', group: 'basics', hint: 'Active · Draft · Archived', aliases: ['product status', 'الحالة'] },
@@ -124,7 +138,7 @@ const norm = (s: string) =>
   s
     .toLowerCase()
     .replace(/[‏‎]/g, '')
-    .replace(/[_\-./()]+/g, ' ')
+    .replace(/[_\-./()[\]]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 

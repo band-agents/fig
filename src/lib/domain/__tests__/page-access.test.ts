@@ -77,7 +77,7 @@ describe('pages each job sees', () => {
 
   // Dan, 27 Oct: the people who upload products (Matrixify before) get the catalogue import and the stock, nothing else
   it('gives the product uploader the catalogue import and the stock, and lands them there', () => {
-    expect(sees('uploader')).toEqual(['inventory', 'catalog']);
+    expect(sees('uploader')).toEqual(['inventory', 'webItems', 'catalog']);
     expect(landingFor(job('uploader'))).toBe('/catalog');
     expect(worksOrders(job('uploader'))).toBe(false);
     for (const role of ['admin', 'merchandiser', 'uploader'] as Role[]) expect(scopesFor(role).catalog, role).toBeGreaterThanOrEqual(2);

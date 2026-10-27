@@ -25,5 +25,6 @@ export default async function CatalogPage() {
   const brands = [...new Set(counts.rows.flatMap((r) => (stores.some((s) => s.id === r.channel_id) ? (r.brands ?? []) : [])))].sort();
   const jobs = await listJobs(me, 30);
   const acts = !me.previewing && !READ_ONLY_ROLES.includes(me.role);
-  return <CatalogHome stores={cards} jobs={jobs} brands={brands} canImport={acts && can(me, 'catalog', 2)} canManage={acts && can(me, 'catalog', 3)} />;
+  // Vercel takes at most 4.5 MB in one request; the PC takes the 8 MB the import allows
+  return <CatalogHome stores={cards} jobs={jobs} brands={brands} canImport={acts && can(me, 'catalog', 2)} canManage={acts && can(me, 'catalog', 3)} maxMb={process.env.VERCEL ? 4 : 8} />;
 }

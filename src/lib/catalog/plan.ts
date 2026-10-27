@@ -30,9 +30,17 @@ export type StoreProduct = {
   images: StoreImage[];
   metafields: { owner: 'product' | 'variant'; variantId?: string; namespace: string; key: string; type: string; value: string }[];
   truncated?: boolean; // more variants or photos than were read: not safe to rewrite those lists
+  translations?: Record<string, string>; // Arabic, by key (title, body_html), when asked for
 };
 
-export type StoreRules = { taxable?: boolean; notes: string[] };
+/**
+ * A store's house rules (FIG and Labesny run the same theme and the same tag system):
+ * taxable: forced on every variant (Labesny: false) · houseTags: gender:/cat:/subcat:/season:/color: tags and
+ * the brand tag made from the sheet's columns, the way the menus and filters read them · lucidaPrices:
+ * Lucida's price sync owns prices · vendors: the store's brands, so a misspelt one is caught · arabic: the
+ * store has an Arabic site (titles and descriptions are translated).
+ */
+export type StoreRules = { taxable?: boolean; houseTags?: boolean; lucidaPrices?: boolean; vendors?: string[]; arabic?: boolean; notes: string[] };
 export type StoreCtx = { id: string; name: string; currency: string; rules: StoreRules };
 
 export type ImportOptions = {
@@ -63,6 +71,7 @@ export type Snapshot = {
   optionNames?: string[];
   variants?: { id: string; options: string[]; price: string; compareAt: string | null; sku: string | null; barcode: string | null; taxable: boolean }[];
   images?: { id: string; src: string; alt: string | null }[];
+  translations?: Record<string, string>;
 };
 
 export type Write = {
@@ -73,6 +82,7 @@ export type Write = {
   metafields: { owner: 'product' | 'variant'; variantKey?: string; namespace: string; key: string; type: string; value: string }[];
   stock: { variantKey: string; quantity: number }[];
   publish: boolean | null;
+  translations?: { key: string; locale: string; value: string }[];
   before: Snapshot | null;
 };
 
@@ -107,7 +117,7 @@ const sameImage = (a: string, b: string) => a.split('?')[0] === b.split('?')[0] 
 
 /** What the file says for one store: its values with that store's "@Store" columns on top. */
 function forStore(fp: FileProduct, store: string): { p: ProductValues; variants: (FileVariant & VariantValues)[]; metafields: FileMetafield[] } {
-  const p: ProductValues = { title: fp.title, bodyHtml: fp.bodyHtml, vendor: fp.vendor, type: fp.type, tags: fp.tags, status: fp.status, published: fp.published, templateSuffix: fp.templateSuffix, seoTitle: fp.seoTitle, seoDescription: fp.seoDescription, ...(fp.overrides[store] ?? {}) };
+  const p: ProductValues = { title: fp.title, bodyHtml: fp.bodyHtml, vendor: fp.vendor, type: fp.type, category: fp.category, subcategory: fp.subcategory, gender: fp.gender, season: fp.season, colour: fp.colour, titleAr: fp.titleAr, bodyHtmlAr: fp.bodyHtmlAr, tags: fp.tags, status: fp.status, published: fp.published, templateSuffix: fp.templateSuffix, seoTitle: fp.seoTitle, seoDescription: fp.seoDescription, ...(fp.overrides[store] ?? {}) };
   const variants = fp.variants.map((v) => ({ ...v, ...(v.overrides[store] ?? {}) }));
   const mine = (m: FileMetafield) => !m.store || m.store === store;
   const pick = (list: FileMetafield[]) => {
@@ -172,6 +182,19 @@ export function planProduct(fp: FileProduct, existing: StoreProduct | null, stor
     if (!creating) before[field] = now;
   };
 
+  // ── the brand as the store writes it (brand pages, tiles and filters are keyed on it)
+  if (p.vendor && store.rules.vendors?.length && !store.rules.vendors.includes(p.vendor)) {
+    const squash = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const near = store.rules.vendors.find((v) => squash(v) === squash(p.vendor!));
+    if (near) {
+      issues.push({ level: 'info', code: 'vendor-spelling', message: `Brand “${p.vendor}” written as ${store.name} writes it: “${near}”.` });
+      p.vendor = near;
+    } else issues.push({ level: 'warning', code: 'vendor-new', message: `“${p.vendor}” is not one of ${store.name}’s ${store.rules.vendors.length} brands: it would start a new brand in the filters and brand pages. Check the spelling.` });
+  }
+
+  // a new product named only by its sub-category takes it as its type too (the websites' types are their sub-categories)
+  if (creating && p.type === undefined && p.subcategory) p.type = p.subcategory;
+
   // ── the product's own fields
   const scalar = [
     ['title', 'Title', 'title'],
@@ -201,27 +224,49 @@ export function planProduct(fp: FileProduct, existing: StoreProduct | null, stor
     }
   }
 
-  // ── tags: added to the existing ones unless the sheet says otherwise
+  // ── tags: added to the existing ones unless the sheet says otherwise, then the store's menu tags
+  const haveTags = existing?.tags ?? [];
+  let nextTags = [...haveTags];
+  let tagCmd: ListCmd | null = null;
   if (p.tags !== undefined) {
-    const cmd: ListCmd = fp.tagsCommand ?? (replace ? 'REPLACE' : o.tags);
-    const have = existing?.tags ?? [];
-    const lower = new Set(have.map(lc));
+    tagCmd = fp.tagsCommand ?? (replace ? 'REPLACE' : o.tags);
+    const lower = new Set(haveTags.map(lc));
     const fileLower = new Set(p.tags.map(lc));
-    const next = cmd === 'REPLACE' ? p.tags : cmd === 'DELETE' ? have.filter((t) => !fileLower.has(lc(t))) : [...have, ...p.tags.filter((t) => !lower.has(lc(t)))];
-    const changed = next.length !== have.length || next.some((t) => !lower.has(lc(t)));
-    if (changed || (creating && next.length)) {
-      const added = next.filter((t) => !lower.has(lc(t)));
-      const removed = have.filter((t) => !new Set(next.map(lc)).has(lc(t)));
-      changes.push({ field: 'tags', label: `Tags (${cmd === 'MERGE' ? 'added' : cmd === 'DELETE' ? 'removed' : 'replaced'})`, before: removed.length ? `− ${removed.join(', ')}` : creating ? '—' : 'kept', after: added.length ? `+ ${added.join(', ')}` : '—' });
-      input.tags = next;
-      if (!creating) before.tags = have;
-    }
-    if (cmd === 'REPLACE' && existing && have.some((t) => /^(women|men|kids|girls|boys|cat|sub|gender|dept)[:_-]/i.test(t)) && !p.tags.some((t) => /^(women|men|kids|girls|boys|cat|sub|gender|dept)[:_-]/i.test(t))) {
+    nextTags = tagCmd === 'REPLACE' ? [...p.tags] : tagCmd === 'DELETE' ? haveTags.filter((t) => !fileLower.has(lc(t))) : [...haveTags, ...p.tags.filter((t) => !lower.has(lc(t)))];
+    if (tagCmd === 'REPLACE' && existing && haveTags.some(isMenuTag) && !p.tags.some(isMenuTag) && !store.rules.houseTags) {
       issues.push({ level: 'warning', code: 'menu-tags', message: 'Tags are replaced and the menu tags (gender, category) are not in the file: the product may drop out of its menus.' });
     }
   }
+  const house = store.rules.houseTags ? houseTags({ ...p, colour: p.colour ?? fp.colour }, existing, creating) : { add: [] as string[], remove: [] as string[] };
+  if (house.add.length || house.remove.length) {
+    const drop = new Set(house.remove.map(lc));
+    nextTags = nextTags.filter((t) => !drop.has(lc(t)));
+    const now = new Set(nextTags.map(lc));
+    for (const t of house.add) {
+      if (now.has(lc(t))) continue;
+      now.add(lc(t));
+      nextTags.push(t);
+    }
+  }
+  {
+    const haveLower = new Set(haveTags.map(lc));
+    const nextLower = new Set(nextTags.map(lc));
+    const added = nextTags.filter((t) => !haveLower.has(lc(t)));
+    const removed = haveTags.filter((t) => !nextLower.has(lc(t)));
+    if (added.length || removed.length) {
+      const houseOnly = added.every((t) => house.add.some((h) => lc(h) === lc(t))) && removed.every((t) => house.remove.some((h) => lc(h) === lc(t)));
+      changes.push({ field: 'tags', label: houseOnly ? 'Menu tags' : `Tags (${tagCmd === 'REPLACE' ? 'replaced' : tagCmd === 'DELETE' ? 'removed' : 'added'})`, before: removed.length ? `− ${removed.join(', ')}` : creating ? '—' : 'kept', after: added.length ? `+ ${added.join(', ')}` : '—', rule: houseOnly });
+      input.tags = nextTags;
+      if (!creating) before.tags = haveTags;
+    }
+  }
+  if (store.rules.houseTags && (creating || p.tags !== undefined)) {
+    const missing = [!nextTags.some((t) => /^gender:/i.test(t)) && 'gender', !nextTags.some((t) => /^cat:/i.test(t)) && 'category'].filter(Boolean) as string[];
+    if (missing.length) issues.push({ level: 'warning', code: 'menu-tags-missing', message: `No ${missing.join(' or ')} tag: it will not show in the menus or the filters. Add ${missing.map((m) => (m === 'gender' ? 'a Gender' : 'a Category')).join(' and ')} column.` });
+  }
 
   // ── options and variants
+  let pricesSet = false;
   const variantCmd: ListCmd = fp.variantCommand ?? (replace ? 'REPLACE' : 'MERGE');
   const have = existing?.variants ?? [];
   // a product with no options holds Shopify's one "Default Title" variant: it has no option names of its own
@@ -294,6 +339,7 @@ export function planProduct(fp: FileProduct, existing: StoreProduct | null, stor
         const same = k === 'price' || k === 'compareAt' || k === 'cost' ? sameMoney(now, val) : (now ?? '') === val;
         if (!same || !from) next[k] = (val === '' ? null : val) as StoreVariant[K];
         if (!same && from) diff.push(`${k === 'compareAt' ? 'compare-at' : k} ${show(now)} → ${show(val || null)}`);
+        if ((k === 'price' || k === 'compareAt') && (!same || !from)) pricesSet = true;
       };
       if (f) {
         take('price', f.price);
@@ -446,9 +492,31 @@ export function planProduct(fp: FileProduct, existing: StoreProduct | null, stor
     if (!creating) before.published = existing?.published ?? null;
   }
 
-  for (const n of store.rules.notes) if (changes.some((c) => c.rule)) issues.push({ level: 'info', code: 'rule', message: n });
+  // ── Arabic: the Arabic site's title and description (Shopify's translations)
+  const translations: NonNullable<Write['translations']> = [];
+  for (const [k, key, label] of [
+    ['titleAr', 'title', 'Arabic title'],
+    ['bodyHtmlAr', 'body_html', 'Arabic description'],
+  ] as const) {
+    const v = p[k];
+    if (v === undefined || v === '') continue;
+    if (!store.rules.arabic) {
+      if (!issues.some((x) => x.code === 'no-arabic-site')) issues.push({ level: 'info', code: 'no-arabic-site', message: `${store.name} has no Arabic site: the Arabic columns are left out.` });
+      continue;
+    }
+    const now = existing?.translations?.[key];
+    if (now === v) continue;
+    translations.push({ key, locale: 'ar', value: v });
+    changes.push({ field: `ar:${key}`, label, before: show(now), after: show(v) });
+    if (!creating) (before.translations ??= {})[key] = now ?? '';
+  }
+  if (creating && store.rules.arabic && !p.titleAr) issues.push({ level: 'info', code: 'no-arabic', message: 'No Arabic title: the Arabic site shows the English one until it is translated.' });
 
-  const anything = Object.keys(input).length > 0 || metafields.length > 0 || stock.length > 0 || publish != null;
+  if (pricesSet && store.rules.lucidaPrices) issues.push({ level: 'info', code: 'lucida-price', message: `Lucida's price sync sets ${store.name}'s prices for every barcode it holds: a price here stays only on barcodes Lucida does not have.` });
+  // the house rule on tax, said once where it changed a variant
+  if (store.rules.taxable !== undefined && changes.some((c) => c.rule && c.field.startsWith('variant:'))) issues.push({ level: 'info', code: 'rule-tax', message: `${store.name}'s house rule: every variant goes in ${store.rules.taxable ? 'taxable' : 'not taxable'}.` });
+
+  const anything = Object.keys(input).length > 0 || metafields.length > 0 || stock.length > 0 || publish != null || translations.length > 0;
   if (!creating && !anything) return { item: item('unchanged'), write: null };
   if (creating) input.handle = fp.handle;
   const write: Write = {
@@ -459,9 +527,58 @@ export function planProduct(fp: FileProduct, existing: StoreProduct | null, stor
     metafields,
     stock,
     publish,
+    translations,
     before: creating ? null : before,
   };
   return { item: item(creating ? 'create' : 'update'), write };
+}
+
+const isMenuTag = (t: string) => /^(gender|cat|subcat|season|women|men|kids|girls|boys|dept)[:_-]/i.test(t);
+const words = (x: string) => x.trim().replace(/\s+/g, ' ').replace(/(^|[\s-])(\p{L})/gu, (_m: string, a: string, b: string) => a + b.toUpperCase());
+const slug = (x: string) =>
+  x
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+const GENDER: Record<string, string> = { women: 'women', woman: 'women', ladies: 'women', female: 'women', 'نساء': 'women', 'نسائي': 'women', 'حريمي': 'women', men: 'men', man: 'men', male: 'men', 'رجال': 'men', 'رجالي': 'men', kids: 'kids', kid: 'kids', children: 'kids', 'أطفال': 'kids', 'اطفال': 'kids', girls: 'girls', girl: 'girls', 'بنات': 'girls', boys: 'boys', boy: 'boys', 'أولاد': 'boys', baby: 'baby', unisex: 'unisex' };
+
+/**
+ * The menu and filter tags FIG and Labesny build on, from the sheet's columns: gender:women, cat:tops +
+ * "Tops", subcat:logo-tshirt + "Logo Tshirt" (the Sub-category), season:aw26 + "AW26", color:Blue, and the brand.
+ * A new value replaces the old one with the same prefix (and the old name tag that went with it).
+ */
+export function houseTags(p: ProductValues, existing: Pick<StoreProduct, 'tags' | 'vendor'> | null, creating: boolean) {
+  const have = existing?.tags ?? [];
+  const add: string[] = [];
+  const remove: string[] = [];
+  const swap = (prefix: string, value: string, plain?: string, plainOf?: (tag: string, old: string) => boolean) => {
+    if (!value) return;
+    const tag = `${prefix}:${value}`;
+    for (const t of have) {
+      const i = t.indexOf(':');
+      if (i < 0 || lc(t.slice(0, i)) !== prefix || lc(t) === lc(tag)) continue;
+      remove.push(t);
+      if (plainOf) for (const x of have) if (!x.includes(':') && plainOf(x, t.slice(i + 1))) remove.push(x);
+    }
+    add.push(tag);
+    if (plain) add.push(plain);
+  };
+  if (p.gender) swap('gender', GENDER[lc(p.gender)] ?? slug(p.gender));
+  if (p.category) swap('cat', slug(p.category), words(p.category), (x, old) => slug(x) === lc(old));
+  // the sub-category is its own column: a type is not always the sub-category (20100805: type Panties, subcat Boyshort);
+  // a new product with only a type takes it as its sub-category
+  const sub = p.subcategory ?? (creating ? p.type : undefined);
+  if (sub) swap('subcat', slug(sub), sub.trim(), (x, old) => slug(x) === lc(old));
+  if (p.season) swap('season', lc(p.season), p.season.trim().toUpperCase(), (x) => /^(aw|ss|fw|sp)\d{2}$/i.test(x) && lc(x) !== lc(p.season));
+  if (p.colour) swap('color', words(p.colour));
+  if (p.vendor && (creating || (existing && lc(existing.vendor) !== lc(p.vendor)))) {
+    add.push(p.vendor);
+    if (existing?.vendor && lc(existing.vendor) !== lc(p.vendor)) remove.push(...have.filter((t) => lc(t) === lc(existing.vendor)));
+  }
+  return { add, remove: remove.filter((r) => !add.some((x) => lc(x) === lc(r))) };
 }
 
 function existingImage(have: StoreImage[], src: string): { id?: string; alt?: string | null } {
@@ -545,5 +662,7 @@ export function revertWrite(before: Snapshot, now: StoreProduct): Write {
     }));
   }
   if (before.images) input.files = before.images.map((img) => (now.images.some((x) => x.id === img.id) ? { id: img.id, ...(img.alt != null ? { alt: img.alt } : {}) } : { originalSource: img.src, contentType: 'IMAGE', ...(img.alt ? { alt: img.alt } : {}) }));
-  return { kind: 'set', productId: now.id, identifier: { id: now.id }, input, metafields: [], stock: [], publish: before.published === undefined || before.published === now.published ? null : before.published, before: null };
+  // an Arabic text the import added where there was none goes again (an empty value removes it)
+  const translations = Object.entries(before.translations ?? {}).map(([key, value]) => ({ key, locale: 'ar', value }));
+  return { kind: 'set', productId: now.id, identifier: { id: now.id }, input, metafields: [], stock: [], publish: before.published === undefined || before.published === now.published ? null : before.published, translations, before: null };
 }
