@@ -198,24 +198,12 @@ async function readLucida(channelId: string, by: string, days: number) {
   await setState(channelId, { lucidaAt: now.toISOString(), lucidaCalls: calls, lucidaReported: reported, absent: missing.length, days }, by);
 }
 
-export type GapFilters = { store?: string; group?: string; verdict?: string; reason?: string; brand?: string; q?: string; page?: number };
-export type Group = (typeof VERDICTS)[Verdict]['group'];
-const noGroups = () => ({ matched: 0, gap: 0, unpublished: 0, quiet: 0 }) as Record<Group, number>;
+export type Style = { key: string; title: string; brand: string | null; handle: string | null; status: string; sizes: number; webQty: number; lucidaQty: number | null; verdict: Verdict; reasons: Reason[]; price: number | null; lucidaPrice: number | null; productId: string | null; asked: boolean; hasPhoto: boolean };
 
-export async function webItemsView(p: Principal, f: GapFilters) {
-  const markets = marketsFor(p);
-  const stores = webStores().filter((c) => markets.includes(c.country as 'EG' | 'KW') && (!p.channels.length || p.channels.includes(c.id)));
-  const store = stores.find((c) => c.id === f.store) ?? stores[0] ?? null;
-  const base = { stores: stores.map((c) => ({ id: c.id, label: channelLabel(c.id) })), store: store ? { id: store.id, label: channelLabel(store.id), currency: store.currency } : null, lucida: lucidaConfigured(), budget: lucidaConfigured() ? lucidaBudget() : null };
-  if (!store) return { ...base, state: {} as RunState, empty: true as const };
-  const [state, judged] = await Promise.all([getSetting<RunState>(key(store.id), {}), judgedRows(store.id)]);
-  const mine = judged.filter(({ r }) => !p.brands?.length || seesBrand(p, r.brand ?? r.lucidaDesc));
-
-  type Style = { key: string; title: string; brand: string | null; handle: string | null; status: string; sizes: number; webQty: number; lucidaQty: number | null; verdict: Verdict; reasons: Reason[]; price: number | null; lucidaPrice: number | null; productId: string | null; asked: boolean };
+/** Sizes into styles (one product, or one Lucida item never uploaded): the worst verdict and every reason. */
+function toStyles(mine: Judged[]): Style[] {
   const styles = new Map<string, { rows: Judged['r'][]; verdicts: Verdict[]; reasons: Reason[][] }>();
-  const sizeCount = new Map<Verdict, number>();
   for (const { r, verdict, reasons } of mine) {
-    sizeCount.set(verdict, (sizeCount.get(verdict) ?? 0) + 1);
     const k = r.handle ?? `absent:${r.barcode}`;
     const s = styles.get(k) ?? { rows: [], verdicts: [], reasons: [] };
     s.rows.push(r);
@@ -223,7 +211,7 @@ export async function webItemsView(p: Principal, f: GapFilters) {
     s.reasons.push(reasons);
     styles.set(k, s);
   }
-  const all: Style[] = [...styles.entries()].map(([k, s]) => {
+  return [...styles.entries()].map(([k, s]) => {
     const r0 = s.rows[0];
     const asked = s.rows.some((r) => r.lucidaQty !== null);
     return {
@@ -241,8 +229,40 @@ export async function webItemsView(p: Principal, f: GapFilters) {
       lucidaPrice: r0.lucidaPrice,
       productId: r0.productId,
       asked,
+      hasPhoto: r0.hasPhoto !== false,
     };
   });
+}
+
+/** The stores whose websites this person may compare: their markets and their own stores. */
+const storesFor = (p: Principal) => {
+  const markets = marketsFor(p);
+  return webStores().filter((c) => markets.includes(c.country as 'EG' | 'KW') && (!p.channels.length || p.channels.includes(c.id)));
+};
+const theirs = (p: Principal, judged: Judged[]) => judged.filter(({ r }) => !p.brands?.length || seesBrand(p, r.brand ?? r.lucidaDesc));
+
+/** Every style on every website this person sees, with its store: what the money engine reads (smart/leaks.ts). */
+export async function webStylesFor(p: Principal) {
+  const out: (Style & { channelId: string; currency: string; market: 'EG' | 'KW' })[] = [];
+  for (const c of storesFor(p)) for (const s of toStyles(theirs(p, await judgedRows(c.id)))) out.push({ ...s, channelId: c.id, currency: c.currency, market: c.country as 'EG' | 'KW' });
+  return out;
+}
+
+export type GapFilters = { store?: string; group?: string; verdict?: string; reason?: string; brand?: string; q?: string; page?: number };
+export type Group = (typeof VERDICTS)[Verdict]['group'];
+const noGroups = () => ({ matched: 0, gap: 0, unpublished: 0, quiet: 0 }) as Record<Group, number>;
+
+export async function webItemsView(p: Principal, f: GapFilters) {
+  const stores = storesFor(p);
+  const store = stores.find((c) => c.id === f.store) ?? stores[0] ?? null;
+  const base = { stores: stores.map((c) => ({ id: c.id, label: channelLabel(c.id) })), store: store ? { id: store.id, label: channelLabel(store.id), currency: store.currency } : null, lucida: lucidaConfigured(), budget: lucidaConfigured() ? lucidaBudget() : null };
+  if (!store) return { ...base, state: {} as RunState, empty: true as const };
+  const [state, judged] = await Promise.all([getSetting<RunState>(key(store.id), {}), judgedRows(store.id)]);
+  const mine = theirs(p, judged);
+
+  const sizeCount = new Map<Verdict, number>();
+  for (const { verdict } of mine) sizeCount.set(verdict, (sizeCount.get(verdict) ?? 0) + 1);
+  const all = toStyles(mine);
 
   const byVerdict = (Object.keys(VERDICTS) as Verdict[]).map((v) => ({ verdict: v, styles: all.filter((s) => s.verdict === v).length, sizes: sizeCount.get(v) ?? 0 })).filter((x) => x.styles > 0);
   const byReason = (Object.keys(REASONS) as Reason[]).map((r) => ({ reason: r, styles: all.filter((s) => s.reasons.includes(r) && s.verdict !== 'ok').length })).filter((x) => x.styles > 0).sort((a, b) => b.styles - a.styles);

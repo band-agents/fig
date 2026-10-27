@@ -1,4 +1,4 @@
-import { Activity, ArrowDownUp, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
+import { Activity, ArrowDownUp, Droplets, ListChecks, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
 import { canSee, type Page, type Role, type Scopes } from '@/lib/domain/perms';
 
 export type Me = {
@@ -19,6 +19,7 @@ export const NAV: { group: string | null; items: NavItem[] }[] = [
   {
     group: null,
     items: [
+      { href: '/today', label: 'Today', icon: ListChecks, page: 'today', hint: 'What to do now, ranked by the money it is worth', tint: 'green' },
       { href: '/', label: 'Command centre', icon: Activity, page: 'home', hint: 'Today at a glance: sales, late work, what needs you' },
       { href: '/orders', label: 'Orders', icon: ListOrdered, page: 'orders', hint: 'Every order: search, filter, export' },
       { href: '/pipeline', label: 'Pipeline', icon: KanbanSquare, page: 'pipeline', hint: 'Every open order by stage, on one board' },
@@ -63,6 +64,7 @@ export const NAV: { group: string | null; items: NavItem[] }[] = [
   {
     group: 'Business',
     items: [
+      { href: '/leaks', label: 'Money leaks', icon: Droplets, page: 'leaks', hint: 'What the business loses each week, and where to fix it', tint: 'rose' },
       { href: '/analytics', label: 'Reports', icon: FileBarChart, page: 'analytics', hint: 'Every report for finance and brands' },
       { href: '/financials', label: 'Finance & analysis', icon: Landmark, page: 'financials', hint: 'The month in money' },
       { href: '/insights', label: 'Insights', icon: ChartNoAxesColumn, page: 'insights', hint: 'Trends, customers and channels' },
