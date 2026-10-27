@@ -22,6 +22,7 @@ export const AREAS = [
   'warehouse', // warehouse work: 1 see · 2 do tasks & transfers · 3 assign, rebalance, see everyone's work
   'merch', // website placements: 1 see · 2 propose & edit · 3 publish to the websites
   'production', // contract manufacturing: 1 see · 2 update steps, samples & inspections · 3 place orders, agree costs, manage factories
+  'catalog', // the websites' products in bulk (Matrixify-style): 1 export · 2 import into the stores · 3 delete, revert an import, write stock
 ] as const;
 export type Area = (typeof AREAS)[number];
 
@@ -48,6 +49,7 @@ export const AREA_LABEL: Record<Area, string> = {
   warehouse: 'Warehouse work',
   merch: 'Merchandising',
   production: 'Production',
+  catalog: 'Catalogue import',
 };
 
 export const LEVEL_LABEL: Record<Area, [string, string, string, string]> = {
@@ -69,6 +71,7 @@ export const LEVEL_LABEL: Record<Area, [string, string, string, string]> = {
   warehouse: ['Hidden', 'View', 'Do tasks', 'Run the floor'],
   merch: ['Hidden', 'View', 'Propose', 'Publish'],
   production: ['Hidden', 'View', 'Update steps & QC', 'Place & manage'],
+  catalog: ['Hidden', 'Export', 'Import', 'Delete & revert'],
 };
 
 // Need-to-know: each job sees the pages its work happens on and nothing else. A whole-floor view
@@ -83,12 +86,12 @@ export const ROLES = {
   ops: {
     label: 'Operations manager',
     blurb: 'Runs the floor: every stage, every queue, the rules and the numbers.',
-    scopes: { overview: 1, orders: 3, intake: 3, finance: 2, fulfilment: 3, shipping: 3, returns: 3, customers: 2, money: 2, insights: 3, channels: 2, team: 1, settings: 3, stock: 2, procurement: 1, warehouse: 3, merch: 1, production: 1 },
+    scopes: { overview: 1, orders: 3, intake: 3, finance: 2, fulfilment: 3, shipping: 3, returns: 3, customers: 2, money: 2, insights: 3, channels: 2, team: 1, settings: 3, stock: 2, procurement: 1, warehouse: 3, merch: 1, production: 1, catalog: 1 },
   },
   supply: {
     label: 'Head of supply chain',
     blurb: 'Owns stock, buying and the warehouse: approves purchase orders and sees everyone’s work.',
-    scopes: { overview: 1, orders: 1, fulfilment: 1, shipping: 1, returns: 1, customers: 0, money: 2, insights: 2, channels: 1, settings: 2, stock: 3, procurement: 3, warehouse: 3, merch: 2, production: 3 },
+    scopes: { overview: 1, orders: 1, fulfilment: 1, shipping: 1, returns: 1, customers: 0, money: 2, insights: 2, channels: 1, settings: 2, stock: 3, procurement: 3, warehouse: 3, merch: 2, production: 3, catalog: 1 },
   },
   planner: {
     label: 'Stock planner',
@@ -108,7 +111,13 @@ export const ROLES = {
   merchandiser: {
     label: 'E-commerce merchandiser',
     blurb: 'Decides what the websites push: cross-sells, upsells and pop-ups the AI proposes.',
-    scopes: { customers: 0, money: 1, insights: 1, stock: 1, merch: 3 },
+    scopes: { customers: 0, money: 1, insights: 1, stock: 1, merch: 3, catalog: 2 },
+  },
+  // Dan, 27 Oct: the people who upload products to the websites (they used Matrixify)
+  uploader: {
+    label: 'Product uploader',
+    blurb: 'Creates and updates the websites’ products in bulk from Excel: dry run, import, results. Sees stock, not the orders.',
+    scopes: { customers: 0, money: 1, stock: 1, catalog: 2 },
   },
   care: {
     label: 'Customer care',
@@ -145,7 +154,7 @@ export const ROLES = {
   brand: {
     label: 'Brand manager',
     blurb: 'Their brands’ sales, stock and buying, and the websites’ numbers. No order handling; changes nothing.',
-    scopes: { overview: 0, orders: 0, intake: 0, finance: 0, fulfilment: 0, shipping: 0, returns: 0, customers: 0, money: 2, insights: 1, channels: 0, team: 0, settings: 0, stock: 1, procurement: 1, warehouse: 0, merch: 0, production: 0 },
+    scopes: { overview: 0, orders: 0, intake: 0, finance: 0, fulfilment: 0, shipping: 0, returns: 0, customers: 0, money: 2, insights: 1, channels: 0, team: 0, settings: 0, stock: 1, procurement: 1, warehouse: 0, merch: 0, production: 0, catalog: 0 },
   },
   viewer: {
     label: 'Management (read-only)',
@@ -188,6 +197,7 @@ export const PAGES = {
   channels: { label: 'Channels', href: '/channels', see: (l: Lv) => l('channels') >= 1 },
   team: { label: 'Team & access', href: '/team', see: (l: Lv) => l('team') >= 1 },
   rules: { label: 'Rules & SLAs', href: '/rules', see: (l: Lv) => l('settings') >= 1 || l('stock') >= 3 },
+  catalog: { label: 'Import & export', href: '/catalog', see: (l: Lv) => l('catalog') >= 1 },
 } as const satisfies Record<string, { label: string; href: string; see: (l: Lv) => boolean }>;
 export type Page = keyof typeof PAGES;
 type Lv = (a: Area) => number;
@@ -216,8 +226,8 @@ export const canSee = (p: { role?: string; scopes: Scopes } | null | undefined, 
 export const worksOrders = (p: Pick<Principal, 'scopes'> | null | undefined) => canAny(p, ['overview', 'intake', 'finance', 'fulfilment', 'shipping', 'returns']);
 
 /** Where someone lands after signing in: their job's own page, or the Command centre if they run the floor, or the first page they can open. */
-const JOB_LANDING: Partial<Record<Role, Page>> = { brand: 'brands', care: 'orders', finance: 'financeQueue', fulfilment: 'pick', shipping: 'shipping', returns: 'returns', warehouse: 'warehouse', buyer: 'purchasing', planner: 'stockBrief', merchandiser: 'merch', marketing: 'insights' };
-const LANDING: Page[] = ['home', 'orders', 'financeQueue', 'pick', 'shipping', 'returns', 'warehouse', 'brands', 'stockBrief', 'purchasing', 'merch', 'insights', 'inventory', 'orders', 'cash', 'team', 'channels', 'rules'];
+const JOB_LANDING: Partial<Record<Role, Page>> = { uploader: 'catalog', brand: 'brands', care: 'orders', finance: 'financeQueue', fulfilment: 'pick', shipping: 'shipping', returns: 'returns', warehouse: 'warehouse', buyer: 'purchasing', planner: 'stockBrief', merchandiser: 'merch', marketing: 'insights' };
+const LANDING: Page[] = ['home', 'orders', 'financeQueue', 'pick', 'shipping', 'returns', 'warehouse', 'brands', 'stockBrief', 'purchasing', 'merch', 'insights', 'inventory', 'orders', 'cash', 'team', 'channels', 'rules', 'catalog'];
 export const landingFor = (p: { role?: string; scopes: Scopes }) => {
   const own = JOB_LANDING[p.role as Role];
   const page = own && canSee(p, own) ? own : LANDING.find((pg) => canSee(p, pg));

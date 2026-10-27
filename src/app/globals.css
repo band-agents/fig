@@ -1227,3 +1227,47 @@ dialog[open] {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Catalogue import & export: the glow behind the header and the live progress */
+.cat-hero::before {
+  content: '';
+  position: absolute;
+  inset: -40% -10% auto auto;
+  width: 70%;
+  height: 160%;
+  background:
+    radial-gradient(closest-side, color-mix(in oklab, var(--t-violet) 22%, transparent), transparent 70%),
+    radial-gradient(closest-side at 30% 70%, color-mix(in oklab, var(--sage) 20%, transparent), transparent 70%);
+  pointer-events: none;
+  filter: saturate(1.1);
+}
+.cat-drop {
+  background: color-mix(in oklab, var(--bg-elev-2) 45%, transparent);
+}
+.cat-drop.is-over {
+  background: color-mix(in oklab, var(--t-violet) 12%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in oklab, var(--t-violet) 10%, transparent);
+}
+.cat-shimmer {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.28), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: catShimmer 1.4s linear infinite;
+}
+@keyframes catShimmer {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+.cat-spin {
+  animation: catSpin 1.2s linear infinite;
+  transform-box: fill-box;
+}
+@keyframes catSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
