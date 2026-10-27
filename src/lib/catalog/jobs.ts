@@ -13,7 +13,7 @@ import { RelayError } from '../errors';
 import { keepAlive } from '../keep-alive';
 import { fileName as sheetFileName, toCsv, toXlsx, XLSX_TYPE } from '../sheet';
 import { readGrid } from '../sheet-read';
-import { barcodesInStore, catalogAccess, catalogExport, catalogFetch, catalogSave, catalogWritable } from '../connectors/shopify';
+import { barcodesInStore, catalogAccess, catalogExport, catalogFetch, catalogSave, catalogWritable, storeConventions } from '../connectors/shopify';
 import { mapHeader, pickOf, refFromPick, sheetFormat, type Mapped, type StoreKey } from './fields';
 import { parseProducts, type FileProduct } from './parse';
 import { DEFAULT_OPTIONS, planProduct, revertWrite, tally, type Action, type ImportOptions, type PlanItem, type Snapshot, type StoreCtx, type StoreRules } from './plan';
@@ -33,6 +33,7 @@ export type ImportPlan = {
   products: number;
   stores: Record<string, StorePlan>;
   checks: { images: { checked: number; broken: { src: string; why: string }[] }; barcodes: number };
+  notes?: string[]; // how the file was read: Arabic columns found, styles split by colour, products found by barcode
 };
 export type JobProgress = { phase: string; done: number; total: number; message?: string; perStore?: Record<string, { done: number; ok: number; failed: number; skipped: number; total: number }>; counts?: Record<string, number> };
 export type ImportJobOptions = ImportOptions & { emptyClears: boolean; mapping?: Record<number, string> };
@@ -48,8 +49,22 @@ const running = new Set<string>();
 
 /** A store's house rules, applied on top of every import (they show on the review screen). */
 export function storeRules(c: ChannelDef): StoreRules {
-  if (c.brand === 'Labesny') return { taxable: false, notes: ['Labesny never charges tax: every variant goes in not taxable.'] };
+  // FIG and Labesny share the theme, the menus and the tag system; Lucida owns both stores' prices
+  const shared = c.brand === 'Labesny' || c.brand === 'FIG' ? { houseTags: true, lucidaPrices: true } : {};
+  if (c.brand === 'Labesny') return { ...shared, taxable: false, notes: ['Labesny never charges tax: every variant goes in not taxable.', 'Menu tags (gender:, cat:, subcat:, season:, color:, the brand) are made from the Gender, Category, Type, Season and Colour columns.'] };
+  if (c.brand === 'FIG') return { ...shared, notes: ['Menu tags (gender:, cat:, subcat:, season:, color:, the brand) are made from the Gender, Category, Type, Season and Colour columns.'] };
   return { notes: [] };
+}
+
+/** The store's rules with what only the store knows: its brands as it spells them, and whether it has an Arabic site. */
+async function storeCtx(c: ChannelDef): Promise<StoreCtx> {
+  const rules = storeRules(c);
+  try {
+    const conv = await storeConventions(c);
+    return { id: c.id, name: c.name, currency: c.currency, rules: { ...rules, vendors: conv.vendors, arabic: conv.arabic } };
+  } catch {
+    return { id: c.id, name: c.name, currency: c.currency, rules };
+  }
 }
 
 export function catalogStores(p: Pick<Principal, 'channels'>): CatalogStore[] {
@@ -69,7 +84,6 @@ export function catalogStores(p: Pick<Principal, 'channels'>): CatalogStore[] {
 }
 
 const storeKeys = (stores: CatalogStore[]): StoreKey[] => stores.map((s) => ({ id: s.id, names: [s.name, s.brand, s.store, `${s.brand} ${s.countryName}`, `${s.name} ${s.country}`] }));
-const ctxOf = (c: ChannelDef): StoreCtx => ({ id: c.id, name: c.name, currency: c.currency, rules: storeRules(c) });
 export const adminUrl = (c: ChannelDef, productId?: string) => (productId && c.store ? `https://admin.shopify.com/store/${c.store}/products/${productId.split('/').pop()}` : undefined);
 
 // ── Access ──
@@ -175,6 +189,7 @@ async function createImportJob(p: Principal, name: string, grid: string[][], sto
     .returning({ id: schema.catalogJobs.id });
   const data = JSON.stringify(grid);
   await db.insert(schema.catalogFiles).values({ jobId: job.id, role: 'source', name, mime: 'application/json', data, bytes: data.length });
+  void prune().catch(() => {});
   kick(job.id);
   return job.id;
 }
@@ -287,6 +302,12 @@ export async function cancelJob(p: Principal, id: string) {
 
 // ── Running ──
 
+/** Files of jobs older than a month are dropped: an export is downloaded the day it is made, and the free database is small. */
+async function prune() {
+  const db = await getDb();
+  await db.execute(sql`delete from catalog_files where created_at < now() - interval '30 days'`);
+}
+
 function kick(id: string) {
   keepAlive(runJob(id));
 }
@@ -342,8 +363,50 @@ function readFile(grid: string[][], job: Row, stores: CatalogStore[]) {
     const pick = opts.mapping?.[m.index];
     return pick && pick !== pickOf(m.ref) ? { ...m, ref: refFromPick(pick), how: 'alias' as const, problem: undefined } : m;
   });
-  const products = parseProducts(grid, mapping, { emptyClears: opts.emptyClears });
-  return { opts, mapping, products };
+  const notes: string[] = [];
+  // a Title or Body column written in Arabic is the Arabic site's text, not the English one
+  const arabic = (i: number) => {
+    const vals = grid.slice(1, 61).map((r) => (r[i] ?? '').trim()).filter(Boolean);
+    return vals.length > 0 && vals.filter((v) => /[\u0600-\u06ff]/.test(v)).length / vals.length > 0.6;
+  };
+  for (const m of mapping) {
+    if (m.ref.kind !== 'field' || m.ref.store || (m.ref.key !== 'title' && m.ref.key !== 'bodyHtml') || opts.mapping?.[m.index]) continue;
+    if (!arabic(m.index)) continue;
+    const to = m.ref.key === 'title' ? 'titleAr' : 'bodyHtmlAr';
+    if (mapping.some((x) => x.ref.kind === 'field' && x.ref.key === to)) continue;
+    m.ref = { kind: 'field', key: to };
+    m.how = 'alias';
+    notes.push(`“${m.header}” is written in Arabic: read as the Arabic ${to === 'titleAr' ? 'title' : 'description'}.`);
+  }
+  // the teams' own sheets list a style once and its colours under it; the websites list each colour as its own product
+  const hasKey = mapping.some((m) => m.ref.kind === 'field' && (m.ref.key === 'handle' || m.ref.key === 'id'));
+  const colour = mapping.some((m) => m.ref.kind === 'option' && m.ref.name === 'Colour');
+  const splitColours = !hasKey && colour;
+  if (splitColours) notes.push('No handles and a Colour column: one product per colour, as the websites list them (“Title - Colour”, sizes as variants, a color: tag).');
+  const products = parseProducts(grid, mapping, { emptyClears: opts.emptyClears, splitColours });
+  return { opts, mapping, products, notes };
+}
+
+/**
+ * A product the file names only by title (no handle, no ID) is looked for in the store by its barcodes, so a
+ * sheet of existing styles updates them instead of listing them twice. Returns the notes for the review.
+ */
+async function matchByBarcode(c: ChannelDef, products: FileProduct[]) {
+  const loose = products.filter((fp) => fp.handleMade && !fp.id && fp.variants.some((v) => v.barcode));
+  if (!loose.length) return 0;
+  const taken = await barcodesInStore(c, loose.flatMap((fp) => fp.variants.flatMap((v) => (v.barcode ? [v.barcode] : []))));
+  let found = 0;
+  for (const fp of loose) {
+    const owners = new Set(fp.variants.flatMap((v) => (v.barcode && taken.get(v.barcode) ? [taken.get(v.barcode)!.productId] : [])));
+    if (owners.size !== 1) continue;
+    const [id] = [...owners];
+    fp.id = id;
+    const hit = [...taken.values()].find((x) => x.productId === id)!;
+    fp.handle = hit.handle;
+    fp.matched = `Found in ${c.name} by barcode as “${hit.handle}”: updated, not listed again.`;
+    found++;
+  }
+  return found;
 }
 
 const metafieldKeys = (products: FileProduct[]) => ({
@@ -372,8 +435,9 @@ async function analyse(job: Row) {
   const grid = await sourceGrid(job.id);
   const who = await principalOf(job);
   const all = catalogStores({ channels: [] });
-  const { opts, mapping, products } = readFile(grid, job, all);
+  const { opts, mapping, products, notes } = readFile(grid, job, all);
   if (!products.length) throw new Error('No products found: the file needs a Handle, an ID or a Title column with values.');
+  const arabicColumns = mapping.some((m) => m.ref.kind === 'field' && (m.ref.key === 'titleAr' || m.ref.key === 'bodyHtmlAr'));
   const plan: ImportPlan = {
     format: sheetFormat(mapping),
     header: grid[0],
@@ -383,6 +447,7 @@ async function analyse(job: Row) {
     products: products.length,
     stores: {},
     checks: { images: { checked: 0, broken: [] }, barcodes: 0 },
+    notes,
   };
   const total = products.length * job.stores.length;
   let done = 0;
@@ -402,13 +467,20 @@ async function analyse(job: Row) {
       }
     }
     if (c && channelConfigured(c)) {
-      for (let i = 0; i < products.length; i += 25) {
+      const ctx = await storeCtx(c);
+      // each store matches on its own: a fresh copy of the products per store
+      const mine = structuredClone(products);
+      const byBarcode = await matchByBarcode(c, mine).catch(() => 0);
+      if (byBarcode) notes.push(`${byBarcode} product${byBarcode === 1 ? '' : 's'} with no handle found in ${c.name} by barcode.`);
+      const storeKeys = { ...keys, arabic: arabicColumns && Boolean(ctx.rules.arabic) };
+      for (let i = 0; i < mine.length; i += 25) {
         if (await cancelled(job.id)) return;
-        const batch = products.slice(i, i + 25);
-        const found = await catalogFetch(c, batch.map(refOf), keys);
+        const batch = mine.slice(i, i + 25);
+        const found = await catalogFetch(c, batch.map(refOf), storeKeys);
         for (const fp of batch) {
           const existing = existingFor(found, fp);
-          const r = planProduct(fp, existing, ctxOf(c), opts);
+          const r = planProduct(fp, existing, ctx, opts);
+          if (fp.matched) r.item.issues.unshift({ level: 'info', code: 'matched', message: fp.matched });
           const block = brandBlock(who, fp, existing?.vendor);
           if (block) items.push({ ...r.item, action: 'error', issues: [...r.item.issues, { level: 'error', code: 'brand', message: block }] });
           else items.push(r.item);
@@ -417,7 +489,7 @@ async function analyse(job: Row) {
         await save(job.id, { progress: { phase: 'checking', done, total, message: `Comparing with ${c.name}` } });
       }
       // a new variant whose barcode another product already has
-      const fresh = products.filter((fp) => items.find((x) => x.key === fp.key)?.action !== 'error');
+      const fresh = mine.filter((fp) => items.find((x) => x.key === fp.key)?.action !== 'error');
       const barcodes = fresh.flatMap((fp) => fp.variants.flatMap((v) => (v.barcode ? [{ fp, barcode: v.barcode }] : [])));
       if (barcodes.length) {
         try {
@@ -485,31 +557,36 @@ async function write(job: Row) {
   const grid = await sourceGrid(job.id);
   const who = await principalOf(job);
   const all = catalogStores({ channels: [] });
-  const { opts, products } = readFile(grid, job, all);
+  const { opts, mapping, products: parsed } = readFile(grid, job, all);
   const plan = job.plan as unknown as ImportPlan | null;
+  const arabicColumns = mapping.some((m) => m.ref.kind === 'field' && (m.ref.key === 'titleAr' || m.ref.key === 'bodyHtmlAr'));
   const stores = job.stores.filter((s) => !plan?.stores[s]?.blocked && CHANNEL[s] && catalogWritable(CHANNEL[s]));
   const results = [...((job.results as JobResult[]) ?? [])];
   const done = new Set(results.map((r) => `${r.store}|${r.key}`));
-  const total = products.length * stores.length;
-  const perStore: NonNullable<JobProgress['perStore']> = Object.fromEntries(stores.map((s) => [s, { done: 0, ok: 0, failed: 0, skipped: 0, total: products.length }]));
+  const total = parsed.length * stores.length;
+  const perStore: NonNullable<JobProgress['perStore']> = Object.fromEntries(stores.map((s) => [s, { done: 0, ok: 0, failed: 0, skipped: 0, total: parsed.length }]));
   for (const r of results) {
     const ps = perStore[r.store];
     if (!ps) continue;
     ps.done++;
     ps[r.result === 'ok' ? 'ok' : r.result === 'failed' ? 'failed' : 'skipped']++;
   }
-  const keys = metafieldKeys(products);
+  const keys = metafieldKeys(parsed);
   const progress = (message: string) => ({ phase: 'writing', done: results.length, total, message, perStore });
   for (const sid of stores) {
     const c = CHANNEL[sid];
+    const ctx = await storeCtx(c);
+    const products = structuredClone(parsed);
+    await matchByBarcode(c, products).catch(() => 0);
+    const storeKeys = { ...keys, arabic: arabicColumns && Boolean(ctx.rules.arabic) };
     for (let i = 0; i < products.length; i += 5) {
       const batch = products.slice(i, i + 5).filter((fp) => !done.has(`${sid}|${fp.key}`));
       if (!batch.length) continue;
       if (await cancelled(job.id)) return;
-      const found = await catalogFetch(c, batch.map(refOf), keys);
+      const found = await catalogFetch(c, batch.map(refOf), storeKeys);
       for (const fp of batch) {
         const existing = existingFor(found, fp);
-        const { item, write } = planProduct(fp, existing, ctxOf(c), opts);
+        const { item, write } = planProduct(fp, existing, ctx, opts);
         const block = brandBlock(who, fp, existing?.vendor);
         const base = { key: fp.key, handle: item.handle, title: item.title, store: sid, action: item.action, lines: fp.lines, at: new Date().toISOString() };
         let r: JobResult;
@@ -554,9 +631,11 @@ async function runExport(job: Row) {
   if (!c || !channelConfigured(c)) throw new Error('The store is not connected.');
   const o = job.options as unknown as ExportJobOptions;
   let polls = 0;
-  const products = await catalogExport(c, { query: exportQuery(o), metafields: o.metafields }, (m) => {
+  const conv = await storeConventions(c).catch(() => ({ arabic: false, vendors: [] as string[] }));
+  const progress0 = (job.progress ?? {}) as JobProgress & { bulkId?: string };
+  const products = await catalogExport(c, { query: exportQuery(o), metafields: o.metafields, arabic: conv.arabic && o.groups.includes('arabic'), bulkId: progress0.bulkId, started: (bulkId) => save(job.id, { progress: { phase: 'exporting', done: 0, total: 0, message: 'Shopify is preparing the export', bulkId } }) }, (m) => {
     polls++;
-    void save(job.id, { progress: { phase: 'exporting', done: polls, total: 0, message: m.trim() } });
+    void save(job.id, { progress: { phase: 'exporting', done: polls, total: 0, message: m.trim(), bulkId: progress0.bulkId } });
   });
   if (await cancelled(job.id)) return;
   await save(job.id, { progress: { phase: 'building', done: products.length, total: products.length, message: `Writing ${products.length.toLocaleString('en')} products` } });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mapHeader, sheetFormat, type StoreKey } from '../catalog/fields';
 import { parseProducts, slugify } from '../catalog/parse';
-import { planProduct, tally, type StoreCtx, type StoreProduct } from '../catalog/plan';
+import { houseTags, planProduct, tally, type StoreCtx, type StoreProduct } from '../catalog/plan';
 
 /* Dan, 27 Oct: Matrixify inside the console, for every website. A sheet becomes products, each product a
    plan per store: what changes, before → after, and what Shopify is sent. */
@@ -10,6 +10,8 @@ const STORES: StoreKey[] = [
   { id: 'fig-web', names: ['FIG', 'ujvi0q-ga'] },
 ];
 const LAB: StoreCtx = { id: 'labesny-web', name: 'Labesny', currency: 'KWD', rules: { taxable: false, notes: ['Labesny never charges tax: every variant goes in not taxable.'] } };
+// Labesny as the import really sees it: the tag system, Lucida's prices, its brands, its Arabic site
+const LAB_LIVE: StoreCtx = { ...LAB, rules: { ...LAB.rules, houseTags: true, lucidaPrices: true, vendors: ['Bebe', 'Etam', 'Tomtailor', 'Women Secret'], arabic: true } };
 const FIG: StoreCtx = { id: 'fig-web', name: 'FIG', currency: 'EGP', rules: { notes: [] } };
 
 const read = (grid: string[][]) => parseProducts(grid, mapHeader(grid[0], STORES));
@@ -189,5 +191,55 @@ describe('the plan for one store', () => {
     const [p] = read([['Handle', 'Title'], ['lace-bra', 'Lace bra 2']]);
     const items = [planProduct(p, existing(), LAB).item, planProduct(p, null, FIG).item];
     expect(tally(items)).toMatchObject({ update: 1, create: 1 });
+  });
+});
+
+describe('how FIG and Labesny run (Dan, 27 Oct: tailored to the business)', () => {
+  it('makes the menu tags from Gender, Category, Type, Season and Colour, and the brand tag', () => {
+    const t = houseTags({ gender: 'Women', category: 'sleep & homewear', subcategory: 'Logo Tshirt', season: 'aw26', colour: 'off-white', vendor: 'Bebe' }, null, true);
+    expect(t.add).toEqual(['gender:women', 'cat:sleep-and-homewear', 'Sleep & Homewear', 'subcat:logo-tshirt', 'Logo Tshirt', 'season:aw26', 'AW26', 'color:Off-White', 'Bebe']);
+    // a new category replaces the old cat: tag and the name tag that went with it
+    const swap = houseTags({ category: 'Tops' }, { tags: ['gender:women', 'cat:bras', 'Bras', 'AW26'], vendor: 'Etam' }, false);
+    expect(swap).toEqual({ add: ['cat:tops', 'Tops'], remove: ['cat:bras', 'Bras'] });
+    // a type on an existing product is not its sub-category (20100805: type Panties, subcat Boyshort)
+    expect(houseTags({ type: 'Panties' }, { tags: ['subcat:boyshort', 'Boyshort'], vendor: 'La vie en rose' }, false)).toEqual({ add: [], remove: [] });
+    // a new product with only a type takes it as its sub-category
+    expect(houseTags({ type: 'Robe' }, null, true).add).toEqual(['subcat:robe', 'Robe']);
+  });
+
+  it('splits a style sheet into one product per colour, as the websites list them', () => {
+    const grid = [
+      ['Title', 'Brand', 'Gender', 'Category', 'Colour', 'Size', 'Barcode', 'RRP'],
+      ['Logo Tank Top', 'bebe', 'Women', 'Tops', 'Blue', 'S', '111', '9'],
+      ['', '', '', '', 'Blue', 'M', '112', '9'],
+      ['', '', '', '', 'Pink', 'S', '121', '9'],
+    ];
+    const ps = parseProducts(grid, mapHeader(grid[0], STORES), { splitColours: true });
+    expect(ps.map((p) => [p.title, p.handle, p.colour, p.optionNames.join('/'), p.variants.length, p.vendor])).toEqual([
+      ['Logo Tank Top - Blue', 'logo-tank-top-blue', 'Blue', 'Size', 2, 'bebe'],
+      ['Logo Tank Top - Pink', 'logo-tank-top-pink', 'Pink', 'Size', 1, 'bebe'],
+    ]);
+    const { item, write } = planProduct(ps[0], null, LAB_LIVE);
+    // the brand as the store spells it, the menu tags, and the Arabic and Lucida notes
+    expect(write!.input!.vendor).toBe('Bebe');
+    expect(write!.input!.tags).toEqual(['gender:women', 'cat:tops', 'Tops', 'color:Blue', 'Bebe']);
+    expect(item.issues.map((i) => i.code)).toEqual(expect.arrayContaining(['vendor-spelling', 'no-arabic', 'lucida-price']));
+    expect(item.issues.map((i) => i.code)).not.toContain('menu-tags-missing');
+  });
+
+  it('warns when a new product would miss the menus, or brings a brand the store does not have', () => {
+    const [p] = read([['Title', 'Vendor', 'Price'], ['Robe', 'Tom Taylor', '5']]);
+    const codes = planProduct(p, null, LAB_LIVE).item.issues.map((i) => i.code);
+    expect(codes).toEqual(expect.arrayContaining(['menu-tags-missing', 'vendor-new']));
+  });
+
+  it('writes the Arabic title and description to the Arabic site, and only when they change', () => {
+    const [p] = read([['Handle', 'Title [ar]', 'Body HTML [ar]'], ['lace-bra', 'صدرية دانتيل', '<p>ناعمة</p>']]);
+    const { item, write } = planProduct(p, existing({ translations: { title: 'صدرية دانتيل' } }), LAB_LIVE);
+    expect(item.action).toBe('update');
+    expect(write!.translations).toEqual([{ key: 'body_html', locale: 'ar', value: '<p>ناعمة</p>' }]);
+    expect(write!.before!.translations).toEqual({ body_html: '' });
+    const noArabic = planProduct(p, existing(), { ...LAB_LIVE, rules: { ...LAB_LIVE.rules, arabic: false } }).item;
+    expect(noArabic.issues.map((i) => i.code)).toContain('no-arabic-site');
   });
 });

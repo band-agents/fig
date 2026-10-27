@@ -686,10 +686,14 @@ export async function exportCatalogue(c: ChannelDef, log: (m: string) => void = 
 }
 
 /** Starts a bulk export, waits for it, and hands back its lines (JSONL). Read-only towards the store. */
-async function runBulk(c: ChannelDef, query: string, log: (m: string) => void): Promise<string[]> {
-  const started = await mutate(c, START_BULK, { query }, 'bulkOperationRunQuery');
-  const id = (started as { bulkOperation?: { id: string } } | null)?.bulkOperation?.id;
-  if (!id) throw new ConnectorError('Shopify did not start the catalogue export.');
+async function runBulk(c: ChannelDef, query: string, log: (m: string) => void, resume?: { id?: string; started?: (id: string) => void | Promise<void> }): Promise<string[]> {
+  let id = resume?.id;
+  if (!id) {
+    const started = await mutate(c, START_BULK, { query }, 'bulkOperationRunQuery');
+    id = (started as { bulkOperation?: { id: string } } | null)?.bulkOperation?.id;
+    if (!id) throw new ConnectorError('Shopify did not start the catalogue export.');
+    await resume?.started?.(id);
+  }
   let url: string | null = null;
   for (let i = 0; i < 360; i++) {
     await sleep(i < 5 ? 2000 : 5000);
@@ -770,6 +774,7 @@ export async function stockLocations(c: ChannelDef) {
 
 type CatalogNode = {
   id: string;
+  translations?: { key: string; value: string }[];
   handle: string;
   title: string;
   descriptionHtml: string;
@@ -819,6 +824,19 @@ export async function onlineStorePublication(c: ChannelDef): Promise<string | nu
   return id;
 }
 
+const conventionCache = new Map<string, { at: number; v: { vendors: string[]; arabic: boolean } }>();
+
+/** The store's own brands (as it spells them) and whether it has an Arabic site: the import checks against both. */
+export async function storeConventions(c: ChannelDef) {
+  const store = storeOf(c);
+  const hit = conventionCache.get(store);
+  if (hit && Date.now() - hit.at < HOUR) return hit.v;
+  const body = await gql<{ productVendors: { nodes: string[] }; shopLocales: { locale: string; published: boolean }[] }>(c, `{ productVendors(first: 250) { nodes } shopLocales { locale published } }`, {}, { soft: true });
+  const v = { vendors: (body.data?.productVendors?.nodes ?? []).filter((x) => x && !/^relay test$/i.test(x)), arabic: (body.data?.shopLocales ?? []).some((l) => l.locale.startsWith('ar') && l.published) };
+  conventionCache.set(store, { at: Date.now(), v });
+  return v;
+}
+
 /** Whether a store can be read and written for catalogue work, from the app's granted scopes. */
 export async function catalogAccess(c: ChannelDef) {
   const scopes = await grantedScopes(c);
@@ -826,6 +844,8 @@ export async function catalogAccess(c: ChannelDef) {
   const missing = ['write_products', 'write_publications', 'write_files'].filter((s) => !has(s));
   return { read: has('read_products') || has('write_products'), write: has('write_products'), publish: has('write_publications'), stock: has('write_inventory'), missing };
 }
+
+const bareKey = (m: { namespace: string; key: string }) => (m.key.startsWith(`${m.namespace}.`) ? m.key.slice(m.namespace.length + 1) : m.key);
 
 function toStoreProduct(n: CatalogNode, opts: { variants: CatalogVariantNode[]; media: CatalogMedia[]; metafields: CatalogMetafield[]; truncated?: boolean }): ExportedProduct {
   const optionNames = [...(n.options ?? [])].sort((a, b) => a.position - b.position).map((o) => o.name);
@@ -861,17 +881,20 @@ function toStoreProduct(n: CatalogNode, opts: { variants: CatalogVariantNode[]; 
         image: v.image?.url ?? null,
       })),
     images: opts.media.filter((m) => m.id && m.image?.url).map((m) => ({ id: m.id!, src: m.image!.url, alt: m.alt ?? null })),
+    // asked for by keys, Shopify answers key as "namespace.key": keep the key alone
     metafields: [
-      ...opts.metafields.map((m) => ({ owner: 'product' as const, namespace: m.namespace, key: m.key, type: m.type, value: m.value })),
-      ...opts.variants.flatMap((v) => (v.metafields?.nodes ?? []).map((m) => ({ owner: 'variant' as const, variantId: v.id, namespace: m.namespace, key: m.key, type: m.type, value: m.value }))),
+      ...opts.metafields.map((m) => ({ owner: 'product' as const, namespace: m.namespace, key: bareKey(m), type: m.type, value: m.value })),
+      ...opts.variants.flatMap((v) => (v.metafields?.nodes ?? []).map((m) => ({ owner: 'variant' as const, variantId: v.id, namespace: m.namespace, key: bareKey(m), type: m.type, value: m.value }))),
     ],
     ...(opts.truncated ? { truncated: true } : {}),
     ...(n.createdAt ? { createdAt: n.createdAt, updatedAt: n.updatedAt } : {}),
+    ...(n.translations ? { translations: Object.fromEntries(n.translations.map((t) => [t.key, t.value])) } : {}),
   };
 }
 
-const catalogFields = (opts: { pub: boolean; meta: boolean; variantMeta: boolean }) => `
+const catalogFields = (opts: { pub: boolean; meta: boolean; variantMeta: boolean; arabic?: boolean }) => `
   id handle title descriptionHtml vendor productType tags status templateSuffix
+  ${opts.arabic ? 'translations(locale: "ar") { key value }' : ''}
   seo { title description }
   options { name position }
   ${opts.pub ? 'onlineStore: publishedOnPublication(publicationId: $pub)' : ''}
@@ -888,9 +911,9 @@ const catalogFields = (opts: { pub: boolean; meta: boolean; variantMeta: boolean
  * brings up to 100 variants and 50 photos). Products not in the store are absent from the map, which is
  * keyed `id:<gid>` and `h:<handle>`.
  */
-export async function catalogFetch(c: ChannelDef, refs: { handle?: string; id?: string }[], keys: { product: string[]; variant: string[] } = { product: [], variant: [] }) {
+export async function catalogFetch(c: ChannelDef, refs: { handle?: string; id?: string }[], keys: { product: string[]; variant: string[]; arabic?: boolean } = { product: [], variant: [] }) {
   const pub = await onlineStorePublication(c);
-  const opts = { pub: Boolean(pub), meta: keys.product.length > 0, variantMeta: keys.variant.length > 0 };
+  const opts = { pub: Boolean(pub), meta: keys.product.length > 0, variantMeta: keys.variant.length > 0, arabic: Boolean(keys.arabic) };
   const vars = `${pub ? ', $pub: ID!' : ''}${opts.meta ? ', $keys: [String!]' : ''}${opts.variantMeta ? ', $vkeys: [String!]' : ''}`;
   const extra = { ...(pub ? { pub } : {}), ...(opts.meta ? { keys: keys.product } : {}), ...(opts.variantMeta ? { vkeys: keys.variant } : {}) };
   const out = new Map<string, ExportedProduct>();
@@ -941,11 +964,12 @@ export async function barcodesInStore(c: ChannelDef, barcodes: string[]) {
 }
 
 /** Every product of the store (or those the filter picks) with variants, photos and metafields: one bulk export. */
-export async function catalogExport(c: ChannelDef, opts: { query?: string; metafields: boolean }, log: (m: string) => void = () => {}): Promise<ExportedProduct[]> {
+export async function catalogExport(c: ChannelDef, opts: { query?: string; metafields: boolean; arabic?: boolean; bulkId?: string; started?: (id: string) => void | Promise<void> }, log: (m: string) => void = () => {}): Promise<ExportedProduct[]> {
   const pub = await onlineStorePublication(c);
   const filter = opts.query?.trim() ? `(query: ${JSON.stringify(opts.query.trim())})` : '';
   const query = `{ products${filter} { edges { node {
     id handle title descriptionHtml vendor productType tags status templateSuffix createdAt updatedAt
+    ${opts.arabic ? 'translations(locale: "ar") { key value }' : ''}
     seo { title description }
     options { name position }
     ${pub ? `onlineStore: publishedOnPublication(publicationId: ${JSON.stringify(pub)})` : ''}
@@ -953,7 +977,7 @@ export async function catalogExport(c: ChannelDef, opts: { query?: string; metaf
     variants { edges { node { id sku barcode price compareAtPrice taxable position inventoryQuantity inventoryPolicy selectedOptions { name value } inventoryItem { unitCost { amount } } image { url } } } }
     ${opts.metafields ? 'metafields { edges { node { id namespace key type value } } }' : ''}
   } } } }`;
-  const lines = await runBulk(c, query, log);
+  const lines = await runBulk(c, query, log, { id: opts.bulkId, started: opts.started });
   const products = new Map<string, { node: CatalogNode; variants: CatalogVariantNode[]; media: CatalogMedia[]; metafields: CatalogMetafield[] }>();
   for (const l of lines) {
     const o = JSON.parse(l) as Record<string, unknown> & { id?: string; __parentId?: string };
@@ -980,6 +1004,8 @@ const METAFIELDS_SET = `mutation RelayMetafieldsSet($m: [MetafieldsSetInput!]!) 
 const PUBLISH = `mutation RelayPublish($id: ID!, $input: [PublicationInput!]!) { publishablePublish(id: $id, input: $input) { userErrors { field message } } }`;
 const UNPUBLISH = `mutation RelayUnpublish($id: ID!, $input: [PublicationInput!]!) { publishableUnpublish(id: $id, input: $input) { userErrors { field message } } }`;
 const STOCK_SET = `mutation RelayStockSet($input: InventorySetQuantitiesInput!) { inventorySetQuantities(input: $input) { userErrors { field message } } }`;
+const TRANSLATIONS_REGISTER = `mutation RelayTranslations($id: ID!, $t: [TranslationInput!]!) { translationsRegister(resourceId: $id, translations: $t) { userErrors { field message } } }`;
+const TRANSLATIONS_REMOVE = `mutation RelayTranslationsRemove($id: ID!, $keys: [String!]!, $locales: [String!]!) { translationsRemove(resourceId: $id, translationKeys: $keys, locales: $locales) { userErrors { field message } } }`;
 const PRODUCT_DELETE = `mutation RelayProductDelete($input: ProductDeleteInput!) { productDelete(input: $input) { deletedProductId userErrors { field message } } }`;
 
 /** Whether catalogue imports may write to this store: its own RELAY_<PREFIX>_CATALOG=on|off, else any store not connected read-only. */
@@ -1045,6 +1071,21 @@ export async function catalogSave(c: ChannelDef, w: Write): Promise<{ productId:
         await mutate(c, STOCK_SET, { input: { name: 'available', reason: 'correction', quantities } }, 'inventorySetQuantities');
         notes.push(`stock set on ${quantities.length}`);
       }
+    }
+  }
+  if (w.translations?.length) {
+    // a translation is registered against the digest of the English text it translates, read after the save
+    const body = await gql<{ translatableResource: { translatableContent: { key: string; digest: string | null }[] } | null }>(c, `query RelayTranslatable($id: ID!) { translatableResource(resourceId: $id) { translatableContent { key digest } } }`, { id: product.id });
+    const digests = new Map((body.data?.translatableResource?.translatableContent ?? []).map((x) => [x.key, x.digest]));
+    const list = w.translations.flatMap((t) => (t.value && digests.get(t.key) ? [{ key: t.key, locale: t.locale, value: t.value, translatableContentDigest: digests.get(t.key) }] : []));
+    const gone = w.translations.filter((t) => !t.value);
+    if (gone.length) {
+      await mutate(c, TRANSLATIONS_REMOVE, { id: product.id, keys: gone.map((t) => t.key), locales: [...new Set(gone.map((t) => t.locale))] }, 'translationsRemove');
+      notes.push('Arabic text removed');
+    }
+    if (list.length) {
+      await mutate(c, TRANSLATIONS_REGISTER, { id: product.id, t: list }, 'translationsRegister');
+      notes.push(`Arabic ${list.map((x) => (x.key === 'title' ? 'title' : 'description')).join(' and ')}`);
     }
   }
   if (w.publish != null) {

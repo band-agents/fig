@@ -188,7 +188,8 @@ export const PAGES = {
   purchasing: { label: 'Purchasing', href: '/stock/purchasing', see: (l: Lv) => l('procurement') >= 1 },
   warehouse: { label: 'Warehouse', href: '/stock/warehouse', see: (l: Lv) => l('warehouse') >= 1 },
   merch: { label: 'Website merch', href: '/stock/merch', see: (l: Lv) => l('merch') >= 1 },
-  webItems: { label: 'Website vs Lucida', href: '/stock/web-items', see: (l: Lv) => l('merch') >= 1 || l('stock') >= 2 || l('procurement') >= 3 },
+  // the listing gaps (no photo, stock not live) are the product uploaders' work too
+  webItems: { label: 'Website vs Lucida', href: '/stock/web-items', see: (l: Lv) => l('merch') >= 1 || l('stock') >= 2 || l('procurement') >= 3 || l('catalog') >= 2 },
   teamPulse: { label: 'Team pulse', href: '/stock/team', see: (l: Lv) => l('warehouse') >= 3 || l('procurement') >= 3 || l('merch') >= 3 },
   production: { label: 'Production', href: '/production', see: (l: Lv) => l('production') >= 1 },
   insights: { label: 'Insights', href: '/insights', see: (l: Lv) => l('insights') >= 1 },

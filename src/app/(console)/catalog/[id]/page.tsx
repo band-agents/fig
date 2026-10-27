@@ -172,6 +172,16 @@ function Review({ id, plan, options, storeOf, sp, qs, canImport }: { id: string;
         </div>
       )}
 
+      {(plan.notes ?? []).length > 0 && (
+        <div className="space-y-1.5">
+          {[...new Set(plan.notes)].map((n) => (
+            <div key={n} className="flex items-start gap-2 rounded-[14px] bg-[var(--b-info)] px-3.5 py-2.5 text-[12.5px] text-[var(--b-info-ink)]">
+              <Info className="mt-px size-4 shrink-0" /> {n}
+            </div>
+          ))}
+        </div>
+      )}
+
       {sPlan.blocked && (
         <div className="flex items-start gap-2 rounded-[14px] bg-[var(--b-attention)] px-3.5 py-3 text-[12.5px] text-[var(--b-attention-ink)]">
           <ShieldCheck className="mt-px size-4 shrink-0" /> {sPlan.blocked}

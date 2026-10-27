@@ -12,7 +12,7 @@ export type Status = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
 export type FileMetafield = { owner: 'product' | 'variant'; namespace: string; key: string; type: string; value: string; store?: string };
 
 export type VariantValues = { sku?: string; barcode?: string; price?: string; compareAt?: string; taxable?: boolean; cost?: string; inventoryPolicy?: 'DENY' | 'CONTINUE'; inventoryQty?: number; image?: string };
-export type ProductValues = { title?: string; bodyHtml?: string; vendor?: string; type?: string; tags?: string[]; status?: Status; published?: boolean; templateSuffix?: string; seoTitle?: string; seoDescription?: string };
+export type ProductValues = { title?: string; bodyHtml?: string; vendor?: string; type?: string; category?: string; subcategory?: string; gender?: string; season?: string; colour?: string; titleAr?: string; bodyHtmlAr?: string; tags?: string[]; status?: Status; published?: boolean; templateSuffix?: string; seoTitle?: string; seoDescription?: string };
 
 export type FileVariant = VariantValues & {
   line: number;
@@ -31,7 +31,7 @@ export type FileProduct = ProductValues & {
   lines: number[]; // the sheet's own row numbers (1 = header)
   id?: string;
   handle: string;
-  handleMade: boolean; // made from the title (the file had none)
+  handleMade: boolean; // made from the title (the file had none): the store's product is then found by barcode
   command: Cmd;
   tagsCommand?: ListCmd;
   variantCommand?: ListCmd;
@@ -42,9 +42,11 @@ export type FileProduct = ProductValues & {
   metafields: FileMetafield[];
   overrides: Record<string, ProductValues>;
   problems: string[]; // read problems: a status or a price that could not be read
+  matched?: string; // found in the store by barcode (no handle in the file)
 };
 
-export type ParseOptions = { emptyClears?: boolean };
+/** splitColours: a sheet of styles with a Colour column and no handles becomes one product per colour, as the websites list them ("Logo Tee - Blue", sizes as variants). */
+export type ParseOptions = { emptyClears?: boolean; splitColours?: boolean };
 
 const CMDS: Cmd[] = ['MERGE', 'NEW', 'UPDATE', 'REPLACE', 'DELETE', 'IGNORE'];
 const LIST: ListCmd[] = ['MERGE', 'REPLACE', 'DELETE'];
@@ -86,6 +88,9 @@ const readStatus = (s: string): Status | null => {
 
 export const readTags = (s: string) => [...new Set(s.split(/[,،;]/).map((t) => t.trim()).filter(Boolean))];
 
+const TEXT_KEYS = ['title', 'bodyHtml', 'vendor', 'type', 'category', 'subcategory', 'gender', 'season', 'titleAr', 'bodyHtmlAr', 'templateSuffix', 'seoTitle', 'seoDescription'] as const;
+type TextKey = (typeof TEXT_KEYS)[number];
+
 const VARIANT_KEYS = new Set<FieldKey>(['variantId', 'variantCommand', 'option1Value', 'option2Value', 'option3Value', 'variantPosition', 'sku', 'barcode', 'price', 'compareAt', 'taxable', 'cost', 'inventoryPolicy', 'inventoryQty', 'variantImage']);
 
 /**
@@ -95,8 +100,12 @@ const VARIANT_KEYS = new Set<FieldKey>(['variantId', 'variantCommand', 'option1V
 export function parseProducts(grid: string[][], mapped: Mapped[], opts: ParseOptions = {}): FileProduct[] {
   const products: FileProduct[] = [];
   const byKey = new Map<string, FileProduct>();
-  const namedOptions = [...new Set(mapped.flatMap((m) => (m.ref.kind === 'option' ? [m.ref.name] : [])))];
+  const split = Boolean(opts.splitColours);
+  const colourCol = split ? mapped.find((m) => m.ref.kind === 'option' && m.ref.name === 'Colour') : undefined;
+  // split by colour: the colour names the product, so it is not a variant option
+  const namedOptions = [...new Set(mapped.flatMap((m) => (m.ref.kind === 'option' && !(colourCol && m.ref.name === 'Colour') ? [m.ref.name] : [])))];
   let current: FileProduct | null = null;
+  let lastTitle = '';
 
   for (let r = 1; r < grid.length; r++) {
     const row = grid[r];
@@ -111,7 +120,18 @@ export function parseProducts(grid: string[][], mapped: Mapped[], opts: ParseOpt
     const id = idOf(get('id'), 'Product');
     const handle = get('handle').toLowerCase();
     const title = get('title');
-    const key = id ? `id:${id}` : handle ? `h:${handle}` : title ? `h:${slugify(title) || title}` : null;
+    const colour = colourCol ? cell(colourCol) : '';
+    let key: string | null;
+    let display = title;
+    const prevColour: string = (current as FileProduct | null)?.colour ?? '';
+    if (colourCol && !id && !handle) {
+      // one product per style and colour: a row with no title continues the style above, in its own colour
+      const base = title || lastTitle;
+      const tone: string = colour || prevColour;
+      key = base ? `h:${slugify(base)}|${tone.toLowerCase()}` : null;
+      display = base && tone && !base.toLowerCase().endsWith(tone.toLowerCase()) ? `${base} - ${tone}` : base;
+    } else key = id ? `id:${id}` : handle ? `h:${handle}` : title ? `h:${slugify(title) || title}` : null;
+    if (title) lastTitle = title;
     let p: FileProduct | undefined = key ? byKey.get(key) : (current ?? undefined);
     if (!p) {
       if (!key) continue; // nothing to hang this row on
@@ -120,9 +140,11 @@ export function parseProducts(grid: string[][], mapped: Mapped[], opts: ParseOpt
         key,
         lines: [],
         id: id ?? undefined,
-        handle: handle || slugify(title) || slugify(get('sku')) || `product-${line}`,
+        handle: handle || slugify(display) || slugify(get('sku')) || `product-${line}`,
         handleMade: made && !id,
         command: 'MERGE',
+        ...(colourCol && display !== title ? { title: display } : {}),
+        ...(colourCol && (colour || prevColour) ? { colour: colour || prevColour } : {}),
         optionNames: [],
         variants: [],
         images: [],
@@ -130,6 +152,13 @@ export function parseProducts(grid: string[][], mapped: Mapped[], opts: ParseOpt
         overrides: {},
         problems: [],
       };
+      // a new colour started on a size row takes the style's own fields from the colour above
+      const prev = current as FileProduct | null;
+      if (colourCol && !title && prev) {
+        for (const k of ['vendor', 'type', 'category', 'subcategory', 'gender', 'season', 'bodyHtml', 'bodyHtmlAr', 'status', 'published', 'templateSuffix'] as const) if (prev[k] !== undefined) (p as Record<string, unknown>)[k] = prev[k];
+        if (prev.tags) p.tags = [...prev.tags];
+        p.optionNames = [...prev.optionNames];
+      }
       byKey.set(key, p);
       products.push(p);
     }
@@ -138,13 +167,13 @@ export function parseProducts(grid: string[][], mapped: Mapped[], opts: ParseOpt
     const prob = (m: string) => p!.problems.push(`Row ${line}: ${m}`);
 
     // ── product fields: the first row that gives one wins
-    const text = (k: 'title' | 'bodyHtml' | 'vendor' | 'type' | 'templateSuffix' | 'seoTitle' | 'seoDescription') => {
+    const text = (k: TextKey) => {
       if (!has(k) || p![k] !== undefined) return;
       const v = get(k);
       if (v) p![k] = v;
       else if (opts.emptyClears && p!.lines.length === 1 && k !== 'title' && k !== 'vendor') p![k] = '';
     };
-    for (const k of ['title', 'bodyHtml', 'vendor', 'type', 'templateSuffix', 'seoTitle', 'seoDescription'] as const) text(k);
+    for (const k of TEXT_KEYS) text(k);
     if (has('command') && get('command')) {
       const c = get('command').toUpperCase() as Cmd;
       if (CMDS.includes(c)) p.command = c;
@@ -188,8 +217,8 @@ export function parseProducts(grid: string[][], mapped: Mapped[], opts: ParseOpt
         const b = readBool(v);
         if (b != null) o.published = b;
       } else if (k === 'tags') o.tags = readTags(v);
-      else if (k === 'title' || k === 'bodyHtml' || k === 'vendor' || k === 'type' || k === 'templateSuffix' || k === 'seoTitle' || k === 'seoDescription') {
-        if (o[k] === undefined) o[k] = v;
+      else if ((TEXT_KEYS as readonly string[]).includes(k)) {
+        if (o[k as TextKey] === undefined) o[k as TextKey] = v;
       }
     }
 
