@@ -1527,3 +1527,42 @@ a.wv-seg:hover {
   background: var(--sage);
 }
 .pf-bar[data-neg] { background: var(--critical); }
+/* Targets & pacing */
+.pc-track {
+  position: relative;
+  height: 10px;
+  overflow: visible;
+  border-radius: 99px;
+  background: var(--bg-elev-3);
+}
+.pc-fill,
+.pc-proj {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 99px;
+  background: var(--pc, var(--ink-3));
+}
+.pc-proj {
+  opacity: 0.32;
+}
+.pc-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--ink);
+}
+[data-s='ahead'],
+[data-s='on'] { --pc: var(--sage); }
+[data-s='close'] { --pc: var(--t-amber); }
+[data-s='behind'] { --pc: var(--critical); }
+[data-s='none'] { --pc: var(--ink-3); }
+.pc-axis { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.pc-road { stroke: var(--ink-4); stroke-width: 1.5; stroke-dasharray: 2 5; vector-effect: non-scaling-stroke; }
+.pc-goal { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 6 6; vector-effect: non-scaling-stroke; }
+.pc-area { fill: color-mix(in oklab, var(--sage) 22%, transparent); }
+.pc-line { fill: none; stroke: var(--sage-deep); stroke-width: 2.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.pc-dash { stroke: var(--sage-deep); stroke-width: 2; stroke-dasharray: 6 6; vector-effect: non-scaling-stroke; }
+.pc-today { stroke: var(--ink-4); stroke-width: 1; vector-effect: non-scaling-stroke; }

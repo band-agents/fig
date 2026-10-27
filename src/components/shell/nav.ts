@@ -1,4 +1,4 @@
-import { Activity, ArrowDownUp, Droplets, ListChecks, PiggyBank, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
+import { Activity, ArrowDownUp, Droplets, Goal, ListChecks, PiggyBank, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
 import { canSee, type Page, type Role, type Scopes } from '@/lib/domain/perms';
 
 export type Me = {
@@ -65,6 +65,7 @@ export const NAV: { group: string | null; items: NavItem[] }[] = [
     group: 'Business',
     items: [
       { href: '/leaks', label: 'Money leaks', icon: Droplets, page: 'leaks', hint: 'What the business loses each week, and where to fix it', tint: 'rose' },
+      { href: '/targets', label: 'Targets & pacing', icon: Goal, page: 'targets', hint: 'Each brand’s month against its target, and where it will land', tint: 'amber' },
       { href: '/profit', label: 'True profit', icon: PiggyBank, page: 'profit', hint: 'What each order really leaves, and where it sells at a loss', tint: 'green' },
       { href: '/analytics', label: 'Reports', icon: FileBarChart, page: 'analytics', hint: 'Every report for finance and brands' },
       { href: '/financials', label: 'Finance & analysis', icon: Landmark, page: 'financials', hint: 'The month in money' },

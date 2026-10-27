@@ -197,6 +197,8 @@ export const PAGES = {
   insights: { label: 'Insights', href: '/insights', see: (l: Lv) => l('insights') >= 1 },
   // what the business loses each week, by cause: whoever reads money and fixes one of the causes
   leaks: { label: 'Money leaks', href: '/leaks', see: (l: Lv) => l('money') >= 1 && (l('overview') >= 1 || l('finance') >= 1 || l('merch') >= 1 || l('stock') >= 2 || l('procurement') >= 1 || l('catalog') >= 2) },
+  // each brand's month against its target and where it will land: management, buying, merchandising, finance
+  targets: { label: 'Targets & pacing', href: '/targets', see: (l: Lv) => l('money') >= 1 && (l('overview') >= 1 || l('procurement') >= 1 || l('merch') >= 1 || l('finance') >= 1 || l('stock') >= 2) },
   // what each order really leaves after goods, courier, fees and returns: whoever reads costs and the money picture
   profit: { label: 'True profit', href: '/profit', see: (l: Lv) => l('money') >= 2 && (l('finance') >= 1 || l('overview') >= 1) },
   financials: { label: 'Finance & analysis', href: '/financials', see: (l: Lv) => (l('finance') >= 1 || l('overview') >= 1) && l('money') >= 2 },
@@ -213,7 +215,7 @@ type Lv = (a: Area) => number;
 export const READ_ONLY_ROLES: string[] = ['viewer', 'brand'];
 
 /** A brand manager's pages: their brands, the reports, stock and buying. Nothing from the order floor. */
-export const BRAND_PAGES: Page[] = ['today', 'leaks', 'profit', 'brands', 'analytics', 'insights', 'financials', 'stockBrief', 'inventory', 'planning', 'purchasing'];
+export const BRAND_PAGES: Page[] = ['today', 'leaks', 'targets', 'profit', 'brands', 'analytics', 'insights', 'financials', 'stockBrief', 'inventory', 'planning', 'purchasing'];
 
 /**
  * Whether this person is offered (and may open) a page. Management read-only sees every page but the

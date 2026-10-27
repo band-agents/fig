@@ -6,7 +6,7 @@ import { canAny, type Area, type Principal } from '../domain/perms';
 import { parcelCost, pickupCost } from '../domain/shipping-cost';
 import { RETURN_REASONS, type ReturnReason } from '../domain/stages';
 import { remember } from '../remember';
-import { scope } from '../queries';
+import { foldBrand, scope } from '../queries';
 import { shippingRates } from '../shipping';
 import { egpMinor } from '../stock/core';
 import { factsFor, getFacts, type ProductFacts } from '../stock/facts';
@@ -42,6 +42,7 @@ export type Leak = {
   fix: string;
   items: LeakItem[];
   off?: string; // why it is not counted yet
+  byBrand?: Record<string, number>; // folded brand → weekly, where the cause is per style
 };
 
 // who may see (and is asked to fix) each leak
@@ -102,6 +103,7 @@ async function compute(p: Principal) {
     for (const x of r.rows) empty.set(x.product_id, [...(empty.get(x.product_id) ?? []), { size: x.size || 'One size', qty: x.qty }]);
   }
   const sizeItems: LeakItem[] = [];
+  const sizesByBrand: Record<string, number> = {};
   let sizesOut = 0;
   for (const x of selling) {
     const vs = empty.get(x.id) ?? [];
@@ -113,6 +115,8 @@ async function compute(p: Principal) {
     const weekly = Math.round(egpMinor(demandOf(x) * lostShare * x.price, x.currency));
     if (weekly <= 0) continue;
     sizesOut += gone.length;
+    const fb = foldBrand(x.brand);
+    sizesByBrand[fb] = (sizesByBrand[fb] ?? 0) + weekly;
     const all = gone.length === vs.length;
     sizeItems.push({
       key: `sizes:${x.id}`,
@@ -136,6 +140,7 @@ async function compute(p: Principal) {
     href: '/stock/inventory?status=broken',
     fix: 'Reorder or move pieces in',
     items: top(sizeItems),
+    byBrand: sizesByBrand,
   });
 
   // 2 and 3. stock the websites hold but cannot sell: not published, or no photo
