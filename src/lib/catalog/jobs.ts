@@ -51,8 +51,8 @@ const running = new Set<string>();
 export function storeRules(c: ChannelDef): StoreRules {
   // FIG and Labesny share the theme, the menus and the tag system; Lucida owns both stores' prices
   const shared = c.brand === 'Labesny' || c.brand === 'FIG' ? { houseTags: true, lucidaPrices: true } : {};
-  if (c.brand === 'Labesny') return { ...shared, taxable: false, notes: ['Labesny never charges tax: every variant goes in not taxable.', 'Menu tags (gender:, cat:, subcat:, season:, color:, the brand) are made from the Gender, Category, Type, Season and Colour columns.'] };
-  if (c.brand === 'FIG') return { ...shared, notes: ['Menu tags (gender:, cat:, subcat:, season:, color:, the brand) are made from the Gender, Category, Type, Season and Colour columns.'] };
+  if (c.brand === 'Labesny') return { ...shared, taxable: false, notes: ['Labesny never charges tax: every variant goes in not taxable.', 'Menu tags (gender:, cat:, subcat:, season:, color:, the brand) are made from the Gender, Category, Sub-category, Season and Colour columns.'] };
+  if (c.brand === 'FIG') return { ...shared, notes: ['Menu tags (gender:, cat:, subcat:, season:, color:, the brand) are made from the Gender, Category, Sub-category, Season and Colour columns.'] };
   return { notes: [] };
 }
 
