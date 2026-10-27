@@ -1271,3 +1271,209 @@ dialog[open] {
     transform: rotate(360deg);
   }
 }
+
+/* ── Inventory: the warehouse board ─────────────────────────────────────────────────────────── */
+.pill[data-tone='magic'] {
+  --pill-bg: var(--b-magic);
+  --pill-ink: var(--b-magic-ink);
+}
+.inv-board {
+  gap: 1px;
+  background: var(--line);
+}
+.inv-stat {
+  background: var(--bg-elev);
+}
+a.inv-stat:hover {
+  background: var(--bg-elev-2);
+}
+.inv-loc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 10px 10px;
+  border-radius: 14px;
+  background: var(--bg-elev);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition:
+    background 0.12s,
+    box-shadow 0.12s;
+}
+.inv-loc:hover {
+  background: var(--bg-elev-2);
+}
+.inv-loc.is-on {
+  background: var(--bg-elev-2);
+  box-shadow: inset 0 0 0 1.5px var(--ink-2);
+}
+.inv-loc-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--bg-elev-3);
+  color: var(--ink-2);
+}
+.inv-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--b-neutral-ink);
+}
+.inv-dot[data-tone='success'] { background: var(--b-success-ink); }
+.inv-dot[data-tone='warning'] { background: var(--b-warning-ink); }
+.inv-dot[data-tone='attention'] { background: var(--b-attention-ink); }
+.inv-dot[data-tone='critical'] { background: var(--b-critical-ink); }
+.inv-dot[data-tone='info'] { background: var(--b-info-ink); }
+.inv-dot[data-tone='magic'] { background: var(--b-magic-ink); }
+/* a size run: one cell per size, the size on top and its pieces below */
+.inv-size {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 32px;
+  overflow: hidden;
+  border-radius: 7px;
+  text-align: center;
+  background: var(--bg-elev-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.inv-size-k {
+  padding: 2px 5px 1px;
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.inv-size-v {
+  padding: 0 5px 2px;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.inv-size[data-q='out'] {
+  background: var(--b-critical);
+  box-shadow: none;
+  color: var(--b-critical-ink);
+}
+.inv-size[data-q='out'] .inv-size-k {
+  color: var(--b-critical-ink);
+  opacity: 0.8;
+}
+.inv-size[data-q='low'] {
+  background: var(--b-attention);
+  box-shadow: none;
+  color: var(--b-attention-ink);
+}
+.inv-size[data-q='low'] .inv-size-k {
+  color: var(--b-attention-ink);
+  opacity: 0.8;
+}
+.inv-table td {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+.inv-heat {
+  display: inline-block;
+  min-width: 38px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  background: color-mix(in oklab, var(--sage) var(--h), var(--bg-elev-2));
+}
+
+/* ── Website vs Lucida ──────────────────────────────────────────────────────────────────────── */
+.wv-hero {
+  position: relative;
+  isolation: isolate;
+}
+.wv-hero::before {
+  content: '';
+  position: absolute;
+  inset: -60% -20% auto auto;
+  z-index: -1;
+  width: 60%;
+  height: 200%;
+  background:
+    radial-gradient(closest-side, color-mix(in oklab, var(--sage) 18%, transparent), transparent 70%),
+    radial-gradient(closest-side at 20% 80%, color-mix(in oklab, var(--t-amber) 10%, transparent), transparent 70%);
+  pointer-events: none;
+}
+.wv-bar {
+  display: flex;
+  gap: 3px;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 99px;
+}
+.wv-bar-sm {
+  gap: 2px;
+  height: 8px;
+  background: var(--bg-elev-3);
+}
+.wv-seg {
+  display: block;
+  flex-basis: 0;
+  min-width: 4px;
+  border-radius: 3px;
+  background: var(--wv, var(--line-2));
+  transition: filter 0.12s;
+}
+.wv-bar > .wv-seg:first-child {
+  border-top-left-radius: 99px;
+  border-bottom-left-radius: 99px;
+}
+.wv-bar > .wv-seg:last-child {
+  border-top-right-radius: 99px;
+  border-bottom-right-radius: 99px;
+}
+a.wv-seg:hover {
+  filter: brightness(1.12) saturate(1.1);
+}
+.wv-key {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  background: var(--wv, var(--line-2));
+}
+[data-g='matched'] { --wv: var(--sage); }
+[data-g='gap'] { --wv: var(--t-amber); }
+[data-g='unpublished'] { --wv: color-mix(in oklab, var(--critical) 62%, var(--bg-elev)); }
+[data-g='quiet'] { --wv: var(--line-2); }
+.wv-on .wv-key {
+  box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 3.5px var(--wv);
+}
+.wv-reason {
+  background: var(--ink-3);
+}
+.wv-reason[data-r='no_photo'],
+.wv-reason[data-r='no_description'],
+.wv-reason[data-r='no_category'],
+.wv-reason[data-r='no_price'],
+.wv-reason[data-r='no_barcode'] {
+  background: var(--t-violet);
+}
+.wv-reason[data-r='web_no_stock'],
+.wv-reason[data-r='lucida_no_stock'],
+.wv-reason[data-r='qty_differs'],
+.wv-reason[data-r='price_differs'] {
+  background: var(--t-amber);
+}
+.wv-reason[data-r='not_uploaded'] {
+  background: color-mix(in oklab, var(--critical) 62%, var(--bg-elev));
+}
+.wv-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 21px;
+  padding: 0 7px;
+  border-radius: 7px;
+  font-size: 11px;
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  white-space: nowrap;
+}

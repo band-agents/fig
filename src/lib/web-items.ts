@@ -198,7 +198,9 @@ async function readLucida(channelId: string, by: string, days: number) {
   await setState(channelId, { lucidaAt: now.toISOString(), lucidaCalls: calls, lucidaReported: reported, absent: missing.length, days }, by);
 }
 
-export type GapFilters = { store?: string; verdict?: string; reason?: string; brand?: string; q?: string; page?: number };
+export type GapFilters = { store?: string; group?: string; verdict?: string; reason?: string; brand?: string; q?: string; page?: number };
+export type Group = (typeof VERDICTS)[Verdict]['group'];
+const noGroups = () => ({ matched: 0, gap: 0, unpublished: 0, quiet: 0 }) as Record<Group, number>;
 
 export async function webItemsView(p: Principal, f: GapFilters) {
   const markets = marketsFor(p);
@@ -244,11 +246,14 @@ export async function webItemsView(p: Principal, f: GapFilters) {
 
   const byVerdict = (Object.keys(VERDICTS) as Verdict[]).map((v) => ({ verdict: v, styles: all.filter((s) => s.verdict === v).length, sizes: sizeCount.get(v) ?? 0 })).filter((x) => x.styles > 0);
   const byReason = (Object.keys(REASONS) as Reason[]).map((r) => ({ reason: r, styles: all.filter((s) => s.reasons.includes(r) && s.verdict !== 'ok').length })).filter((x) => x.styles > 0).sort((a, b) => b.styles - a.styles);
-  const brands = new Map<string, { brand: string; live: number; unpublishedStock: number; gaps: number; notUploaded: number; total: number }>();
+  const groups = noGroups();
+  const brands = new Map<string, { brand: string; live: number; unpublishedStock: number; gaps: number; notUploaded: number; total: number; groups: Record<Group, number> }>();
   for (const s of all) {
     const b = s.brand ?? 'Unknown';
-    const x = brands.get(b) ?? { brand: b, live: 0, unpublishedStock: 0, gaps: 0, notUploaded: 0, total: 0 };
+    const x = brands.get(b) ?? { brand: b, live: 0, unpublishedStock: 0, gaps: 0, notUploaded: 0, total: 0, groups: noGroups() };
     x.total += 1;
+    x.groups[VERDICTS[s.verdict].group] += 1;
+    groups[VERDICTS[s.verdict].group] += 1;
     if (s.status === 'active') x.live += 1;
     if (s.verdict === 'unpublished_stock') x.unpublishedStock += 1;
     if (s.verdict === 'not_uploaded') x.notUploaded += 1;
@@ -258,13 +263,20 @@ export async function webItemsView(p: Principal, f: GapFilters) {
 
   const q = f.q?.trim().toLowerCase();
   const list = all
-    .filter((s) => (!f.verdict ? s.verdict !== 'ok' && s.verdict !== 'unpublished_none' && s.verdict !== 'live_web_only' : f.verdict === 'all' || s.verdict === f.verdict))
+    .filter((s) => (f.group ? f.group === 'all' || VERDICTS[s.verdict].group === f.group : true))
+    .filter((s) => (f.group || f.verdict ? !f.verdict || f.verdict === 'all' || s.verdict === f.verdict : s.verdict !== 'ok' && s.verdict !== 'unpublished_none' && s.verdict !== 'live_web_only'))
     .filter((s) => !f.reason || s.reasons.includes(f.reason as Reason))
     .filter((s) => !f.brand || (s.brand ?? 'Unknown') === f.brand)
     .filter((s) => !q || `${s.title} ${s.handle ?? ''} ${s.brand ?? ''}`.toLowerCase().includes(q))
     .sort((a, b) => ORDER_RANK(a.verdict) - ORDER_RANK(b.verdict) || (b.lucidaQty ?? 0) - (a.lucidaQty ?? 0) || b.webQty - a.webQty);
   const page = Math.max(1, f.page ?? 1);
   const per = 60;
+  const rows = list.slice((page - 1) * per, page * per);
+  // the photos of the styles on screen, from the console's own catalogue
+  const handles = rows.map((r) => r.handle).filter((h): h is string => Boolean(h));
+  const db = await getDb();
+  const pics = handles.length ? await db.select({ handle: schema.products.handle, image: schema.products.image }).from(schema.products).where(inArray(schema.products.handle, handles)) : [];
+  const image = new Map(pics.filter((x) => x.image).map((x) => [x.handle, x.image]));
   return {
     ...base,
     empty: false as const,
@@ -278,8 +290,10 @@ export async function webItemsView(p: Principal, f: GapFilters) {
     },
     byVerdict,
     byReason,
-    brands: [...brands.values()].sort((a, b) => b.unpublishedStock + b.gaps - (a.unpublishedStock + a.gaps) || b.total - a.total),
-    rows: list.slice((page - 1) * per, page * per),
+    // most to fix first: what Lucida says should be on sale, then everything off or not on sale
+    brands: [...brands.values()].sort((a, b) => b.unpublishedStock + b.notUploaded - (a.unpublishedStock + a.notUploaded) || b.groups.gap + b.groups.unpublished - (a.groups.gap + a.groups.unpublished) || b.total - a.total),
+    groups,
+    rows: rows.map((r) => ({ ...r, image: (r.handle && image.get(r.handle)) || null })),
     total: list.length,
     page,
     per,

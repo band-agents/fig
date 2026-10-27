@@ -7,21 +7,19 @@ import type { Mail } from './mail';
  * apps draw it the same; a plain-text copy rides along.
  */
 
-const site = () => (process.env.RELAY_PUBLIC_URL || 'http://localhost:3400').replace(/\/$/, '');
+// RELAY_MAIL_URL: the address the emails link to when it is not the one the console runs on (an address on
+// the sender's own domain, so mail filters see the link and the sender agree)
+const site = () => (process.env.RELAY_MAIL_URL || process.env.RELAY_PUBLIC_URL || 'http://localhost:3400').replace(/\/$/, '');
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function frame(o: { preview: string; title: string; lines: string[]; facts: [string, string][]; button: { label: string; href: string }; foot: string }) {
-  const base = site();
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(o.title)}</title></head>
 <body style="margin:0;padding:0;background:#ebe9e4;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;color:#1c1b19">
 <span style="display:none;max-height:0;overflow:hidden">${esc(o.preview)}</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ebe9e4;padding:32px 12px">
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:20px;padding:32px">
-<tr><td>
-  <img src="${base}/brand/dh-full.png" alt="D&amp;H" height="22" style="height:22px;margin-right:14px;vertical-align:middle">
-  <img src="${base}/brand/dco-full.png" alt="D&amp;Co" height="22" style="height:22px;vertical-align:middle">
-</td></tr>
+<tr><td style="font-family:Georgia,'Times New Roman',serif;font-size:21px;letter-spacing:-0.4px;color:#1c1b19">D&amp;H<span style="color:#cfccc4;padding:0 10px">|</span>D&amp;Co</td></tr>
 <tr><td style="padding-top:26px;font-size:21px;font-weight:600;letter-spacing:-0.3px">${esc(o.title)}</td></tr>
 ${o.lines.map((l) => `<tr><td style="padding-top:10px;font-size:14px;line-height:1.55;color:#4a4843">${esc(l)}</td></tr>`).join('')}
 <tr><td style="padding-top:18px">

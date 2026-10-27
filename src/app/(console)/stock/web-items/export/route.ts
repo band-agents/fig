@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const me = await currentUser();
   if (!me || !canSee(me, 'webItems')) return new Response('Not allowed', { status: 403 });
   const sp = req.nextUrl.searchParams;
-  const d = await webItemsView(me, { store: sp.get('store') ?? undefined, verdict: sp.get('verdict') ?? undefined, reason: sp.get('reason') ?? undefined, brand: sp.get('brand') ?? undefined, q: sp.get('q') ?? undefined });
+  const d = await webItemsView(me, { store: sp.get('store') ?? undefined, group: sp.get('group') ?? undefined, verdict: sp.get('verdict') ?? undefined, reason: sp.get('reason') ?? undefined, brand: sp.get('brand') ?? undefined, q: sp.get('q') ?? undefined });
   if (d.empty || !d.store) return new Response('No store', { status: 404 });
   const cur = d.store.currency;
   const dec = moneyDecimals(cur);
