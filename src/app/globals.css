@@ -1566,3 +1566,40 @@ a.wv-seg:hover {
 .pc-line { fill: none; stroke: var(--sage-deep); stroke-width: 2.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .pc-dash { stroke: var(--sage-deep); stroke-width: 2; stroke-dasharray: 6 6; vector-effect: non-scaling-stroke; }
 .pc-today { stroke: var(--ink-4); stroke-width: 1; vector-effect: non-scaling-stroke; }
+/* Size rescue */
+.rs-size {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 40px;
+  padding: 3px 7px 4px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.3;
+  background: var(--b-critical);
+  color: var(--b-critical-ink);
+}
+.rs-size b { font-size: 12px; }
+.rs-size[data-has='move'] { background: var(--b-success); color: var(--b-success-ink); }
+.rs-size[data-has='po'] { background: var(--b-info); color: var(--b-info-ink); }
+.rs-src { opacity: 0.8; white-space: nowrap; }
+/* Listing score */
+.ls-fill { background: var(--ls, var(--ink-3)); }
+[data-grade='A'] { --ls: var(--sage); }
+[data-grade='B'] { --ls: var(--t-blue); }
+[data-grade='C'] { --ls: var(--t-amber); }
+[data-grade='D'] { --ls: var(--critical); }
+.ls-score {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 99px;
+  font-size: 12.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--ls);
+  box-shadow: inset 0 0 0 2.5px var(--ls);
+  background: color-mix(in oklab, var(--ls) 10%, var(--bg-elev));
+}
+.ls-score-sm { width: 32px; height: 32px; font-size: 11.5px; }

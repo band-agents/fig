@@ -1,4 +1,4 @@
-import { Activity, ArrowDownUp, Droplets, Goal, ListChecks, PiggyBank, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
+import { Activity, ArrowDownUp, BadgeCheck, Droplets, Goal, LifeBuoy, ListChecks, PiggyBank, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
 import { canSee, type Page, type Role, type Scopes } from '@/lib/domain/perms';
 
 export type Me = {
@@ -53,6 +53,8 @@ export const NAV: { group: string | null; items: NavItem[] }[] = [
       { href: '/production', label: 'Production', icon: Factory, page: 'production', hint: 'Made-to-order work in progress', tint: 'amber' },
       { href: '/stock/warehouse', label: 'Warehouse', icon: Warehouse, page: 'warehouse', hint: 'Receiving, counts and moves', badge: 'warehouse', tint: 'green' },
       { href: '/stock/merch', label: 'Website merch', icon: Megaphone, page: 'merch', hint: 'What the websites push', badge: 'merch', tint: 'rose' },
+      { href: '/stock/rescue', label: 'Size rescue', icon: LifeBuoy, page: 'rescue', hint: 'Sold-out sizes on styles that sell, and where to get pieces', tint: 'amber' },
+      { href: '/stock/listings', label: 'Listing score', icon: BadgeCheck, page: 'listings', hint: 'Every sellable style scored; the weakest first by money', tint: 'violet' },
       { href: '/stock/web-items', label: 'Website vs Lucida', icon: GitCompareArrows, page: 'webItems', hint: 'Live, sold out, missing photos', tint: 'neutral' },
       { href: '/stock/team', label: 'Team pulse', icon: Gauge, page: 'teamPulse', hint: 'Who is doing what, right now', tint: 'neutral' },
     ],

@@ -190,6 +190,10 @@ export const PAGES = {
   purchasing: { label: 'Purchasing', href: '/stock/purchasing', see: (l: Lv) => l('procurement') >= 1 },
   warehouse: { label: 'Warehouse', href: '/stock/warehouse', see: (l: Lv) => l('warehouse') >= 1 },
   merch: { label: 'Website merch', href: '/stock/merch', see: (l: Lv) => l('merch') >= 1 },
+  // the sizes the websites cannot sell on styles that sell, and where to get pieces (smart/sizes.ts)
+  rescue: { label: 'Size rescue', href: '/stock/rescue', see: (l: Lv) => l('stock') >= 1 && (l('stock') >= 2 || l('procurement') >= 1 || l('merch') >= 1 || l('warehouse') >= 3) },
+  // every sellable style scored on what a shopper needs (smart/listings.ts): the websites' people
+  listings: { label: 'Listing score', href: '/stock/listings', see: (l: Lv) => l('merch') >= 1 || l('catalog') >= 2 || l('stock') >= 2 },
   // the listing gaps (no photo, stock not live) are the product uploaders' work too
   webItems: { label: 'Website vs Lucida', href: '/stock/web-items', see: (l: Lv) => l('merch') >= 1 || l('stock') >= 2 || l('procurement') >= 3 || l('catalog') >= 2 },
   teamPulse: { label: 'Team pulse', href: '/stock/team', see: (l: Lv) => l('warehouse') >= 3 || l('procurement') >= 3 || l('merch') >= 3 },
@@ -215,7 +219,7 @@ type Lv = (a: Area) => number;
 export const READ_ONLY_ROLES: string[] = ['viewer', 'brand'];
 
 /** A brand manager's pages: their brands, the reports, stock and buying. Nothing from the order floor. */
-export const BRAND_PAGES: Page[] = ['today', 'leaks', 'targets', 'profit', 'brands', 'analytics', 'insights', 'financials', 'stockBrief', 'inventory', 'planning', 'purchasing'];
+export const BRAND_PAGES: Page[] = ['today', 'leaks', 'targets', 'profit', 'rescue', 'brands', 'analytics', 'insights', 'financials', 'stockBrief', 'inventory', 'planning', 'purchasing'];
 
 /**
  * Whether this person is offered (and may open) a page. Management read-only sees every page but the

@@ -9,9 +9,10 @@ import { remember } from '../remember';
 import { foldBrand, scope } from '../queries';
 import { shippingRates } from '../shipping';
 import { egpMinor } from '../stock/core';
-import { factsFor, getFacts, type ProductFacts } from '../stock/facts';
+import { factsFor, getFacts } from '../stock/facts';
 import { marketsFor, sees } from '../stock/views/common';
 import { webStylesFor } from '../web-items';
+import { demandOf, sizeGaps } from './sizes';
 
 /**
  * Money leaks (Dan, 28 Oct: "smart features that help this business grow"): the money the business
@@ -65,8 +66,6 @@ const WEEKS = DAYS / 7;
 const top = <T extends { weekly: number }>(xs: T[], n = 8) => [...xs].sort((a, b) => b.weekly - a.weekly).slice(0, n);
 const sum = <T>(xs: T[], f: (x: T) => number) => xs.reduce((a, x) => a + f(x), 0);
 
-/** Online demand a week for a style: the forecast, or its last eight weeks when the forecast is lower. */
-const demandOf = (x: ProductFacts) => Math.max(x.rate, x.sold8 / 8);
 
 export function moneyLeaks(p: Principal) {
   return remember(`leaks:${p.channels.join(',')}:${(p.brands ?? []).join(',')}`, 5 * 60_000, () => compute(p));
@@ -89,45 +88,20 @@ async function compute(p: Principal) {
   }
   const paceText = markets.map((m) => `${m === 'KW' ? 'Kuwait' : 'Egypt'} ${((pace.get(m) ?? 0) * 100).toFixed(2)}%`).join(', ');
 
-  // 1. sizes sold out on styles that sell: the share of the style's demand those sizes carry
-  const selling = facts.filter((x) => demandOf(x) > 0);
-  const empty = new Map<string, { size: string; qty: number }[]>();
-  for (let i = 0; i < selling.length; i += 2000) {
-    const ids = selling.slice(i, i + 2000).map((x) => sql`${x.id}`);
-    if (!ids.length) break;
-    const r = await db.execute<{ product_id: string; size: string | null; qty: number }>(sql`
-      select v.product_id, v.size, coalesce(sum(sl.on_hand), 0)::int as qty
-      from variants v left join stock_levels sl on sl.variant_id = v.id
-      where v.product_id in (${sql.join(ids, sql`, `)})
-      group by v.id`);
-    for (const x of r.rows) empty.set(x.product_id, [...(empty.get(x.product_id) ?? []), { size: x.size || 'One size', qty: x.qty }]);
-  }
-  const sizeItems: LeakItem[] = [];
+  // 1. sizes sold out on styles that sell: the share of the style's demand those sizes carry (smart/sizes.ts)
+  const gaps = await sizeGaps(p);
   const sizesByBrand: Record<string, number> = {};
-  let sizesOut = 0;
-  for (const x of selling) {
-    const vs = empty.get(x.id) ?? [];
-    const gone = vs.filter((v) => v.qty <= 0);
-    if (!gone.length) continue;
-    const mixTotal = sum(vs, (v) => x.sizeMix[v.size] ?? 0);
-    const share = (v: { size: string }) => (mixTotal > 0 ? (x.sizeMix[v.size] ?? 0) / mixTotal : 1 / vs.length);
-    const lostShare = sum(gone, share);
-    const weekly = Math.round(egpMinor(demandOf(x) * lostShare * x.price, x.currency));
-    if (weekly <= 0) continue;
-    sizesOut += gone.length;
-    const fb = foldBrand(x.brand);
-    sizesByBrand[fb] = (sizesByBrand[fb] ?? 0) + weekly;
-    const all = gone.length === vs.length;
-    sizeItems.push({
-      key: `sizes:${x.id}`,
-      productId: x.id,
-      title: all ? `${x.title}: every size sold out` : `${x.title}: size${new Set(gone.map((g) => g.size)).size === 1 ? '' : 's'} ${[...new Set(gone.map((g) => g.size))].slice(0, 5).join(', ')} sold out`,
-      sub: `${x.brand} · ${x.styleCode} · sells ${demandOf(x).toFixed(1)} a week online`,
-      weekly,
-      href: `/stock/inventory/${x.id}`,
-      image: x.image,
-    });
-  }
+  for (const g of gaps) sizesByBrand[foldBrand(g.brand)] = (sizesByBrand[foldBrand(g.brand)] ?? 0) + g.weekly;
+  const sizesOut = sum(gaps, (g) => g.gone.length);
+  const sizeItems: LeakItem[] = gaps.map((g) => ({
+    key: `sizes:${g.productId}`,
+    productId: g.productId,
+    title: g.allOut ? `${g.title}: every size sold out` : `${g.title}: size${g.gone.length === 1 ? '' : 's'} ${g.gone.slice(0, 5).map((v) => v.size).join(', ')} sold out`,
+    sub: `${g.brand} · ${g.styleCode} · sells ${g.demand.toFixed(1)} a week online · ${g.actionText.toLowerCase()}`,
+    weekly: g.weekly,
+    href: `/stock/inventory/${g.productId}`,
+    image: g.image,
+  }));
   leaks.push({
     key: 'sizes',
     label: 'Sold-out sizes on styles that sell',
@@ -137,8 +111,8 @@ async function compute(p: Principal) {
     count: sizeItems.length,
     unit: `styles, ${sizesOut} sizes`,
     basis: 'Each style’s online sales a week × the share of its sales those sizes carry × its price.',
-    href: '/stock/inventory?status=broken',
-    fix: 'Reorder or move pieces in',
+    href: '/stock/rescue',
+    fix: 'Rescue the sizes',
     items: top(sizeItems),
     byBrand: sizesByBrand,
   });
