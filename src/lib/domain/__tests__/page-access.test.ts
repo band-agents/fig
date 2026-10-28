@@ -23,7 +23,7 @@ describe('pages each job sees', () => {
   // Dan, 25 Oct: brand managers read sales (the shops first), stock and buying, and the websites' numbers,
   // never the websites' order handling
   it('gives a brand manager their brands, the reports, stock and buying, and nothing from the order floor', () => {
-    expect(sees('brand')).toEqual(['brands', 'analytics', 'stockBrief', 'inventory', 'planning', 'purchasing', 'insights', 'financials']);
+    expect(sees('brand')).toEqual(['today', 'brands', 'analytics', 'stockBrief', 'inventory', 'planning', 'purchasing', 'rescue', 'insights', 'leaks', 'targets', 'profit', 'financials']);
     expect(landingFor(job('brand'))).toBe('/brands');
     for (const area of ['overview', 'orders', 'intake', 'finance', 'fulfilment', 'shipping', 'returns', 'customers'] as const) expect(can(job('brand'), area, 1), area).toBe(false);
     expect(worksOrders(job('brand'))).toBe(false);
@@ -51,33 +51,33 @@ describe('pages each job sees', () => {
   });
 
   it('gives customer care the orders and returns, and no stock screens (the confirmation queue is retired)', () => {
-    expect(sees('care')).toEqual(['orders', 'returns']);
+    expect(sees('care')).toEqual(['today', 'orders', 'returns']);
     expect(landingFor(job('care'))).toBe('/orders');
   });
 
   it('gives finance its queue, cash, orders, returns, purchase orders, insights and the money picture', () => {
-    expect(sees('finance')).toEqual(['orders', 'financeQueue', 'returns', 'brands', 'analytics', 'purchasing', 'production', 'insights', 'financials', 'cash']);
+    expect(sees('finance')).toEqual(['today', 'orders', 'financeQueue', 'returns', 'brands', 'analytics', 'purchasing', 'production', 'insights', 'leaks', 'targets', 'profit', 'financials', 'cash']);
   });
 
   it('keeps the warehouse on picking, stock and its floor, away from the orders list and money', () => {
-    expect(sees('warehouse')).toEqual(['pick', 'inventory', 'warehouse']);
-    expect(sees('fulfilment')).toEqual(['pick', 'shipping', 'inventory', 'warehouse']);
+    expect(sees('warehouse')).toEqual(['today', 'pick', 'inventory', 'warehouse']);
+    expect(sees('fulfilment')).toEqual(['today', 'pick', 'shipping', 'inventory', 'warehouse']);
     expect(canSee(job('warehouse'), 'cash')).toBe(false);
   });
 
   it('gives shipping and the returns desk their own queues', () => {
-    expect(sees('shipping')).toEqual(['orders', 'shipping', 'couriers', 'returns', 'insights']);
-    expect(sees('returns')).toEqual(['shipping', 'returns', 'inventory', 'warehouse']);
+    expect(sees('shipping')).toEqual(['today', 'orders', 'shipping', 'couriers', 'returns', 'insights']);
+    expect(sees('returns')).toEqual(['today', 'shipping', 'returns', 'inventory', 'warehouse']);
   });
 
   it('gives buying its plan, stock and purchase orders, and the planner the rules too', () => {
-    expect(sees('buyer')).toEqual(['brands', 'analytics', 'stockBrief', 'inventory', 'planning', 'purchasing', 'warehouse', 'production']);
-    expect(sees('planner')).toEqual(['brands', 'analytics', 'stockBrief', 'inventory', 'planning', 'purchasing', 'warehouse', 'merch', 'webItems', 'production', 'insights', 'rules']);
+    expect(sees('buyer')).toEqual(['today', 'brands', 'analytics', 'stockBrief', 'inventory', 'planning', 'purchasing', 'warehouse', 'rescue', 'production', 'leaks', 'targets']);
+    expect(sees('planner')).toEqual(['today', 'brands', 'analytics', 'stockBrief', 'inventory', 'planning', 'purchasing', 'warehouse', 'merch', 'rescue', 'listings', 'webItems', 'production', 'insights', 'leaks', 'targets', 'rules']);
   });
 
   // Dan, 27 Oct: the people who upload products (Matrixify before) get the catalogue import and the stock, nothing else
   it('gives the product uploader the catalogue import and the stock, and lands them there', () => {
-    expect(sees('uploader')).toEqual(['inventory', 'webItems', 'catalog']);
+    expect(sees('uploader')).toEqual(['today', 'inventory', 'listings', 'webItems', 'leaks', 'catalog']);
     expect(landingFor(job('uploader'))).toBe('/catalog');
     expect(worksOrders(job('uploader'))).toBe(false);
     for (const role of ['admin', 'merchandiser', 'uploader'] as Role[]) expect(scopesFor(role).catalog, role).toBeGreaterThanOrEqual(2);
@@ -85,8 +85,8 @@ describe('pages each job sees', () => {
   });
 
   it('gives marketing and the merchandiser the numbers and the website, never orders', () => {
-    expect(sees('marketing')).toEqual(['brands', 'analytics', 'stockBrief', 'inventory', 'merch', 'webItems', 'insights']);
-    expect(sees('merchandiser')).toEqual(['brands', 'analytics', 'stockBrief', 'inventory', 'merch', 'webItems', 'teamPulse', 'insights', 'catalog']);
+    expect(sees('marketing')).toEqual(['today', 'brands', 'analytics', 'stockBrief', 'inventory', 'merch', 'rescue', 'listings', 'webItems', 'insights', 'leaks', 'targets']);
+    expect(sees('merchandiser')).toEqual(['today', 'brands', 'analytics', 'stockBrief', 'inventory', 'merch', 'rescue', 'listings', 'webItems', 'teamPulse', 'insights', 'leaks', 'targets', 'catalog']);
     expect(canSee(job('marketing'), 'orders')).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import { Activity, ArrowDownUp, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
+import { Activity, ArrowDownUp, BadgeCheck, Droplets, Goal, LifeBuoy, ListChecks, PiggyBank, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
 import { canSee, type Page, type Role, type Scopes } from '@/lib/domain/perms';
 
 export type Me = {
@@ -19,6 +19,7 @@ export const NAV: { group: string | null; items: NavItem[] }[] = [
   {
     group: null,
     items: [
+      { href: '/today', label: 'Today', icon: ListChecks, page: 'today', hint: 'What to do now, ranked by the money it is worth', tint: 'green' },
       { href: '/', label: 'Command centre', icon: Activity, page: 'home', hint: 'Today at a glance: sales, late work, what needs you' },
       { href: '/orders', label: 'Orders', icon: ListOrdered, page: 'orders', hint: 'Every order: search, filter, export' },
       { href: '/pipeline', label: 'Pipeline', icon: KanbanSquare, page: 'pipeline', hint: 'Every open order by stage, on one board' },
@@ -52,6 +53,8 @@ export const NAV: { group: string | null; items: NavItem[] }[] = [
       { href: '/production', label: 'Production', icon: Factory, page: 'production', hint: 'Made-to-order work in progress', tint: 'amber' },
       { href: '/stock/warehouse', label: 'Warehouse', icon: Warehouse, page: 'warehouse', hint: 'Receiving, counts and moves', badge: 'warehouse', tint: 'green' },
       { href: '/stock/merch', label: 'Website merch', icon: Megaphone, page: 'merch', hint: 'What the websites push', badge: 'merch', tint: 'rose' },
+      { href: '/stock/rescue', label: 'Size rescue', icon: LifeBuoy, page: 'rescue', hint: 'Sold-out sizes on styles that sell, and where to get pieces', tint: 'amber' },
+      { href: '/stock/listings', label: 'Listing score', icon: BadgeCheck, page: 'listings', hint: 'Every sellable style scored; the weakest first by money', tint: 'violet' },
       { href: '/stock/web-items', label: 'Website vs Lucida', icon: GitCompareArrows, page: 'webItems', hint: 'Live, sold out, missing photos', tint: 'neutral' },
       { href: '/stock/team', label: 'Team pulse', icon: Gauge, page: 'teamPulse', hint: 'Who is doing what, right now', tint: 'neutral' },
     ],
@@ -63,6 +66,9 @@ export const NAV: { group: string | null; items: NavItem[] }[] = [
   {
     group: 'Business',
     items: [
+      { href: '/leaks', label: 'Money leaks', icon: Droplets, page: 'leaks', hint: 'What the business loses each week, and where to fix it', tint: 'rose' },
+      { href: '/targets', label: 'Targets & pacing', icon: Goal, page: 'targets', hint: 'Each brand’s month against its target, and where it will land', tint: 'amber' },
+      { href: '/profit', label: 'True profit', icon: PiggyBank, page: 'profit', hint: 'What each order really leaves, and where it sells at a loss', tint: 'green' },
       { href: '/analytics', label: 'Reports', icon: FileBarChart, page: 'analytics', hint: 'Every report for finance and brands' },
       { href: '/financials', label: 'Finance & analysis', icon: Landmark, page: 'financials', hint: 'The month in money' },
       { href: '/insights', label: 'Insights', icon: ChartNoAxesColumn, page: 'insights', hint: 'Trends, customers and channels' },
