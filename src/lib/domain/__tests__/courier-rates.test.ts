@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bracketPrice, customerPriceAbroad, estimateKg, INTL, isOffCity, recommend } from '../courier-rates';
+import { bracketPrice, customerPriceAbroad, destinationOf, estimateKg, INTL, isOffCity, recommend } from '../courier-rates';
 
 describe('weights and brackets', () => {
   it('estimates a parcel from its pieces (1 ≈ 0.5 kg, 3 ≈ 1 kg, 15 ≈ 5 kg)', () => {
@@ -8,8 +8,8 @@ describe('weights and brackets', () => {
     expect(estimateKg(15)).toBeLessThanOrEqual(5);
   });
   it('charges the next bracket up, and repeats the last step above 5 kg', () => {
-    expect(bracketPrice(INTL.UPS.AE, 0.7)).toEqual({ kg: 1, price: 3710 });
-    expect(bracketPrice(INTL.UPS.AE, 6.2)).toEqual({ kg: 7, price: 7290 + 2 * (7290 - 6630) });
+    expect(bracketPrice(INTL.UPS.AE!, 0.7)).toEqual({ kg: 1, price: 3710 });
+    expect(bracketPrice(INTL.UPS.AE!, 6.2)).toEqual({ kg: 7, price: 7290 + 2 * (7290 - 6630) });
   });
 });
 
@@ -34,6 +34,21 @@ describe('recommend: international', () => {
   });
 });
 
+describe('recommend: outside the Gulf (28 Oct sheet)', () => {
+  it('UK, 1 piece: UPS 4.410 + surge beats Aramex 4.900 + war risk', () => {
+    const r = recommend({ to: 'GB', pieces: 1 });
+    expect(r.pick?.courier).toBe('UPS');
+    expect(r.pick?.total).toBe(4410 + 150);
+  });
+  it('Turkey has no FedEx', () => {
+    expect(recommend({ to: 'TR', pieces: 1 }).options.map((o) => o.courier)).not.toContain('FedEx');
+  });
+  it('reads country names', () => {
+    expect(destinationOf('United Kingdom')).toBe('GB');
+    expect(destinationOf('Morocco')).toBe('MA');
+  });
+});
+
 describe('recommend: Kuwait', () => {
   it('within city, next day: UPS 1.000 beats Aramex 1.250 at the 2–50 tier', () => {
     const r = recommend({ to: 'KW', pieces: 2, area: 'Salmiya' });
@@ -50,6 +65,18 @@ describe('recommend: Kuwait', () => {
     const r = recommend({ to: 'KW', pieces: 1, area: 'Salmiya' });
     expect(r.options.some((o) => o.courier === 'Posta Plus' && !o.inUse)).toBe(true);
     expect(r.pick?.courier).not.toBe('Posta Plus');
+  });
+  it('shows Frontline Express (1.000 same day, +0.150 cash on delivery) without picking it', () => {
+    const r = recommend({ to: 'KW', pieces: 2, area: 'Salmiya', speed: 'same_day', codAmount: 1 });
+    const fl = r.options.find((o) => o.courier === 'Frontline')!;
+    expect(fl.total).toBe(1150);
+    expect(fl.inUse).toBe(false);
+    expect(r.pick?.courier).not.toBe('Frontline');
+    expect(recommend({ to: 'KW', pieces: 2, area: 'Wafra', speed: 'same_day' }).options.some((o) => o.courier === 'Frontline')).toBe(false);
+  });
+  it('uses the 28 Oct Posta Plus rates', () => {
+    const r = recommend({ to: 'KW', pieces: 1, area: 'Wafra', speed: 'same_day' });
+    expect(r.options.find((o) => o.courier === 'Posta Plus')?.freight).toBe(2000);
   });
   it('on a tie, prefers the courier the console can book', () => {
     const r = recommend({ to: 'KW', pieces: 1, area: 'Salmiya', aramexMonthlyParcels: 60 }, { apis: ['UPS'] });

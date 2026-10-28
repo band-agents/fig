@@ -11,13 +11,20 @@
  * - Posta Plus (same sheet, domestic): 0.250 per extra kg, 0.250 per cash-on-delivery parcel.
  * - Moody, WhatsApp 25 Oct: inside Kuwait only UPS and Aramex (Posta is not competitive); outside Kuwait all
  *   four, whichever is cheapest for the country. Customer price abroad by pieces (CUSTOMER_PRICE below).
+ * - Same sheet, updated by Jessy 28 Oct: cheaper Posta Plus domestic rates; Frontline Express added for
+ *   domestic (international pending); 10 countries outside the Gulf and the Arab world (WORLD below).
  */
 
-export type Courier = 'UPS' | 'Aramex' | 'Posta Plus' | 'FedEx';
+export type Courier = 'UPS' | 'Aramex' | 'Posta Plus' | 'FedEx' | 'Frontline';
 export type Speed = 'same_day' | 'next_day';
-export type Destination = 'KW' | 'JO' | 'LB' | 'AE' | 'BH' | 'QA' | 'OM' | 'SA' | 'EG';
+type Gulf = 'JO' | 'LB' | 'AE' | 'BH' | 'QA' | 'OM' | 'SA' | 'EG';
+type World = 'DE' | 'ES' | 'FR' | 'GB' | 'IT' | 'TR' | 'US' | 'CH' | 'PH' | 'MA';
+export type Destination = 'KW' | Gulf | World;
 
-export const COUNTRY_NAME: Record<Destination, string> = { KW: 'Kuwait', JO: 'Jordan', LB: 'Lebanon', AE: 'UAE', BH: 'Bahrain', QA: 'Qatar', OM: 'Oman', SA: 'Saudi Arabia', EG: 'Egypt' };
+export const COUNTRY_NAME: Record<Destination, string> = {
+  KW: 'Kuwait', JO: 'Jordan', LB: 'Lebanon', AE: 'UAE', BH: 'Bahrain', QA: 'Qatar', OM: 'Oman', SA: 'Saudi Arabia', EG: 'Egypt',
+  DE: 'Germany', ES: 'Spain', FR: 'France', GB: 'UK', IT: 'Italy', TR: 'Turkey', US: 'USA', CH: 'Switzerland', PH: 'Philippines', MA: 'Morocco',
+};
 /**
  * Where Labesny ships abroad (Dan, 25 Oct 2026): the Gulf, Jordan and Lebanon. Not Egypt, although the
  * rate sheet prices it (kept in INTL for reference). No free shipping abroad; 5–10 business days; the
@@ -25,23 +32,33 @@ export const COUNTRY_NAME: Record<Destination, string> = { KW: 'Kuwait', JO: 'Jo
  */
 export const INTERNATIONAL: Exclude<Destination, 'KW'>[] = ['AE', 'SA', 'QA', 'BH', 'OM', 'JO', 'LB'];
 export const ABROAD_DELIVERY = '5–10 business days';
+/** Priced on the 28 Oct sheet but not open on the website: for comparison until D&H decides. */
+export const WORLD: World[] = ['DE', 'ES', 'FR', 'GB', 'IT', 'TR', 'US', 'CH', 'PH', 'MA'];
 
-const CODES: Record<string, Destination> = { kw: 'KW', kuwait: 'KW', jo: 'JO', jordan: 'JO', lb: 'LB', lebanon: 'LB', ae: 'AE', uae: 'AE', 'united arab emirates': 'AE', bh: 'BH', bahrain: 'BH', qa: 'QA', qatar: 'QA', om: 'OM', oman: 'OM', sa: 'SA', ksa: 'SA', 'saudi arabia': 'SA', eg: 'EG', egypt: 'EG' };
+const CODES: Record<string, Destination> = {
+  kw: 'KW', kuwait: 'KW', jo: 'JO', jordan: 'JO', lb: 'LB', lebanon: 'LB', ae: 'AE', uae: 'AE', 'united arab emirates': 'AE', bh: 'BH', bahrain: 'BH', qa: 'QA', qatar: 'QA', om: 'OM', oman: 'OM', sa: 'SA', ksa: 'SA', 'saudi arabia': 'SA', eg: 'EG', egypt: 'EG',
+  de: 'DE', germany: 'DE', es: 'ES', spain: 'ES', fr: 'FR', france: 'FR', gb: 'GB', uk: 'GB', 'united kingdom': 'GB', it: 'IT', italy: 'IT', tr: 'TR', turkey: 'TR', 'türkiye': 'TR', us: 'US', usa: 'US', 'united states': 'US', ch: 'CH', switzerland: 'CH', ph: 'PH', philippines: 'PH', ma: 'MA', morocco: 'MA',
+};
 
 /** An address's country as one of the destinations on the rate sheet, or null. */
 export const destinationOf = (country: string | null | undefined): Destination | null => CODES[(country ?? '').trim().toLowerCase()] ?? null;
 
 // ── Domestic (Kuwait), flat up to 5 kg ─────────────────────────────────────────────────────────
 type DomesticRow = { withinSame: number | null; withinNext: number; offSame: number | null; offNext: number };
-/** Aramex has two tiers by monthly parcels: 2–50 and 50–100. */
-export const DOMESTIC: Record<'UPS' | 'Aramex' | 'Aramex 50+' | 'Posta Plus', DomesticRow> = {
+/**
+ * Aramex has two tiers by monthly parcels: 2–50 and 50–100. Frontline Express (28 Oct) delivers the same
+ * day by 10 pm: 1.000 collected at 10 am (1.250 collected at 3 pm), outside city limits 1.000 but only on
+ * Saturday, Monday and Wednesday (so no same day there).
+ */
+export const DOMESTIC: Record<'UPS' | 'Aramex' | 'Aramex 50+' | 'Posta Plus' | 'Frontline', DomesticRow> = {
   UPS: { withinSame: 1400, withinNext: 1000, offSame: null, offNext: 1400 },
   Aramex: { withinSame: 1500, withinNext: 1250, offSame: 1250, offNext: 1250 },
   'Aramex 50+': { withinSame: 1400, withinNext: 1000, offSame: 1000, offNext: 1000 },
-  'Posta Plus': { withinSame: 1750, withinNext: 1250, offSame: 2750, offNext: 1750 },
+  'Posta Plus': { withinSame: 1500, withinNext: 1250, offSame: 2000, offNext: 1750 },
+  Frontline: { withinSame: 1000, withinNext: 1000, offSame: null, offNext: 1000 },
 };
 export const DOMESTIC_MAX_KG = 5;
-/** Moody 25 Oct: inside Kuwait only these two; Posta stays in the table for comparison only. */
+/** Moody 25 Oct: inside Kuwait only these two; Posta and Frontline stay in the table for comparison only. */
 export const DOMESTIC_IN_USE: Courier[] = ['UPS', 'Aramex'];
 
 /**
@@ -54,18 +71,26 @@ export const isOffCity = (area: string | null | undefined) => Boolean(area && OF
 
 // ── International: freight by weight bracket (kg) and country ──────────────────────────────────
 export const BRACKETS = [0.5, 1, 2, 3, 4, 5] as const;
-type Table = Record<Exclude<Destination, 'KW'>, number[]>; // one price per bracket, fils
+type Table = Partial<Record<Exclude<Destination, 'KW'>, number[]>>; // one price per bracket, fils
 const t = (rows: Record<string, number[]>) => rows as Table;
-export const INTL: Record<Courier, Table> = {
+export const INTL: Record<Exclude<Courier, 'Frontline'>, Table> = {
   UPS: t({ JO: [5770, 6470, 8320, 9860, 11470, 13010], LB: [5770, 6470, 8320, 9860, 11470, 13010], AE: [3430, 3710, 4790, 5730, 6630, 7290], BH: [5470, 5930, 7650, 9150, 10580, 11630], QA: [5620, 6800, 7850, 9390, 10860, 11940], OM: [3360, 3630, 4690, 5610, 6490, 7130], SA: [4010, 4340, 5610, 6710, 7750, 8520], EG: [5470, 6340, 8210, 9860, 11660, 13610] }),
   'Posta Plus': t({ JO: [5390, 6930, 10100, 13090, 16170, 19250], LB: [3430, 4730, 7350, 10370, 13450, 16490], AE: [2420, 3360, 5220, 7060, 8930, 10830], BH: [2500, 3900, 6690, 9460, 12250, 14430], QA: [3790, 4810, 6860, 8920, 10890, 12820], OM: [3780, 4390, 5610, 6380, 8040, 9260], SA: [3400, 4532, 6921, 9310, 11699, 14088], EG: [5390, 6930, 10100, 13090, 16170, 19250] }),
   FedEx: t({ JO: [4760, 7370, 12820, 18760, 24400, 29530], LB: [4760, 7370, 12820, 18760, 24400, 29530], AE: [4460, 6940, 11480, 17260, 21680, 26110], BH: [4640, 6940, 11480, 17260, 21680, 26110], QA: [4640, 6940, 11480, 17260, 21680, 26110], OM: [4640, 6940, 11480, 17260, 21680, 26110], SA: [7000, 23710, 40540, 60820, 76840, 38860], EG: [4760, 7370, 12820, 19280, 24400, 29530] }),
   Aramex: t({ JO: [4900, 5650, 9250, 10950, 16500, 20100], LB: [3400, 4300, 7600, 12850, 14250, 17550], AE: [3400, 4300, 7600, 12850, 14250, 17550], BH: [3400, 4300, 7600, 12850, 14250, 17550], QA: [3400, 4300, 7600, 12850, 14250, 17550], OM: [3400, 4300, 7600, 12850, 14250, 17550], SA: [4900, 5650, 9250, 10950, 16500, 20100], EG: [6000, 7050, 11850, 16600, 21400, 26100] }),
 };
 
+// The 28 Oct sheet's second table (WORLD). FedEx does not serve Turkey. FedEx 1 kg is 0.070 below 0.5 kg in
+// the sheet; kept as written.
+const EU5 = (row: number[]) => ({ DE: row, ES: row, FR: row, GB: row, IT: row });
+Object.assign(INTL.UPS, { DE: [4100, 4750, 6160, 7400, 8750, 10210], ES: [3540, 4230, 5610, 6950, 8280, 9610], FR: [4410, 5100, 6610, 7950, 9400, 10960], GB: [4410, 5100, 6610, 7950, 9400, 10960], IT: [4310, 5150, 6830, 8460, 10080, 11730], TR: [4080, 4880, 6470, 8000, 9540, 11080], US: [5010, 5980, 7740, 9550, 11050, 12740], CH: [5850, 6780, 8780, 10550, 12470, 14550], PH: [5930, 7080, 9390, 11630, 13850, 16090], MA: [6010, 7390, 9860, 12400, 14780, 17330] });
+Object.assign(INTL['Posta Plus'], EU5([11520, 11960, 12820, 17580, 22330, 27090]), { TR: [11650, 12440, 14010, 19490, 24990, 30490], US: [13440, 13940, 14940, 20430, 25920, 31420], CH: [11520, 11960, 12820, 17580, 22330, 27090], PH: [7540, 10620, 16770, 22930, 29100, 35260], MA: [8430, 12020, 19190, 26370, 33530, 40710] });
+Object.assign(INTL.FedEx, EU5([8690, 8620, 14140, 19490, 24660, 29840]), { US: [9320, 10410, 16860, 23130, 29240, 35340], CH: [18670, 29730, 52120, 73840, 94870, 115910], PH: [20390, 31660, 50450, 68740, 86550, 104360], MA: [23310, 36060, 61680, 87020, 111540, 136060] });
+Object.assign(INTL.Aramex, EU5([6000, 7050, 11850, 16600, 21400, 26100]), { GB: [4900, 5650, 9250, 12850, 16500, 20100], TR: [4900, 5650, 9250, 12850, 16500, 20100], US: [8650, 9900, 16300, 22650, 29050, 35400], CH: [6000, 7050, 11850, 16600, 21400, 26100], PH: [6000, 7050, 11850, 16600, 21400, 26100], MA: [8650, 9900, 16300, 22650, 29050, 35400] });
+
 /** Surcharges on top of freight. Editable later; the UPS fuel % is unknown until GMTC states it. */
-export type Surcharges = { upsSurgePerKg: number; upsFuelPct: number; aramexWarRiskUsdUpTo4Kg: number; aramexWarRiskUsdPerKgAbove: number; usdToKwd: number; postaCod: number; postaPerExtraKg: number };
-export const SURCHARGES: Surcharges = { upsSurgePerKg: 300, upsFuelPct: 0, aramexWarRiskUsdUpTo4Kg: 2, aramexWarRiskUsdPerKgAbove: 0.5, usdToKwd: 0.307, postaCod: 250, postaPerExtraKg: 250 };
+export type Surcharges = { upsSurgePerKg: number; upsFuelPct: number; aramexWarRiskUsdUpTo4Kg: number; aramexWarRiskUsdPerKgAbove: number; usdToKwd: number; postaCod: number; postaPerExtraKg: number; frontlineCod: number; frontlinePerKgOver5: number };
+export const SURCHARGES: Surcharges = { upsSurgePerKg: 300, upsFuelPct: 0, aramexWarRiskUsdUpTo4Kg: 2, aramexWarRiskUsdPerKgAbove: 0.5, usdToKwd: 0.307, postaCod: 250, postaPerExtraKg: 250, frontlineCod: 150, frontlinePerKgOver5: 150 };
 
 // ── Weight ─────────────────────────────────────────────────────────────────────────────────────
 /** Planning estimate (25 Oct): 1 piece ≈ 0.5 kg, 3 ≈ 1 kg, 6 ≈ 2, 9 ≈ 3, 12 ≈ 4, 15 ≈ 5 (0.3 kg a piece + 0.1 kg box). */
@@ -116,6 +141,7 @@ function domesticQuotes(p: ParcelInput, kg: number, opts: { apis: Courier[] }): 
     ['UPS', 'UPS', 'UPS'],
     ['Aramex', aramexKey, aramexKey === 'Aramex' ? 'Aramex (2–50 orders/month)' : 'Aramex (50–100 orders/month)'],
     ['Posta Plus', 'Posta Plus', 'Posta Plus'],
+    ['Frontline', 'Frontline', 'Frontline Express'],
   ];
   const out: Quote[] = [];
   for (const [courier, key, label] of rows) {
@@ -127,8 +153,12 @@ function domesticQuotes(p: ParcelInput, kg: number, opts: { apis: Courier[] }): 
       if (kg > 1) surcharges.push({ label: `${Math.ceil(kg - 1)} extra kg`, amount: Math.ceil(kg - 1) * SURCHARGES.postaPerExtraKg });
       if ((p.codAmount ?? 0) > 0) surcharges.push({ label: 'Cash on delivery', amount: SURCHARGES.postaCod });
     }
+    if (courier === 'Frontline') {
+      if (over) surcharges.push({ label: `${Math.ceil(kg - DOMESTIC_MAX_KG)} kg over 5`, amount: Math.ceil(kg - DOMESTIC_MAX_KG) * SURCHARGES.frontlinePerKgOver5 });
+      if ((p.codAmount ?? 0) > 0) surcharges.push({ label: 'Cash on delivery', amount: SURCHARGES.frontlineCod });
+    }
     const total = price + surcharges.reduce((s, x) => s + x.amount, 0);
-    out.push({ courier, label, freight: price, surcharges, total, chargedKg: Math.min(kg, DOMESTIC_MAX_KG), speed, inUse: DOMESTIC_IN_USE.includes(courier), hasApi: opts.apis.includes(courier), note: over ? 'Over 5 kg: the card covers up to 5 kg, ask the courier' : off ? 'Outside city limits' : undefined });
+    out.push({ courier, label, freight: price, surcharges, total, chargedKg: Math.min(kg, DOMESTIC_MAX_KG), speed, inUse: DOMESTIC_IN_USE.includes(courier), hasApi: opts.apis.includes(courier), note: over && courier !== 'Frontline' ? 'Over 5 kg: the card covers up to 5 kg, ask the courier' : off ? 'Outside city limits' : undefined });
   }
   return out;
 }
@@ -136,7 +166,7 @@ function domesticQuotes(p: ParcelInput, kg: number, opts: { apis: Courier[] }): 
 function internationalQuotes(p: ParcelInput, kg: number, opts: { apis: Courier[]; s: Surcharges }): Quote[] {
   const to = p.to as Exclude<Destination, 'KW'>;
   const out: Quote[] = [];
-  for (const courier of Object.keys(INTL) as Courier[]) {
+  for (const courier of Object.keys(INTL) as (keyof typeof INTL)[]) {
     const row = INTL[courier][to];
     if (!row) continue;
     const { kg: charged, price } = bracketPrice(row, kg);

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Scale } from 'lucide-react';
-import { COUNTRY_NAME, customerPriceAbroad, fmt, INTERNATIONAL, OFF_CITY, recommend, type Destination, type Speed } from '@/lib/domain/courier-rates';
+import { COUNTRY_NAME, customerPriceAbroad, fmt, INTERNATIONAL, OFF_CITY, recommend, WORLD, type Destination, type Speed } from '@/lib/domain/courier-rates';
 import { gmtcArea } from '@/lib/connectors/kuwait-areas';
 
 const PIECES = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15];
@@ -41,6 +41,11 @@ export function CourierCompare({ ups }: { ups: boolean }) {
               {INTERNATIONAL.map((c) => (
                 <option key={c} value={c}>{COUNTRY_NAME[c]}</option>
               ))}
+              <optgroup label="Not open on the website">
+                {WORLD.map((c) => (
+                  <option key={c} value={c}>{COUNTRY_NAME[c]}</option>
+                ))}
+              </optgroup>
             </select>
           </label>
           <label className="grid gap-1">
