@@ -7,6 +7,7 @@ const acc: GmtcAccount = {
   serviceType: 'NEXT DAY',
   movementType: 'con',
   consignmentType: 'FORWARD',
+  destinationPincode: 'Dajeej',
   origin: { name: 'D&H International - Labesny', phone: '96522649224', line1: 'D&H Warehouse', pincode: 'Dajeej', city: 'Dajeej', state: 'Farwaniya' },
 };
 
@@ -38,8 +39,8 @@ describe('buildConsignment', () => {
     expect(body.origin_details.pincode).toBe('Dajeej');
   });
 
-  it('uses the area as the Kuwait "pincode" and a 965 phone', () => {
-    expect(body.destination_details).toMatchObject({ pincode: 'Salmiya', city: 'Salmiya', phone: '96550000000', address_line_1: 'Block 1, Street 2, House 3' });
+  it('sends pincode Dajeej with the area as the city, and a 965 phone', () => {
+    expect(body.destination_details).toMatchObject({ pincode: 'Dajeej', city: 'Salmiya', phone: '96550000000', address_line_1: 'Block 1, Street 2, House 3' });
   });
 
   it('values the parcel in KWD with fils, and leaves COD blank when paid', () => {

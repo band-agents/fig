@@ -24,6 +24,8 @@ export type GmtcAccount = {
   serviceType: string; // "NEXT DAY" | "SAME DAY"
   movementType: string; // "con"
   consignmentType: string; // "FORWARD"
+  /** GMTC's live account (Marissa, 29 Oct): every destination pincode is "Dajeej"; the area goes in the city. */
+  destinationPincode: string;
   origin: { name: string; phone: string; line1: string; line2?: string; pincode: string; city: string; state?: string };
 };
 
@@ -34,9 +36,9 @@ export type GmtcOrder = Pick<Order, 'number' | 'customerName' | 'phone' | 'addre
 const KG_PER_PIECE = 0.5;
 
 /**
- * Shipsy's "pincode" for Kuwait is the area name, spelled GMTC's way. A known area anywhere in the address
- * wins; otherwise what the customer typed goes as it is (GMTC refuses it if it is not on their list), unless
- * it names no area at all ("Kuwait"), which is refused here with the reason.
+ * The Kuwait area for the destination city. A known area anywhere in the address wins, spelled GMTC's way;
+ * otherwise what the customer typed goes as it is (GMTC keeps no fixed list, Marissa 29 Oct), unless it
+ * names no area at all ("Kuwait"), which is refused here with the reason.
  */
 export function areaOf(a: Address | null | undefined): string {
   const known = areaFromAddress(a);
@@ -104,7 +106,7 @@ export function buildConsignment(o: GmtcOrder, acc: GmtcAccount) {
       phone: kuwaitPhone(a.phone || o.phone),
       address_line_1: a.line1.trim(),
       address_line_2: [a.line2, a.notes].filter(Boolean).join(' · '),
-      pincode: area,
+      pincode: acc.destinationPincode,
       city: area,
       state: a.region ?? '',
       country: 'Kuwait',
