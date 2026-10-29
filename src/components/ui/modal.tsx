@@ -20,11 +20,11 @@ export function Modal({ title, sub, onClose, children, wide = false }: { title: 
       ref={ref}
       data-editing="true"
       onClick={(e) => e.target === ref.current && ref.current?.close()}
-      className={`m-auto w-[calc(100vw-24px)] ${wide ? 'max-w-[640px]' : 'max-w-[460px]'} rounded-2xl border border-line-2 bg-elev p-0 text-ink shadow-[var(--shadow-lg)]`}
+      className={`m-auto w-[calc(100vw-24px)] ${wide ? 'max-w-[640px]' : 'max-w-[460px]'} rounded-[10px] border-0 bg-elev p-0 text-ink shadow-[0_24px_64px_rgb(0_0_0/0.3)]`}
     >
       <div className="flex items-start gap-3 border-b border-line px-5 py-4">
         <div className="min-w-0">
-          <h3 className="font-display text-[16px] leading-tight">{title}</h3>
+          <h3 className="font-display text-[18px] leading-tight">{title}</h3>
           {sub && <p className="mt-0.5 text-[12.5px] text-ink-3">{sub}</p>}
         </div>
         <button onClick={() => ref.current?.close()} className="btn btn-ghost btn-sm ml-auto !px-2" aria-label="Close">

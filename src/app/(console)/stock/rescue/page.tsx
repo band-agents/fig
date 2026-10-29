@@ -47,24 +47,24 @@ export default async function RescuePage(props: PageProps<'/stock/rescue'>) {
 
       <section className="panel inv-board grid grid-cols-2 overflow-hidden md:grid-cols-4">
         <div className="inv-stat p-4">
-          <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">Costing a week</div>
+          <div className="text-[12.5px] text-ink-3">Costing a week</div>
           <div className="mt-1.5 font-mono text-[22px] font-semibold leading-none text-[var(--t-amber)] xl:text-[24px]">{money ? `≈ ${m(total)}` : '—'}</div>
           <div className="mt-1.5 text-[11.5px] text-ink-3">online sales missed</div>
         </div>
         <div className="inv-stat p-4">
-          <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">Styles · sizes</div>
+          <div className="text-[12.5px] text-ink-3">Styles · sizes</div>
           <div className="mt-1.5 font-mono text-[22px] font-semibold leading-none xl:text-[24px]">
             {num(all.length)} <span className="text-ink-3">·</span> {num(sizes)}
           </div>
           <div className="mt-1.5 text-[11.5px] text-ink-3">{num(all.filter((g) => g.allOut).length)} sold out in every size</div>
         </div>
         <div className="inv-stat p-4">
-          <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">Can move in now</div>
+          <div className="text-[12.5px] text-ink-3">Can move in now</div>
           <div className="mt-1.5 font-mono text-[22px] font-semibold leading-none text-[var(--sage-deep)] xl:text-[24px]">{num(count('move'))}</div>
           <div className="mt-1.5 text-[11.5px] text-ink-3">pieces in a shop or another place</div>
         </div>
         <div className="inv-stat p-4">
-          <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">On order · to reorder</div>
+          <div className="text-[12.5px] text-ink-3">On order · to reorder</div>
           <div className="mt-1.5 font-mono text-[22px] font-semibold leading-none xl:text-[24px]">
             {num(count('incoming'))} <span className="text-ink-3">·</span> {num(count('reorder'))}
           </div>

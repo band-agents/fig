@@ -38,17 +38,17 @@ export default async function TodayPage() {
 
       <section className="panel inv-board grid grid-cols-1 overflow-hidden sm:grid-cols-3">
         <div className="inv-stat flex items-baseline justify-between gap-3 p-4 sm:block">
-          <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">To do</div>
+          <div className="text-[12.5px] text-ink-3">To do</div>
           <div className="mt-1.5 font-mono text-[24px] font-semibold leading-none">{num(t.tasks.length)}</div>
           <div className="mt-1.5 text-[11.5px] text-ink-3">{t.late ? <span className="text-[var(--t-amber)]">{t.late} running late</span> : 'nothing running late'}</div>
         </div>
         <div className="inv-stat flex items-baseline justify-between gap-3 p-4 sm:block">
-          <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">Leaking a week</div>
+          <div className="text-[12.5px] text-ink-3">Leaking a week</div>
           <div className="mt-1.5 font-mono text-[24px] font-semibold leading-none text-[var(--t-rose)]">{seesMoney ? `≈ ${m(t.weekly)}` : '—'}</div>
           <div className="mt-1.5 text-[11.5px] text-ink-3">in the leaks on your list</div>
         </div>
         <div className="inv-stat flex items-baseline justify-between gap-3 p-4 sm:block">
-          <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">At stake now</div>
+          <div className="text-[12.5px] text-ink-3">At stake now</div>
           <div className="mt-1.5 font-mono text-[24px] font-semibold leading-none">{seesMoney ? m(t.stake) : '—'}</div>
           <div className="mt-1.5 text-[11.5px] text-ink-3">orders, refunds, suggestions</div>
         </div>

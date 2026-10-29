@@ -1,11 +1,8 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist_Mono, Inter } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
 import { ImageFallback } from '@/components/ui/image-fallback';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' });
 
 export const metadata: Metadata = {
   title: { default: 'DH & DCO', template: '%s · DH & DCO' },
@@ -17,7 +14,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: dark)', color: '#141414' },
-    { media: '(prefers-color-scheme: light)', color: '#1a1a1a' },
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
   ],
 };
 
@@ -25,7 +22,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Light is the house default; dark is a choice each person makes from the top bar.
   const theme = (await cookies()).get('dh_theme')?.value === 'dark' ? 'dark' : 'light';
   return (
-    <html lang="en" data-theme={theme} className={`${inter.variable} ${mono.variable}`}>
+    <html lang="en" data-theme={theme}>
       <body>
         <div className="atmosphere" aria-hidden />
         <div className="relative z-[1]">{children}</div>

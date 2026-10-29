@@ -63,7 +63,7 @@ export default async function CatalogJobPage(props: PageProps<'/catalog/[id]'>) 
           </div>
         </div>
         {job.note && (
-          <div className={`mt-3 flex items-start gap-2 rounded-[14px] px-3.5 py-2.5 text-[12.5px] ${job.status === 'failed' ? 'bg-[var(--b-critical)] text-[var(--b-critical-ink)]' : 'bg-elev-2 text-ink-2'}`}>
+          <div className={`mt-3 flex items-start gap-2 rounded-[6px] px-3.5 py-2.5 text-[12.5px] ${job.status === 'failed' ? 'bg-[var(--b-critical)] text-[var(--b-critical-ink)]' : 'bg-elev-2 text-ink-2'}`}>
             <Info className="mt-px size-4 shrink-0" /> {job.note}
           </div>
         )}
@@ -161,7 +161,7 @@ function Review({ id, plan, options, storeOf, sp, qs, canImport }: { id: string;
             const st = storeOf(sid);
             const t = plan.stores[sid].tally;
             return (
-              <Link key={sid} href={qs({ store: sid, page: undefined, action: undefined, issue: undefined })} className={`flex items-center gap-2 rounded-[14px] border px-3 py-2 text-[12.5px] transition ${sid === store ? 'border-[var(--t-violet)] bg-[color-mix(in_oklab,var(--t-violet)_12%,transparent)]' : 'border-line hover:border-line-2'}`}>
+              <Link key={sid} href={qs({ store: sid, page: undefined, action: undefined, issue: undefined })} className={`flex items-center gap-2 rounded-[6px] border px-3 py-2 text-[12.5px] transition ${sid === store ? 'border-[var(--t-violet)] bg-[color-mix(in_oklab,var(--t-violet)_12%,transparent)]' : 'border-line hover:border-line-2'}`}>
                 <StoreMark name={st.name} brand={st.brand} size={22} /> <span className="font-semibold">{st.name}</span>
                 <span className="text-ink-3">
                   {num(t.create)} new · {num(t.update)} upd{t.error ? ` · ${num(t.error)} err` : ''}
@@ -175,7 +175,7 @@ function Review({ id, plan, options, storeOf, sp, qs, canImport }: { id: string;
       {(plan.notes ?? []).length > 0 && (
         <div className="space-y-1.5">
           {[...new Set(plan.notes)].map((n) => (
-            <div key={n} className="flex items-start gap-2 rounded-[14px] bg-[var(--b-info)] px-3.5 py-2.5 text-[12.5px] text-[var(--b-info-ink)]">
+            <div key={n} className="flex items-start gap-2 rounded-[6px] bg-[var(--b-info)] px-3.5 py-2.5 text-[12.5px] text-[var(--b-info-ink)]">
               <Info className="mt-px size-4 shrink-0" /> {n}
             </div>
           ))}
@@ -183,7 +183,7 @@ function Review({ id, plan, options, storeOf, sp, qs, canImport }: { id: string;
       )}
 
       {sPlan.blocked && (
-        <div className="flex items-start gap-2 rounded-[14px] bg-[var(--b-attention)] px-3.5 py-3 text-[12.5px] text-[var(--b-attention-ink)]">
+        <div className="flex items-start gap-2 rounded-[6px] bg-[var(--b-attention)] px-3.5 py-3 text-[12.5px] text-[var(--b-attention-ink)]">
           <ShieldCheck className="mt-px size-4 shrink-0" /> {sPlan.blocked}
         </div>
       )}
@@ -263,7 +263,7 @@ function Review({ id, plan, options, storeOf, sp, qs, canImport }: { id: string;
               <ul className="space-y-1.5">
                 {issues.map((g) => (
                   <li key={g.code}>
-                    <Link href={qs({ issue: sp.issue === g.code ? undefined : g.code, action: undefined, page: undefined })} className={`flex items-start gap-2.5 rounded-[12px] p-2 text-[12px] transition hover:bg-elev-2 ${sp.issue === g.code ? 'bg-elev-2' : ''}`}>
+                    <Link href={qs({ issue: sp.issue === g.code ? undefined : g.code, action: undefined, page: undefined })} className={`flex items-start gap-2.5 rounded-[6px] p-2 text-[12px] transition hover:bg-elev-2 ${sp.issue === g.code ? 'bg-elev-2' : ''}`}>
                       {g.level === 'error' ? <AlertOctagon className="mt-px size-4 shrink-0 text-critical" /> : g.level === 'warning' ? <AlertTriangle className="mt-px size-4 shrink-0 text-[var(--t-amber)]" /> : <Info className="mt-px size-4 shrink-0 text-ink-3" />}
                       <span className="min-w-0 flex-1 leading-snug">
                         <span className="line-clamp-2 text-ink-2">{g.example}</span>
@@ -302,9 +302,9 @@ function PlanRow({ item }: { item: PlanItem }) {
         <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-2.5 transition hover:bg-elev-2/60">
           {item.image ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.image} alt="" className="size-10 shrink-0 rounded-[10px] object-cover" loading="lazy" />
+            <img src={item.image} alt="" className="size-10 shrink-0 rounded-[6px] object-cover" loading="lazy" />
           ) : (
-            <span className="size-10 shrink-0 rounded-[10px] bg-elev-3" />
+            <span className="size-10 shrink-0 rounded-[6px] bg-elev-3" />
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -465,7 +465,7 @@ function ExportDone({ job, progress, canImport, stores }: { job: { id: string; s
   return (
     <section className="panel cat-hero relative overflow-hidden p-6">
       <div className="relative z-[1] flex flex-wrap items-center gap-6">
-        <span className="grid size-16 place-items-center rounded-[20px] bg-[var(--sage-soft)] text-[var(--sage-ink)]">
+        <span className="grid size-16 place-items-center rounded-[8px] bg-[var(--sage-soft)] text-[var(--sage-ink)]">
           <FileSpreadsheet className="size-7" />
         </span>
         <div className="min-w-0 flex-1">

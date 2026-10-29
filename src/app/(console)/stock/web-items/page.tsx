@@ -88,9 +88,9 @@ export default async function WebItemsPage(props: PageProps<'/stock/web-items'>)
       {/* where the two readings stand, and the buttons that take them again */}
       <section className="panel flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center">
         {d.stores.length > 1 && (
-          <div className="flex shrink-0 rounded-[11px] bg-elev-2 p-0.5">
+          <div className="flex shrink-0 rounded-[6px] bg-elev-2 p-0.5">
             {d.stores.map((x) => (
-              <Link key={x.id} href={`/stock/web-items?store=${x.id}`} className={`flex h-8 items-center rounded-[9px] px-3 text-[12.5px] ${x.id === d.store!.id ? 'bg-elev font-semibold text-ink shadow-[var(--card-shadow)]' : 'text-ink-3 hover:text-ink'}`}>
+              <Link key={x.id} href={`/stock/web-items?store=${x.id}`} className={`flex h-8 items-center rounded-[6px] px-3 text-[12.5px] ${x.id === d.store!.id ? 'bg-elev font-semibold text-ink shadow-[var(--card-shadow)]' : 'text-ink-3 hover:text-ink'}`}>
                 {x.label}
               </Link>
             ))}

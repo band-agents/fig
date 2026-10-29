@@ -8,7 +8,7 @@ export function StoreMark({ name, brand, size = 34 }: { name: string; brand?: st
   const hue = HUES[brand ?? name] ?? '#a99af0';
   return (
     <span
-      className="grid shrink-0 place-items-center rounded-[11px] font-semibold text-white"
+      className="grid shrink-0 place-items-center rounded-[6px] font-semibold text-white"
       style={{ width: size, height: size, fontSize: size * 0.38, background: `linear-gradient(135deg, ${hue}, color-mix(in oklab, ${hue} 55%, #1d1d1b))`, boxShadow: `0 6px 16px -8px ${hue}` }}
     >
       {(brand ?? name).replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || '·'}
@@ -64,7 +64,7 @@ export function KindMark({ kind, size = 38 }: { kind: string; size?: number }) {
   const k = KIND[kind] ?? KIND.import;
   const Icon = k.icon;
   return (
-    <span data-tint={k.tint} className="grid shrink-0 place-items-center rounded-[12px]" style={{ width: size, height: size, background: 'color-mix(in oklab, var(--tint) 18%, transparent)', color: 'var(--tint)' }}>
+    <span data-tint={k.tint} className="grid shrink-0 place-items-center rounded-[6px]" style={{ width: size, height: size, background: 'color-mix(in oklab, var(--tint) 18%, transparent)', color: 'var(--tint)' }}>
       <Icon className="size-[18px]" strokeWidth={1.8} />
     </span>
   );

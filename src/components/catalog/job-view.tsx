@@ -71,7 +71,7 @@ export function JobLive({ id, status: first, progress: start, stores, canStop }:
               {Object.entries(p.perStore).map(([sid, s]) => {
                 const st = stores.find((x) => x.id === sid);
                 return (
-                  <div key={sid} className="rounded-[14px] bg-elev-2/70 p-3">
+                  <div key={sid} className="rounded-[6px] bg-elev-2/70 p-3">
                     <div className="mb-2 flex items-center gap-2 text-[12.5px] font-medium">
                       <StoreMark name={st?.name ?? sid} brand={st?.brand} size={20} /> {st?.name ?? sid}
                       <span className="ml-auto font-mono text-[11.5px] text-ink-3">
@@ -156,7 +156,7 @@ export function RunBar({ id, lines, blocked, canRun, errors }: { id: string; lin
             {lines
               .filter((l) => l.create + l.update + l.remove)
               .map((l) => (
-                <div key={l.store} className="flex items-center gap-3 rounded-[12px] bg-elev-2 px-3 py-2.5 text-[13px]">
+                <div key={l.store} className="flex items-center gap-3 rounded-[6px] bg-elev-2 px-3 py-2.5 text-[13px]">
                   <StoreMark name={l.name} brand={l.brand} size={26} />
                   <span className="font-semibold">{l.name}</span>
                   <span className="ml-auto text-ink-3">
@@ -202,7 +202,7 @@ export function MappingEditor({ id, columns, choices, options, canEdit }: { id: 
           const value = picks[c.index] ?? c.pick;
           const bad = value === 'ignore' && c.header;
           return (
-            <div key={c.index} className={`rounded-[14px] border p-3 ${bad ? 'border-[color-mix(in_oklab,var(--t-amber)_45%,transparent)] bg-[color-mix(in_oklab,var(--t-amber)_7%,transparent)]' : 'border-line bg-elev-2/40'}`}>
+            <div key={c.index} className={`rounded-[6px] border p-3 ${bad ? 'border-[color-mix(in_oklab,var(--t-amber)_45%,transparent)] bg-[color-mix(in_oklab,var(--t-amber)_7%,transparent)]' : 'border-line bg-elev-2/40'}`}>
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-[12.5px] font-semibold" title={c.header}>
                   {c.header || `Column ${c.index + 1}`}
@@ -231,7 +231,7 @@ export function MappingEditor({ id, columns, choices, options, canEdit }: { id: 
         </button>
       )}
       {canEdit && (
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[14px] bg-elev-2/60 px-3.5 py-3 text-[12.5px]">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[6px] bg-elev-2/60 px-3.5 py-3 text-[12.5px]">
           <label className="flex items-center gap-2">
             Tags
             <select className="field !h-8 !w-auto !text-[12px]" value={o.tags} onChange={(e) => setO({ ...o, tags: e.target.value })}>
@@ -279,7 +279,7 @@ export function RevertButton({ id, count }: { id: string; count: number }) {
       </button>
       {confirm && (
         <Modal title="Revert this import?" sub={`${num(count)} product${count === 1 ? '' : 's'} go back to how they were. Products the import created are archived, not deleted.`} onClose={() => setConfirm(false)}>
-          <div className="flex items-start gap-2 rounded-[12px] bg-[var(--b-attention)] px-3 py-2.5 text-[12px] text-[var(--b-attention-ink)]">
+          <div className="flex items-start gap-2 rounded-[6px] bg-[var(--b-attention)] px-3 py-2.5 text-[12px] text-[var(--b-attention-ink)]">
             <AlertTriangle className="mt-px size-4 shrink-0" /> Changes made in Shopify after the import, on the same products, are undone too.
           </div>
           <div className="mt-5 flex justify-end gap-2">
@@ -324,7 +324,7 @@ export function CopyExport({ id, stores }: { id: string; stores: { id: string; n
             {stores.map((s) => {
               const on = targets.includes(s.id);
               return (
-                <button key={s.id} onClick={() => setTargets(on ? targets.filter((x) => x !== s.id) : [...targets, s.id])} className={`flex items-center gap-2 rounded-[12px] border px-3 py-2 text-[13px] transition ${on ? 'border-[var(--t-violet)] bg-[color-mix(in_oklab,var(--t-violet)_14%,transparent)] font-semibold' : 'border-line'}`}>
+                <button key={s.id} onClick={() => setTargets(on ? targets.filter((x) => x !== s.id) : [...targets, s.id])} className={`flex items-center gap-2 rounded-[6px] border px-3 py-2 text-[13px] transition ${on ? 'border-[var(--t-violet)] bg-[color-mix(in_oklab,var(--t-violet)_14%,transparent)] font-semibold' : 'border-line'}`}>
                   <StoreMark name={s.name} brand={s.brand} size={22} /> {s.name}
                 </button>
               );

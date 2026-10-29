@@ -123,7 +123,7 @@ export default async function ProductionPage(props: PageProps<'/production'>) {
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {d.rows.map((x, i) => (
                 <div key={x.id} className="panel flex flex-col p-2.5">
-                  <Link href={`/production/${x.id}`} className="pastel relative flex h-[132px] items-end justify-center overflow-hidden rounded-[16px]" data-pastel={PASTELS[i % PASTELS.length]}>
+                  <Link href={`/production/${x.id}`} className="pastel relative flex h-[132px] items-end justify-center overflow-hidden rounded-[8px]" data-pastel={PASTELS[i % PASTELS.length]}>
                     <span className="pastel-dot absolute right-3.5 top-3.5" />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     {x.image ? <img src={x.image} alt="" className="h-[118px] w-auto rounded-t-xl object-cover shadow-[0_-4px_20px_rgb(0_0_0/0.08)]" /> : <Factory className="mb-5 size-14 text-[color-mix(in_oklab,var(--pastel-dot)_70%,#1f2b25)]" strokeWidth={1.3} />}

@@ -5,178 +5,184 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /* ── Tokens ─────────────────────────────────────────────────────────────────────────────────────
-   The page always carries data-theme; light is the house default (set in the root layout) and dark
-   is a per-person choice. The look (Dan, 22 Oct 2026): a warm grey page, white cards with large
-   soft corners and a soft shadow, a floating white icon menu, black for what is active or primary,
-   sage green for the accents, pastel tiles, and an AI orb. Colour is information: red is a signal
-   (late, refused), green is good or live, and status always travels with a word. */
+   The look (Dan, 29 Oct 2026): the Ghattas clinic admin, as it is. Payload's grey scale (elevation
+   0–1000) for every surface, line and word; white pages and white cards drawn with a hairline, never
+   a shadow; 6px corners; the system font at 13px; Ghattas navy (#082742) for what is primary or
+   pressed, its gold for "now", and its status colours (good, warn, serious, bad, info) on small dots
+   beside a word. Charts in the Ghattas blue. Dark mode is Payload's dark scale with the gold accent.
+   Names kept from the earlier look (sage, inv, pastel…) so every page follows without edits. */
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
-  --frame: #141413;
-  --bg: #141413;
-  --bg-elev: #1f1f1e;
-  --bg-elev-2: #282826;
-  --bg-elev-3: #323230;
-  --bg-inset: #1a1a19;
-  --line: #2b2b29;
-  --line-2: #363633;
-  --line-3: #4b4a46;
-  --card-edge: rgb(255 255 255 / 0.05);
-  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
-  --ink: #ecebe6;
-  --ink-2: #b7b5ae;
-  --ink-3: #8b8983;
-  --ink-4: #5f5d58;
-  --link: #9fc0ab;
-  --focus: #8fb09a;
-  --signal: #f06a6a;
-  --signal-ink: #ff9b96;
-  --signal-soft: rgb(240 106 106 / 0.14);
+  --frame: #141414;
+  --bg: #141414;
+  --bg-elev: #141414;
+  --bg-elev-2: #222222;
+  --bg-elev-3: #2f2f2f;
+  --bg-inset: #222222;
+  --line: #2f2f2f;
+  --line-2: #3c3c3c;
+  --line-3: #4a4a4a;
+  --card-edge: transparent;
+  --card-shadow: none;
+  --ink: #ebebeb;
+  --ink-2: #b5b5b5;
+  --ink-3: #808080;
+  --ink-4: #656565;
+  --link: #eac998;
+  --focus: #3987e5;
+  --signal: #ef7c7c;
+  --signal-ink: #ef7c7c;
+  --signal-soft: rgb(239 124 124 / 0.12);
   --glow: transparent;
-  --inv-bg: #ecebe6;
-  --inv-ink: #151515;
-  --accent: #8fb09a;
-  --sage: #8fb09a;
-  --sage-deep: #5d7d69;
-  --sage-soft: rgb(143 176 154 / 0.16);
-  --sage-ink: #b9d3c1;
-  --live: #5fbf86;
+  --inv-bg: #eac998;
+  --inv-ink: #111826;
+  --accent: #eac998;
+  --gold: #eac998;
+  --sage: #3987e5;
+  --sage-deep: #4cc94c;
+  --sage-soft: rgb(76 201 76 / 0.12);
+  --sage-ink: #4cc94c;
+  --live: #0ca30c;
   --hi: none;
   --shadow: none;
-  --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 0.75), 0 0 0 1px #363633;
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 0.5), 0 0 0 1px #3c3c3c;
 
-  --t-violet: #a99af0;
-  --t-amber: #e2bf6e;
-  --t-blue: #8fb6e2;
-  --t-cyan: #7cc3c4;
-  --t-green: #8fb09a;
-  --t-rose: #e59ab0;
-  --t-red: #f0807a;
-  --t-neutral: #b7b5ae;
+  --t-violet: #9085e9;
+  --t-amber: #c98500;
+  --t-blue: #3987e5;
+  --t-cyan: #199e70;
+  --t-green: #4cc94c;
+  --t-rose: #d55181;
+  --t-red: #e66767;
+  --t-neutral: #808080;
 
-  --s1: #9fc0ab;
-  --s2: #6f8f7b;
-  --s3: #8fb09a;
-  --s4: #e2bf6e;
-  --s5: #e59ab0;
-  --s6: #8fb6e2;
+  --s1: #3987e5;
+  --s2: #5c5b56;
+  --s3: #5598e7;
+  --s4: #c98500;
+  --s5: #d55181;
+  --s6: #9085e9;
 
-  --b-neutral: #323230;
-  --b-neutral-ink: #e2e0da;
-  --b-success: #1f3a2a;
-  --b-success-ink: #a8dcb8;
-  --b-info: #1d3147;
-  --b-info-ink: #b4d2ef;
-  --b-attention: #3d3517;
-  --b-attention-ink: #f0dd8a;
-  --b-warning: #43301a;
-  --b-warning-ink: #f4c896;
-  --b-critical: #4a1f1d;
-  --b-critical-ink: #ffb8b2;
-  --b-magic: #2e2647;
-  --b-magic-ink: #d6ccff;
+  --b-neutral: transparent;
+  --b-neutral-ink: #ebebeb;
+  --b-success: transparent;
+  --b-success-ink: #ebebeb;
+  --b-info: transparent;
+  --b-info-ink: #ebebeb;
+  --b-attention: transparent;
+  --b-attention-ink: #ebebeb;
+  --b-warning: transparent;
+  --b-warning-ink: #ebebeb;
+  --b-critical: transparent;
+  --b-critical-ink: #ebebeb;
+  --b-magic: transparent;
+  --b-magic-ink: #ebebeb;
 
-  --p-mint: #22352a;
-  --p-peach: #3d2c22;
-  --p-sky: #213040;
-  --p-sand: #3a3322;
-  --p-lav: #2e2741;
-  --p-aqua: #1f3536;
-  --p-lime: #2c3520;
-  --p-pink: #3d2530;
+  --p-mint: #222222;
+  --p-peach: #222222;
+  --p-sky: #222222;
+  --p-sand: #222222;
+  --p-lav: #222222;
+  --p-aqua: #222222;
+  --p-lime: #222222;
+  --p-pink: #222222;
 
-  --good: #5fbf86;
-  --good-ink: #7fd1a0;
-  --warn: #e2bf6e;
-  --serious: #f0a066;
-  --critical: #f06a6a;
-  --critical-ink: #ff9b96;
+  --good: #0ca30c;
+  --good-ink: #4cc94c;
+  --warn: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --critical-ink: #ef7c7c;
+  --info: #3987e5;
 }
 
 [data-theme='light'] {
   color-scheme: light;
-  --frame: #ebe9e4;
-  --bg: #ebe9e4;
+  --frame: #ffffff;
+  --bg: #ffffff;
   --bg-elev: #ffffff;
-  --bg-elev-2: #f5f4f0;
-  --bg-elev-3: #ecebe6;
-  --bg-inset: #f8f7f4;
-  --line: #efeee9;
-  --line-2: #e5e3dd;
-  --line-3: #d3d0c8;
-  --card-edge: rgb(20 20 20 / 0.035);
-  --card-shadow: 0 1px 2px rgb(20 20 20 / 0.04), 0 12px 32px -16px rgb(20 20 20 / 0.14);
-  --ink: #151515;
-  --ink-2: #5f5e5a;
-  --ink-3: #8f8d87;
-  --ink-4: #b9b6af;
-  --link: #3f6a55;
-  --focus: #6f8f7b;
-  --signal: #e5484d;
-  --signal-ink: #b3262b;
-  --signal-soft: rgb(229 72 77 / 0.09);
+  --bg-elev-2: #f5f5f5;
+  --bg-elev-3: #ebebeb;
+  --bg-inset: #f5f5f5;
+  --line: #ebebeb;
+  --line-2: #dddddd;
+  --line-3: #d0d0d0;
+  --card-edge: transparent;
+  --card-shadow: none;
+  --ink: #2f2f2f;
+  --ink-2: #656565;
+  --ink-3: #808080;
+  --ink-4: #9a9a9a;
+  --link: #082742;
+  --focus: #2a78d6;
+  --signal: #d03b3b;
+  --signal-ink: #b02a2a;
+  --signal-soft: rgb(208 59 59 / 0.08);
   --glow: transparent;
-  --inv-bg: #151515;
-  --inv-ink: #ffffff;
-  --accent: #6f8f7b;
-  --sage: #6f8f7b;
-  --sage-deep: #4f6f5c;
-  --sage-soft: #e4ece6;
-  --sage-ink: #2f4a3a;
-  --live: #3e9b62;
+  --inv-bg: #082742;
+  --inv-ink: #fffdfa;
+  --accent: #082742;
+  --gold: #b8895d;
+  --sage: #2a78d6;
+  --sage-deep: #006300;
+  --sage-soft: rgb(12 163 12 / 0.09);
+  --sage-ink: #006300;
+  --live: #0ca30c;
   --hi: none;
   --shadow: none;
-  --shadow-lg: 0 24px 48px -16px rgb(20 20 20 / 0.28), 0 0 0 1px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 0.12), 0 0 0 1px #ebebeb;
 
-  --t-violet: #8b7bd8;
-  --t-amber: #b78f2e;
-  --t-blue: #4f80b8;
-  --t-cyan: #3f9597;
-  --t-green: #5f8f6f;
-  --t-rose: #c46c87;
-  --t-red: #d4443f;
-  --t-neutral: #8f8d87;
+  --t-violet: #4a3aa7;
+  --t-amber: #eda100;
+  --t-blue: #2a78d6;
+  --t-cyan: #1baf7a;
+  --t-green: #0ca30c;
+  --t-rose: #e87ba4;
+  --t-red: #d03b3b;
+  --t-neutral: #808080;
 
-  /* chart series: the deep green of the bars first, then sage and the pastels */
-  --s1: #2f4a3a;
-  --s2: #8fae98;
-  --s3: #6f8f7b;
-  --s4: #d9b46a;
-  --s5: #d58ea1;
-  --s6: #7fa6cc;
+  /* chart series: the Ghattas blue, the grey of "the period before", then its categorical slots */
+  --s1: #2a78d6;
+  --s2: #b9b8b1;
+  --s3: #6da7ec;
+  --s4: #eda100;
+  --s5: #e87ba4;
+  --s6: #4a3aa7;
 
-  --b-neutral: #efeee9;
-  --b-neutral-ink: #4d4c48;
-  --b-success: #e3f1e6;
-  --b-success-ink: #2f7a4a;
-  --b-info: #e3edf7;
-  --b-info-ink: #2e5f8c;
-  --b-attention: #f6efd2;
-  --b-attention-ink: #6f5b10;
-  --b-warning: #fbe9d6;
-  --b-warning-ink: #8f4e12;
-  --b-critical: #fbe4e2;
-  --b-critical-ink: #b8352f;
-  --b-magic: #ece7f8;
-  --b-magic-ink: #5a43a6;
+  /* badges: Ghattas draws them as an outlined pill with a coloured dot, the word stays ink */
+  --b-neutral: transparent;
+  --b-neutral-ink: #2f2f2f;
+  --b-success: transparent;
+  --b-success-ink: #2f2f2f;
+  --b-info: transparent;
+  --b-info-ink: #2f2f2f;
+  --b-attention: transparent;
+  --b-attention-ink: #2f2f2f;
+  --b-warning: transparent;
+  --b-warning-ink: #2f2f2f;
+  --b-critical: transparent;
+  --b-critical-ink: #2f2f2f;
+  --b-magic: transparent;
+  --b-magic-ink: #2f2f2f;
 
-  /* the pastel tiles */
-  --p-mint: #d6eee0;
-  --p-peach: #f5dccb;
-  --p-sky: #d7e5f2;
-  --p-sand: #efe2c6;
-  --p-lav: #e6dbf5;
-  --p-aqua: #d4ebee;
-  --p-lime: #e2eed0;
-  --p-pink: #f5d8e3;
+  /* no pastel tiles in the Ghattas admin: they are the raised grey */
+  --p-mint: #f5f5f5;
+  --p-peach: #f5f5f5;
+  --p-sky: #f5f5f5;
+  --p-sand: #f5f5f5;
+  --p-lav: #f5f5f5;
+  --p-aqua: #f5f5f5;
+  --p-lime: #f5f5f5;
+  --p-pink: #f5f5f5;
 
-  --good: #3e8f5c;
-  --good-ink: #2f7a4a;
-  --warn: #8f6512;
-  --serious: #b0561a;
-  --critical: #d4443f;
-  --critical-ink: #b3262b;
+  --good: #0ca30c;
+  --good-ink: #006300;
+  --warn: #8a5a00;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --critical-ink: #b02a2a;
+  --info: #2a78d6;
 }
 
 @theme inline {
@@ -202,20 +208,23 @@
   --color-accent: var(--accent);
   --color-frame: var(--frame);
   --color-link: var(--link);
-  /* Inter, as in the Shopify admin, with Polaris's fallbacks and weights; figures line up with
-     tabular numbers, not a mono face */
-  --font-sans: var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, 'San Francisco', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  /* Payload's admin font: the system face (Segoe UI on Windows), figures in tabular numbers */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
-  --font-weight-bold: 700;
+  --font-weight-bold: 600;
   --font-mono: var(--font-sans);
   --font-display: var(--font-sans);
-  --font-code: var(--font-geist-mono), ui-monospace, Consolas, monospace;
-  --radius-card: 20px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-  --radius-2xl: 18px;
+  --font-code: 'SF Mono', Menlo, Consolas, Monaco, monospace;
+  /* Payload's 3/4px and Ghattas's 6px: nothing rounder than a modal's 10px */
+  --radius-card: 6px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+  --radius-3xl: 10px;
   --color-sage: var(--sage);
   --color-sage-deep: var(--sage-deep);
   --color-sage-soft: var(--sage-soft);
@@ -261,7 +270,6 @@ body {
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 6px;
 }
 code,
 pre,
@@ -285,7 +293,7 @@ select:focus-visible {
   h2,
   h3 {
     font-weight: 600;
-    letter-spacing: -0.35px;
+    letter-spacing: 0;
   }
 }
 
@@ -320,17 +328,18 @@ img[data-missing] {
 }
 
 /* ── Surfaces ───────────────────────────────────────────────────────────────────────────────── */
+/* the Ghattas card: white, one hairline (elevation 100), 6px corners, no shadow */
 .panel {
   min-width: 0; /* a panel in a grid may shrink below its content's widest line */
   background: var(--bg-elev);
-  border: 0 solid transparent;
+  border: 1px solid var(--line);
   border-radius: var(--radius-card);
-  box-shadow: var(--card-shadow), inset 0 0 0 1px var(--card-edge);
+  box-shadow: none;
 }
 .panel-2 {
   background: var(--bg-elev-2);
   border: 0;
-  border-radius: 14px;
+  border-radius: 6px;
 }
 .hairline {
   border-color: var(--line);
@@ -352,206 +361,168 @@ img[data-missing] {
 [data-tint='neutral'] { --tint: var(--t-neutral); }
 [data-tint='accent'] { --tint: var(--accent); }
 
-/* Shopify's badges: a tone pair (fill + ink) and a word; neutral grey when there is no tone */
+/* the Ghattas badge: an outlined pill, the word in ink, a 7px dot in the status colour */
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   height: 21px;
-  padding: 0 8px 0 7px;
-  border-radius: 7px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line-3);
   font-size: 11.5px;
-  font-weight: 550;
+  font-weight: 400;
+  line-height: 1.5;
   white-space: nowrap;
-  color: var(--pill-ink, var(--b-neutral-ink));
-  background: var(--pill-bg, var(--b-neutral));
+  color: var(--ink);
+  background: transparent;
 }
+.pill[data-tone='success'],
 .pill[data-tint='green'],
 .pill[data-tint='cyan'] {
-  --pill-bg: var(--b-success);
-  --pill-ink: var(--b-success-ink);
+  --dot: var(--good);
 }
-.pill[data-tint='blue'] {
-  --pill-bg: var(--b-info);
-  --pill-ink: var(--b-info-ink);
-}
+.pill[data-tone='attention'],
 .pill[data-tint='amber'] {
-  --pill-bg: var(--b-attention);
-  --pill-ink: var(--b-attention-ink);
+  --dot: #fab219;
 }
+.pill[data-tone='warning'],
 .pill[data-tint='orange'] {
-  --pill-bg: var(--b-warning);
-  --pill-ink: var(--b-warning-ink);
+  --dot: var(--serious);
 }
+.pill[data-tone='critical'],
 .pill[data-tint='red'],
 .pill[data-tint='rose'] {
-  --pill-bg: var(--b-critical);
-  --pill-ink: var(--b-critical-ink);
+  --dot: #d03b3b;
 }
+.pill[data-tone='info'],
+.pill[data-tint='blue'] {
+  --dot: var(--info);
+}
+.pill[data-tone='magic'],
 .pill[data-tint='violet'] {
-  --pill-bg: var(--b-magic);
-  --pill-ink: var(--b-magic-ink);
+  --dot: var(--t-violet);
 }
 .pill[data-tint='accent'] {
-  --pill-bg: color-mix(in oklab, var(--accent) 22%, var(--bg-elev));
-  --pill-ink: var(--ink);
-}
-.pill .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 99px;
-  background: var(--tint, var(--ink-3));
+  --dot: var(--gold);
 }
 .pill[data-tone='neutral'] {
-  --pill-bg: var(--b-neutral);
-  --pill-ink: var(--b-neutral-ink);
+  --dot: var(--ink-3);
 }
-.pill[data-tone='attention'] {
-  --pill-bg: var(--b-attention);
-  --pill-ink: var(--b-attention-ink);
+/* a toned badge always shows its dot, the way Ghattas draws every status */
+.pill:is([data-tone], [data-tint]):not(:has(.dot))::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--dot, var(--ink-3));
 }
-.pill[data-tone='warning'] {
-  --pill-bg: var(--b-warning);
-  --pill-ink: var(--b-warning-ink);
-}
-.pill[data-tone='info'] {
-  --pill-bg: var(--b-info);
-  --pill-ink: var(--b-info-ink);
-}
-.pill[data-tone='critical'] {
-  --pill-bg: var(--b-critical);
-  --pill-ink: var(--b-critical-ink);
-}
-.pill[data-tone='success'] {
-  --pill-bg: var(--b-success);
-  --pill-ink: var(--b-success-ink);
-}
+.pill .dot,
 .pill[data-tone] .dot {
   width: 7px;
   height: 7px;
-  background: currentColor;
-  opacity: 0.85;
-}
-.pill[data-tone='attention'] .dot,
-.pill[data-tone='warning'] .dot {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px currentColor;
+  flex: none;
+  border-radius: 50%;
+  background: var(--dot, var(--tint, var(--ink-3)));
+  opacity: 1;
+  box-shadow: none;
 }
 
-/* Buttons */
+/* Buttons: Ghattas's gh-btn. 34px, 6px corners, a hairline; primary is the navy */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   height: 34px;
-  padding: 0 14px;
-  border-radius: 11px;
-  font-size: 12.5px;
-  font-weight: 550;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
   white-space: nowrap;
   transition:
-    background 0.1s,
-    color 0.1s,
-    box-shadow 0.1s,
-    filter 0.1s;
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    filter 0.15s;
   user-select: none;
 }
+.btn svg {
+  flex: none;
+}
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   pointer-events: none;
 }
 .btn-primary {
   background: var(--inv-bg);
+  border-color: var(--inv-bg);
   color: var(--inv-ink);
-  box-shadow: 0 6px 16px -8px rgb(0 0 0 / 0.45);
 }
 .btn-primary:hover {
-  filter: brightness(1.18);
+  filter: brightness(1.12);
 }
 .btn-ghost {
-  color: var(--ink-2);
+  color: var(--ink);
+  background: transparent;
 }
 .btn-ghost:hover {
   background: var(--bg-elev-2);
-  color: var(--ink);
 }
 .btn-quiet {
   background: var(--bg-elev);
+  border-color: var(--line-3);
   color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--line-2), 0 1px 2px rgb(20 20 20 / 0.04);
 }
 .btn-quiet:hover {
   background: var(--bg-elev-2);
+  border-color: color-mix(in srgb, var(--line-3) 60%, var(--ink-4));
 }
 .btn-danger {
   color: var(--critical-ink);
   background: var(--bg-elev);
-  box-shadow: inset 0 0 0 1px var(--line-2);
+  border-color: var(--line-3);
 }
 .btn-danger:hover {
   background: var(--signal-soft);
 }
 .btn-sm {
   height: 28px;
-  padding: 0 10px;
-  font-size: 11.5px;
-  border-radius: 9px;
+  padding: 0 9px;
+  font-size: 12px;
 }
 .btn-lg {
   height: 40px;
-  padding: 0 18px;
-  font-size: 13px;
-  border-radius: 12px;
+  padding: 0 16px;
+  font-size: 13.5px;
 }
 @media (max-width: 1023px) {
   .btn {
-    height: 30px;
-    padding: 0 13px;
-    border-radius: 999px;
-    font-size: 12px;
+    height: 32px;
   }
   .btn-sm {
-    height: 26px;
-    padding: 0 10px;
-    font-size: 11.5px;
+    height: 28px;
   }
   .btn-lg {
-    height: 34px;
-    padding: 0 16px;
-  }
-  input.field,
-  select.field {
-    height: 34px;
-    border-radius: 999px;
-    padding-left: 14px;
-  }
-  select.field {
-    padding-right: 30px;
-  }
-  /* short tabs and chips on a page become pills, as Shopify's segmented controls */
-  main :is(a, button).rounded-lg:is(.h-7, .h-8, .h-9) {
-    border-radius: 999px;
-  }
-  .panel {
-    border-radius: 18px;
+    height: 38px;
   }
 }
 
-/* Inputs */
+/* Inputs: Payload's field (elevation 150 hairline, darker on focus, no glow) at the Ghattas size */
 .field {
   width: 100%;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 12px;
-  font-size: 12.5px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
   background: var(--bg-elev);
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--line-3);
   color: var(--ink);
   outline: none;
-  transition:
-    border-color 0.1s,
-    box-shadow 0.1s;
+  transition: border-color 0.1s;
 }
 textarea.field {
   height: auto;
@@ -561,14 +532,17 @@ textarea.field {
 .field::placeholder {
   color: var(--ink-4);
 }
+.field:hover {
+  border-color: color-mix(in srgb, var(--line-3) 70%, var(--ink-4));
+}
 .field:focus {
-  border-color: var(--sage);
-  box-shadow: 0 0 0 3px var(--sage-soft);
+  border-color: var(--ink-4);
+  box-shadow: none;
 }
 select.field {
   appearance: none;
   padding-right: 30px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2375726d' stroke-width='1.6'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23808080' stroke-width='1.6'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
 }
@@ -579,27 +553,26 @@ select.field {
   height: 18px;
   min-width: 18px;
   padding: 0 4px;
-  border-radius: 4px;
-  font-family: var(--font-code);
+  border-radius: 3px;
+  font-family: var(--font-body, inherit);
   font-size: 10.5px;
   color: var(--ink-3);
   background: var(--bg-elev-2);
-  box-shadow: inset 0 -1px 0 var(--line-2), inset 0 0 0 1px var(--line);
+  border: 1px solid var(--line-2);
 }
 
-/* Tables */
+/* Tables: Payload's list table. Grey heads in weight 400, no rules, every other row on elevation 50 */
 .table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
 }
 .table th {
-  font-size: 11.5px;
-  color: var(--ink-3);
-  font-weight: 500;
+  font-size: 12.5px;
+  color: var(--ink-4);
+  font-weight: 400;
   text-align: left;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
   white-space: nowrap;
   position: sticky;
   top: 0;
@@ -608,17 +581,32 @@ select.field {
 }
 .table td {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
   vertical-align: middle;
+}
+.table th:first-child,
+.table td:first-child {
+  padding-left: 16px;
+}
+.table th:last-child,
+.table td:last-child {
+  padding-right: 16px;
 }
 .table tbody tr {
   transition: background 0.12s;
 }
-.table tbody tr:hover {
+.table tbody tr:nth-child(odd) td {
   background: var(--bg-elev-2);
 }
-.table tbody tr:last-child td {
-  border-bottom: 0;
+.table tbody tr:nth-child(odd) td:first-child {
+  border-top-left-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+.table tbody tr:nth-child(odd) td:last-child {
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
+}
+.table tbody tr:hover td {
+  background: var(--bg-elev-3);
 }
 
 /* Live dot */
@@ -718,7 +706,7 @@ select.field {
 }
 
 dialog::backdrop {
-  background: rgb(0 0 0 / 0.4);
+  background: rgb(8 15 26 / 0.55);
 }
 dialog[open] {
   animation: pop 0.14s var(--ease-out-expo);
@@ -745,325 +733,468 @@ dialog[open] {
 
 /* ── The look's own pieces ──────────────────────────────────────────────────────────────────── */
 
-/* pastel tiles: data-pastel on any surface */
-[data-pastel='mint'] { --pastel: var(--p-mint); --pastel-dot: #8fd1a8; }
-[data-pastel='peach'] { --pastel: var(--p-peach); --pastel-dot: #f2b48d; }
-[data-pastel='sky'] { --pastel: var(--p-sky); --pastel-dot: #8fbbe6; }
-[data-pastel='sand'] { --pastel: var(--p-sand); --pastel-dot: #e6c77e; }
-[data-pastel='lav'] { --pastel: var(--p-lav); --pastel-dot: #bba2ec; }
-[data-pastel='aqua'] { --pastel: var(--p-aqua); --pastel-dot: #86ccd6; }
-[data-pastel='lime'] { --pastel: var(--p-lime); --pastel-dot: #b5d98b; }
-[data-pastel='pink'] { --pastel: var(--p-pink); --pastel-dot: #eea3bf; }
+/* pastel tiles (data-pastel): flat raised grey in the Ghattas look, the dot keeps its colour */
+[data-pastel='mint'] { --pastel: var(--p-mint); --pastel-dot: #1baf7a; }
+[data-pastel='peach'] { --pastel: var(--p-peach); --pastel-dot: #eb6834; }
+[data-pastel='sky'] { --pastel: var(--p-sky); --pastel-dot: #2a78d6; }
+[data-pastel='sand'] { --pastel: var(--p-sand); --pastel-dot: #eda100; }
+[data-pastel='lav'] { --pastel: var(--p-lav); --pastel-dot: #4a3aa7; }
+[data-pastel='aqua'] { --pastel: var(--p-aqua); --pastel-dot: #1baf7a; }
+[data-pastel='lime'] { --pastel: var(--p-lime); --pastel-dot: #0ca30c; }
+[data-pastel='pink'] { --pastel: var(--p-pink); --pastel-dot: #e87ba4; }
 .pastel {
-  background: linear-gradient(180deg, var(--pastel) 0%, color-mix(in oklab, var(--pastel) 55%, var(--bg-elev)) 100%);
+  background: var(--pastel, var(--bg-elev-2));
 }
 .pastel-dot {
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   border-radius: 99px;
   background: var(--pastel-dot);
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--pastel-dot) 28%, transparent);
 }
 
-/* the sage card: the one filled card in a row, a live figure on it */
+/* the one filled card in a row (a live figure on it): the Ghattas navy, flat */
 .sage-card {
-  color: #fff;
-  background: radial-gradient(120% 140% at 0% 0%, #8ba896 0%, #6f8f7b 45%, #5a7a67 100%);
+  color: #fffdfa;
+  background: #082742;
   border-radius: var(--radius-card);
-  box-shadow: var(--card-shadow);
+  box-shadow: none;
+}
+[data-theme='dark'] .sage-card {
+  background: #102a4a;
 }
 .btn-sage {
   background: var(--sage-deep);
+  border-color: var(--sage-deep);
   color: #fff;
 }
 .btn-sage:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.1);
 }
 
 /* inner chips: the small grey boxes inside a card */
 .chip-box {
   background: var(--bg-elev-2);
-  border-radius: 12px;
+  border-radius: 6px;
 }
 
-/* round icon buttons of the header */
+/* square icon buttons of the header: Payload's hamburger box */
 .icon-btn {
   position: relative;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
   background: var(--bg-elev);
   color: var(--ink);
-  box-shadow: var(--card-shadow);
-  transition: transform 0.1s var(--ease-out-expo), background 0.1s;
+  border: 1px solid var(--line-2);
+  box-shadow: none;
+  transition: background 0.1s, border-color 0.1s;
 }
 .icon-btn:hover {
-  transform: translateY(-1px);
+  background: var(--bg-elev-3);
+  border-color: var(--ink-3);
 }
 .icon-btn .badge-dot {
   position: absolute;
-  top: 7px;
-  right: 8px;
-  width: 8px;
-  height: 8px;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
   border-radius: 99px;
   background: var(--signal);
   box-shadow: 0 0 0 2px var(--bg-elev);
 }
 .icon-btn .badge-n {
   position: absolute;
-  top: -2px;
-  right: -2px;
+  top: -6px;
+  right: -7px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
   border-radius: 99px;
-  background: var(--inv-bg);
-  color: var(--inv-ink);
+  background: #d03b3b;
+  color: #fff;
   font-size: 9.5px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 16px;
   text-align: center;
+  box-shadow: 0 0 0 2px var(--bg-elev);
 }
 
-/* the search pill */
+/* the search: Payload's search filter, a grey field with the glass at its start */
 .search-pill {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 42px;
-  padding: 0 5px 0 16px;
-  border-radius: 999px;
-  background: var(--bg-elev);
-  box-shadow: var(--card-shadow);
-  color: var(--ink-3);
-  font-size: 12.5px;
-}
-.search-pill .go {
-  display: grid;
-  place-items: center;
-  width: 32px;
   height: 32px;
-  border-radius: 999px;
-  background: var(--inv-bg);
-  color: var(--inv-ink);
-}
-
-/* the floating icon menu */
-.rail {
-  background: var(--bg-elev);
-  border-radius: 28px;
-  box-shadow: var(--card-shadow);
-}
-.rail-item {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  color: var(--ink-3);
-  transition: background 0.08s, color 0.08s, transform 0.1s var(--ease-out-expo);
-}
-.rail-item:hover {
-  color: var(--ink);
+  padding: 0 10px;
+  border-radius: 4px;
   background: var(--bg-elev-2);
+  color: var(--ink-4);
+  font-size: 13px;
+  transition: background 0.1s;
 }
-.rail-item[data-active='true'] {
-  background: var(--inv-bg);
-  color: var(--inv-ink);
-  box-shadow: 0 6px 14px -6px rgb(0 0 0 / 0.45);
-}
-.rail-tip {
-  pointer-events: none;
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  padding: 4px 9px;
-  border-radius: 8px;
-  background: #151515;
-  color: #fff;
-  font-size: 11.5px;
-  font-weight: 550;
-  opacity: 0;
-  transform: translate(-4px, -50%);
-  transition: opacity 0.08s, transform 0.1s var(--ease-out-expo);
-}
-.rail-item:hover .rail-tip,
-.rail-item:focus-visible .rail-tip {
-  opacity: 1;
-  transform: translate(0, -50%);
-}
-.rail-count {
-  position: absolute;
-  top: 1px;
-  right: 0;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 3px;
-  border-radius: 99px;
+.search-pill:hover {
   background: var(--bg-elev-3);
-  color: var(--ink-2);
-  font-size: 9px;
-  font-weight: 650;
-  line-height: 15px;
-  text-align: center;
-  box-shadow: 0 0 0 2px var(--bg-elev);
-}
-.rail-count[data-late='true'] {
-  background: var(--signal);
-  color: #fff;
-}
-.rail-item[data-active='true'] .rail-count {
-  box-shadow: 0 0 0 2px var(--bg-elev);
 }
 
-@keyframes railGrow {
-  from {
-    opacity: 0;
-    transform: scaleY(0.92);
+/* ── The frame: Payload's admin template ─────────────────────────────────────────────────────
+   A 275px side menu with a hairline on its edge, a 56px header with the logo and where you are,
+   and the page in a 60px gutter (40px on a tablet, 16px on a phone). */
+:root {
+  --nav-width: 275px;
+  --app-header-height: 56px;
+  --gutter-h: 60px;
+}
+@media (max-width: 1279px) {
+  :root {
+    --gutter-h: 40px;
   }
 }
-.rail {
-  transform-origin: top;
-}
-
-/* a section's pages sliding out beside the menu */
-@keyframes flyIn {
-  from {
-    opacity: 0;
-    transform: translateX(-5px);
+@media (max-width: 959px) {
+  :root {
+    --app-header-height: 52px;
   }
 }
-.rail-item[data-open='true']:not([data-active='true']) {
-  background: var(--bg-elev-2);
-  color: var(--ink);
+@media (max-width: 768px) {
+  :root {
+    --gutter-h: 16px;
+  }
+}
+.gutter {
+  padding-left: var(--gutter-h);
+  padding-right: var(--gutter-h);
 }
 
-/* a section opened from the menu: a glass panel beside it, the page behind softly dimmed */
-.drawer-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: rgb(20 20 18 / 0.08);
-  backdrop-filter: blur(3px) saturate(0.9);
-  animation: fadeIn 0.18s ease-out both;
-}
-.drawer {
-  position: fixed;
-  z-index: 70;
-  left: 86px;
-  top: 16px;
-  bottom: 16px;
-  width: 372px;
+.app-nav {
+  position: sticky;
+  top: 0;
+  flex: none;
+  width: var(--nav-width);
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border-radius: 30px;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  z-index: 40;
+}
+@media (min-width: 960px) {
+  .app-nav[data-open='false'] {
+    display: none;
+  }
+}
+/* below 960px the menu opens over the page, full width (Payload's small-screen nav) */
+@media (max-width: 959px) {
+  .app-nav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 100vw;
+    border-right: 0;
+    z-index: 80;
+    animation: fadeIn 0.12s ease-out both;
+  }
+  .app-nav[data-phone='false'] {
+    display: none;
+  }
+}
+.app-nav-head {
+  flex: none;
+  height: var(--app-header-height);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+}
+.app-nav-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 4px 30px 20px 20px;
+  display: flex;
+  flex-direction: column;
+}
+.app-nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+/* the desk: the staff pages with their icons, above the rest (Ghattas's gh-nav) */
+.app-desk {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.app-desk-title {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+.app-desk a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-radius: 6px;
   color: var(--ink);
-  background: color-mix(in oklab, var(--bg-elev) 84%, transparent);
-  backdrop-filter: blur(28px) saturate(1.5);
-  box-shadow:
-    0 40px 80px -28px rgb(20 20 18 / 0.45),
-    0 0 0 1px color-mix(in oklab, var(--ink) 7%, transparent),
-    inset 0 1px 0 rgb(255 255 255 / 0.55);
-  transform-origin: left center;
-  animation: drawerIn 0.34s var(--ease-out-expo) both;
+  text-decoration: none;
+  font-size: 14px;
 }
-[data-theme='dark'] .drawer {
-  box-shadow:
-    0 40px 80px -28px rgb(0 0 0 / 0.8),
-    0 0 0 1px #3a3a37,
-    inset 0 1px 0 rgb(255 255 255 / 0.06);
+.app-desk a svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.75;
+  flex: none;
 }
-/* a soft light from the top left, so the glass reads as glass */
-.drawer-sheen {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(120% 60% at 0% 0%, color-mix(in oklab, var(--ink) 5%, transparent), transparent 60%),
-    radial-gradient(80% 40% at 100% 100%, color-mix(in oklab, var(--ink) 3%, transparent), transparent 70%);
+.app-desk a:hover {
+  background: var(--bg-elev-2);
 }
-@keyframes drawerIn {
-  from {
-    opacity: 0;
-    transform: translateX(-16px) scale(0.975);
-    filter: blur(6px);
-  }
+.app-desk a[aria-current='page'] {
+  background: var(--bg-elev-3);
+  font-weight: 600;
 }
-.drawer-row {
-  animation: rowIn 0.38s var(--ease-out-expo) both;
-  animation-delay: calc(var(--i, 0) * 26ms + 40ms);
+.app-count {
+  margin-left: auto;
+  min-width: 18px;
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 6px;
+  border-radius: 999px;
+  text-align: center;
+  font-weight: 400;
+  background: var(--line-2);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
-@keyframes rowIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
+.app-count[data-late='true'] {
+  background: #d03b3b;
+  color: #fff;
 }
-.drawer-pulse {
+/* Payload's nav groups: a grey label with a chevron, then plain links */
+.app-group {
+  width: 100%;
+  margin-bottom: 10px;
+}
+.app-group-toggle {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+  font-size: 13px;
+  color: var(--ink-4);
+}
+.app-group-toggle:hover,
+.app-group-toggle:focus-visible {
+  color: var(--ink);
+}
+.app-group-toggle svg {
+  width: 14px;
+  height: 14px;
+  color: var(--line-3);
+  transition: transform 0.15s;
+}
+.app-group-toggle:hover svg {
+  color: var(--ink);
+}
+.app-group[data-collapsed='true'] .app-group-toggle svg {
+  transform: rotate(-90deg);
+}
+.app-group[data-collapsed='true'] .app-group-links {
+  display: none;
+}
+.app-link {
   position: relative;
-  width: 7px;
-  height: 7px;
-  border-radius: 99px;
-  background: var(--signal);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2.5px 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ink);
+  text-decoration: none;
 }
-.drawer-pulse::after {
+.app-link:hover {
+  text-decoration: underline;
+}
+.app-link[aria-current='page'] {
+  font-weight: 600;
+}
+.app-link[aria-current='page']::before {
   content: '';
   position: absolute;
-  inset: -4px;
-  border-radius: 99px;
-  background: var(--signal);
-  opacity: 0.35;
-  animation: pulseRing 1.6s ease-out infinite;
+  left: -20px;
+  top: 50%;
+  width: 2px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 0 2px 2px 0;
+  background: var(--ink);
 }
-@keyframes pulseRing {
-  from {
-    transform: scale(0.6);
-    opacity: 0.45;
-  }
-  to {
-    transform: scale(1.6);
-    opacity: 0;
-  }
+.app-nav-foot {
+  margin-top: auto;
+  padding-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--ink);
 }
-.drawer-kbd {
-  display: inline-grid;
+.app-nav-foot button,
+.app-nav-foot a {
+  display: grid;
   place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 6px;
-  background: var(--bg-elev-2);
-  color: var(--ink-3);
-  font-size: 10px;
-  font-weight: 600;
-  font-family: inherit;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  color: var(--ink);
 }
-@media (prefers-reduced-motion: reduce) {
-  .drawer,
-  .drawer-row,
-  .drawer-scrim,
-  .drawer-pulse::after {
-    animation: none;
-  }
+.app-nav-foot button:hover,
+.app-nav-foot a:hover {
+  background: var(--bg-elev-3);
+}
+
+/* the header: logo / where you are, then the business switch, search, bell and account */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: var(--app-header-height);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg);
+}
+.app-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+.app-crumbs a {
+  text-decoration: none;
+  color: inherit;
+}
+.app-crumbs a:hover {
+  text-decoration: underline;
+}
+.app-crumbs .sep {
+  color: var(--ink-4);
+}
+.app-crumbs .now {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+/* the hamburger: Payload's square box */
+.app-burger {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  background: var(--bg);
+  flex: none;
+}
+.app-burger:hover {
+  background: var(--bg-elev-3);
+  border-color: var(--ink-3);
+}
+/* the business switch drawn as Ghattas's language switch */
+.app-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.app-switch > svg {
+  width: 15px;
+  height: 15px;
+  margin: 0 2px 0 6px;
+  color: var(--ink-3);
+}
+.app-switch button {
+  all: unset;
+  cursor: pointer;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  transition: background-color 0.2s, color 0.2s;
+}
+.app-switch button:hover {
+  color: var(--ink);
+}
+.app-switch button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.app-switch button[aria-checked='true'] {
+  background: var(--bg-elev-3);
+  color: var(--ink);
+  cursor: default;
+}
+.app-switch[data-compact='true'] button {
+  padding: 2px 9px;
+  font-size: 12px;
+}
+/* Payload's default account picture: a grey person in a circle */
+.app-avatar {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: var(--ink-3);
+  flex: none;
+}
+.app-avatar:hover {
+  color: var(--ink);
+}
+.app-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 70;
+  width: 250px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--bg-elev);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  animation: fadeIn 0.12s ease-out both;
+}
+.app-menu button,
+.app-menu a {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--ink);
+}
+.app-menu button:hover,
+.app-menu a:hover {
+  background: var(--bg-elev-2);
 }
 
 /* the phone toolbar rising in, and its sheets sliding up */
-@keyframes barUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-}
 @keyframes sheetUp {
   from {
     transform: translateY(100%);
@@ -1073,84 +1204,6 @@ dialog[open] {
   from {
     opacity: 0;
   }
-}
-
-/* the AI orb: a glowing blue sphere with two eyes that blink, floating */
-.orb {
-  position: relative;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: radial-gradient(circle at 34% 26%, #d5dbff 0%, #8d8fff 18%, #5a4ff5 46%, #3a2bd8 72%, #4cc1ff 100%);
-  box-shadow:
-    0 10px 28px -6px rgb(76 72 255 / 0.55),
-    inset 0 -0.18em 0.35em rgb(76 193 255 / 0.6),
-    inset 0 0.12em 0.25em rgb(255 255 255 / 0.45);
-}
-.orb::after {
-  content: '';
-  position: absolute;
-  inset: -35%;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgb(110 104 255 / 0.28) 0%, transparent 65%);
-  z-index: -1;
-}
-.orb .eyes {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18%;
-  padding-bottom: 6%;
-}
-.orb .eyes i {
-  display: block;
-  width: 10%;
-  height: 24%;
-  border-radius: 99px;
-  background: #fff;
-  animation: blink 4.6s infinite;
-  transform-origin: center;
-}
-.orb[data-float='true'] {
-  animation: orbFloat 4.2s ease-in-out infinite;
-}
-@keyframes blink {
-  0%, 92%, 100% { transform: scaleY(1); }
-  95% { transform: scaleY(0.12); }
-}
-@keyframes orbFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-.orb-wander {
-  animation: orbWander 6s ease-in-out infinite;
-}
-@keyframes orbWander {
-  0% { transform: translate(-40px, -10px); }
-  25% { transform: translate(60px, 20px); }
-  50% { transform: translate(10px, 60px); }
-  75% { transform: translate(-60px, 30px); }
-  100% { transform: translate(-40px, -10px); }
-}
-
-/* the "Ask AI" pill in the corner */
-.ask-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 14px 0 5px;
-  border-radius: 999px;
-  background: #151515;
-  color: #fff;
-  font-size: 12.5px;
-  font-weight: 600;
-  box-shadow: 0 14px 30px -10px rgb(0 0 0 / 0.5);
-  transition: transform 0.1s var(--ease-out-expo);
-}
-.ask-pill:hover {
-  transform: translateY(-2px);
 }
 
 /* ── Motion ─────────────────────────────────────────────────────────────────────────────────── */

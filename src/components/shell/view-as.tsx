@@ -62,9 +62,9 @@ export function ViewAs({ current, brand, brands }: { current: Role | null; brand
 
   const round = 'grid size-7 shrink-0 place-items-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-40';
   return (
-    <div ref={ref} className="fixed bottom-[100px] left-1/2 z-[45] -translate-x-1/2 lg:bottom-6 lg:ml-[36px]">
+    <div ref={ref} className="fixed bottom-5 left-1/2 z-[45] -translate-x-1/2">
       {open && (
-        <div className="absolute bottom-12 left-1/2 w-[260px] -translate-x-1/2 overflow-hidden rounded-2xl bg-elev py-1.5 text-ink shadow-[var(--shadow-lg)] rise">
+        <div className="absolute bottom-12 left-1/2 w-[260px] -translate-x-1/2 overflow-hidden rounded-[6px] border border-line bg-elev py-1.5 text-ink shadow-[0_8px_24px_rgb(0_0_0/0.12)] rise">
           {GROUPS.map((g) => (
             <div key={g.label} className="px-1.5 py-1">
               <div className="px-2 pb-0.5 text-[11px] font-medium text-ink-3">{g.label}</div>
