@@ -1,5 +1,6 @@
 import { Activity, ArrowDownUp, BadgeCheck, Droplets, Goal, LifeBuoy, ListChecks, PiggyBank, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
 import { canSee, type Page, type Role, type Scopes } from '@/lib/domain/perms';
+import type { Badges } from '@/lib/queries';
 
 export type Me = {
   id: string;
@@ -101,8 +102,15 @@ export const sectionKey = (group: string | null) => group ?? 'main';
 export const sectionsFor = (me: Me) =>
   NAV.map((g) => ({ key: sectionKey(g.group), ...SECTION[sectionKey(g.group)], items: g.items.filter((i) => allowed(me, i)) })).filter((g) => g.items.length > 0);
 
-/** Offered in the menu, the phone tabs and the palette exactly when the page itself would open. */
+/** Offered in the menu and the palette exactly when the page itself would open. */
 export const allowed = (me: Me, item: NavItem) => canSee(me, item.page);
+
+/** The queues this person can open, with what waits in each, for the foot of the bell. */
+export const waitingQueues = (me: Me, badges: Badges) =>
+  NAV.flatMap((g) => g.items)
+    .filter((i) => i.badge && allowed(me, i))
+    .map((i) => ({ label: i.label, href: i.href, n: badges[i.badge!]?.n ?? 0, late: badges[i.badge!]?.late ?? 0 }))
+    .filter((q) => q.n > 0);
 
 // "/stock" is a page and a prefix: it lights up for itself only, not for every stock page under it
 export const isActive = (pathname: string, href: string) =>

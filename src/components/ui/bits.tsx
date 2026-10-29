@@ -128,10 +128,11 @@ export function SectionTitle({ eyebrow, title, right, className = '' }: { eyebro
 export function PageHeader({ eyebrow, title, sub, right }: { eyebrow?: React.ReactNode; title: React.ReactNode; sub?: React.ReactNode; right?: React.ReactNode }) {
   void eyebrow;
   return (
-    <div data-page-header className="mb-4 flex flex-row items-center justify-between gap-3 sm:mb-6 sm:gap-4">
+    // the Ghattas page head: a 26px title, one muted line under it, the controls at the end
+    <div data-page-header className="mb-5 flex flex-row flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.4px] sm:text-[23px]">{title}</h1>
-        {sub && <p className="mt-1 hidden max-w-2xl text-[12.5px] leading-snug text-ink-3 sm:block">{sub}</p>}
+        <h1 className="text-[22px] font-semibold leading-[1.2] sm:text-[26px]">{title}</h1>
+        {sub && <p className="mt-1 hidden max-w-3xl text-[14px] leading-snug text-ink-3 sm:block">{sub}</p>}
       </div>
       {right && <div className="flex flex-wrap items-center gap-2">{right}</div>}
     </div>

@@ -26,10 +26,10 @@ export function Toaster() {
     };
   }, []);
   return (
-    <div className="pointer-events-none fixed bottom-20 left-1/2 z-[60] flex w-[min(92vw,380px)] -translate-x-1/2 flex-col gap-2 lg:bottom-6 lg:left-auto lg:right-6 lg:translate-x-0" aria-live="polite">
+    <div className="pointer-events-none fixed bottom-20 left-1/2 z-[60] flex w-[min(calc(100vw-32px),440px)] -translate-x-1/2 flex-col gap-2" aria-live="polite">
       {items.map((i) => (
-        <div key={i.id} className="rise pointer-events-auto flex items-center gap-2.5 rounded-xl border border-line-2 bg-elev-2/95 px-3.5 py-2.5 text-[12.5px] shadow-[var(--shadow-lg)] backdrop-blur">
-          {i.tone === 'error' ? <CircleAlert className="size-4 text-critical" /> : i.tone === 'live' ? <Radio className="size-4 text-signal" /> : <CheckCircle2 className="size-4 text-good" />}
+        <div key={i.id} className="rise pointer-events-auto flex items-center gap-2.5 rounded-[6px] bg-[var(--ink)] px-3.5 py-2.5 text-[13px] text-[var(--bg)] shadow-[0_8px_24px_rgb(0_0_0/0.2)] backdrop-blur">
+          {i.tone === 'error' ? <CircleAlert className="size-4 text-[#e34948]" /> : i.tone === 'live' ? <Radio className="size-4 text-[#e34948]" /> : <CheckCircle2 className="size-4 text-[#1baf7a]" />}
           <span>{i.text}</span>
         </div>
       ))}

@@ -176,7 +176,7 @@ function why(o: OrderProfit, mf: (v: number) => string) {
 function Stat({ label, value, sub, tone, wide }: { label: string; value: string; sub: string; tone?: 'good' | 'bad'; wide?: boolean }) {
   return (
     <div className={`inv-stat p-4 ${wide ? 'col-span-2 md:col-span-1' : ''}`}>
-      <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">{label}</div>
+      <div className="text-[12.5px] text-ink-3">{label}</div>
       <div className={`mt-1.5 whitespace-nowrap font-mono text-[20px] font-semibold leading-none xl:text-[24px] ${tone === 'bad' ? 'text-critical' : tone === 'good' ? 'text-[var(--sage-deep)]' : ''}`}>{value}</div>
       <div className="mt-1.5 truncate text-[11.5px] text-ink-3">{sub}</div>
     </div>

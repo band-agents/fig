@@ -148,12 +148,12 @@ export default async function InventoryPage(props: PageProps<'/stock/inventory'>
             );
           })}
         </div>
-        <div className="flex shrink-0 rounded-[11px] bg-elev-2 p-0.5">
+        <div className="flex shrink-0 rounded-[6px] bg-elev-2 p-0.5">
           {modes.map((mo) => {
             const on = d.mode === mo.key;
             const Icon = mo.icon;
             return (
-              <Link key={mo.key} href={qs({ mode: mo.key === 'styles' ? undefined : mo.key })} title={mo.hint} className={`flex h-8 items-center gap-1.5 rounded-[9px] px-3 text-[12.5px] transition ${on ? 'bg-elev font-semibold text-ink shadow-[var(--card-shadow)]' : 'text-ink-3 hover:text-ink'}`}>
+              <Link key={mo.key} href={qs({ mode: mo.key === 'styles' ? undefined : mo.key })} title={mo.hint} className={`flex h-8 items-center gap-1.5 rounded-[6px] px-3 text-[12.5px] transition ${on ? 'bg-elev font-semibold text-ink shadow-[var(--card-shadow)]' : 'text-ink-3 hover:text-ink'}`}>
                 <Icon className="size-3.5" /> {mo.label}
               </Link>
             );
@@ -210,7 +210,7 @@ export default async function InventoryPage(props: PageProps<'/stock/inventory'>
 function Stat({ label, value, sub, tone, icon: Icon, href, children }: { label: string; value: string; sub?: string; tone?: 'critical' | 'attention'; icon?: typeof Boxes; href?: string; children?: React.ReactNode }) {
   const body = (
     <>
-      <div className="flex items-center gap-1.5 text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">
+      <div className="flex items-center gap-1.5 text-[12.5px] text-ink-3">
         {Icon && <Icon className="size-3.5" />}
         {label}
       </div>

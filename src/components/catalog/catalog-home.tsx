@@ -74,7 +74,7 @@ export function CatalogHome({ stores, jobs: first, canImport, canManage, brands,
         </div>
         <div className="relative z-[1] mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {stores.map((s) => (
-            <div key={s.id} className="rounded-[16px] border border-line bg-[color-mix(in_oklab,var(--bg-elev)_80%,transparent)] p-3.5 backdrop-blur-sm">
+            <div key={s.id} className="rounded-[8px] border border-line bg-[color-mix(in_oklab,var(--bg-elev)_80%,transparent)] p-3.5 backdrop-blur-sm">
               <div className="flex items-center gap-3">
                 <StoreMark name={s.name} brand={s.brand} />
                 <div className="min-w-0 flex-1">
@@ -218,7 +218,7 @@ function Panel({ icon: Icon, tint, title, sub, children }: { icon: typeof ArrowD
   return (
     <section className="panel flex flex-col p-5">
       <div className="mb-4 flex items-start gap-3">
-        <span data-tint={tint} className="grid size-10 shrink-0 place-items-center rounded-[13px]" style={{ background: 'color-mix(in oklab, var(--tint) 18%, transparent)', color: 'var(--tint)' }}>
+        <span data-tint={tint} className="grid size-10 shrink-0 place-items-center rounded-[6px]" style={{ background: 'color-mix(in oklab, var(--tint) 18%, transparent)', color: 'var(--tint)' }}>
           <Icon className="size-5" strokeWidth={1.8} />
         </span>
         <div>
@@ -233,9 +233,9 @@ function Panel({ icon: Icon, tint, title, sub, children }: { icon: typeof ArrowD
 
 function Seg<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
   return (
-    <div className="inline-flex rounded-[11px] bg-elev-2 p-0.5">
+    <div className="inline-flex rounded-[6px] bg-elev-2 p-0.5">
       {options.map((o) => (
-        <button key={o.value} type="button" onClick={() => onChange(o.value)} className={`h-7 rounded-[9px] px-2.5 text-[12px] transition ${value === o.value ? 'bg-elev font-semibold text-ink shadow-[var(--card-shadow)]' : 'text-ink-3 hover:text-ink'}`}>
+        <button key={o.value} type="button" onClick={() => onChange(o.value)} className={`h-7 rounded-[6px] px-2.5 text-[12px] transition ${value === o.value ? 'bg-elev font-semibold text-ink shadow-[var(--card-shadow)]' : 'text-ink-3 hover:text-ink'}`}>
           {o.label}
         </button>
       ))}
@@ -286,7 +286,7 @@ function ExportPanel({ stores, brands }: { stores: StoreCard[]; brands: string[]
             <Label>Store</Label>
             <div className="flex flex-wrap gap-2">
               {stores.map((s) => (
-                <button key={s.id} type="button" onClick={() => setStore(s.id)} className={`flex items-center gap-2 rounded-[12px] border px-2.5 py-1.5 text-[12.5px] transition ${store === s.id ? 'border-[var(--sage)] bg-[var(--sage-soft)] font-semibold' : 'border-line hover:border-line-2'}`}>
+                <button key={s.id} type="button" onClick={() => setStore(s.id)} className={`flex items-center gap-2 rounded-[6px] border px-2.5 py-1.5 text-[12.5px] transition ${store === s.id ? 'border-[var(--sage)] bg-[var(--sage-soft)] font-semibold' : 'border-line hover:border-line-2'}`}>
                   <StoreMark name={s.name} brand={s.brand} size={20} /> {s.name}
                 </button>
               ))}
@@ -413,12 +413,12 @@ function ImportPanel({ stores, canImport, canManage, maxMb }: { stores: StoreCar
             pick(e.dataTransfer.files[0]);
           }}
           onClick={() => input.current?.click()}
-          className={`cat-drop relative flex cursor-pointer flex-col items-center justify-center rounded-[18px] border-[1.5px] border-dashed px-4 py-7 text-center transition ${drag ? 'is-over border-[var(--t-violet)]' : file ? 'border-[var(--sage)]' : 'border-line-2 hover:border-line-3'}`}
+          className={`cat-drop relative flex cursor-pointer flex-col items-center justify-center rounded-[8px] border-[1.5px] border-dashed px-4 py-7 text-center transition ${drag ? 'is-over border-[var(--t-violet)]' : file ? 'border-[var(--sage)]' : 'border-line-2 hover:border-line-3'}`}
         >
           <input ref={input} type="file" accept=".xlsx,.csv,.txt" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
           {file ? (
             <div className="flex items-center gap-3">
-              <span className="grid size-11 place-items-center rounded-[13px] bg-[var(--sage-soft)] text-[var(--sage-ink)]">
+              <span className="grid size-11 place-items-center rounded-[6px] bg-[var(--sage-soft)] text-[var(--sage-ink)]">
                 <FileSpreadsheet className="size-5" />
               </span>
               <div className="text-left">
@@ -455,7 +455,7 @@ function ImportPanel({ stores, canImport, canManage, maxMb }: { stores: StoreCar
             {stores.map((s) => {
               const on = targets.includes(s.id);
               return (
-                <button key={s.id} type="button" onClick={() => setTargets(on ? targets.filter((x) => x !== s.id) : [...targets, s.id])} className={`flex items-center gap-2 rounded-[12px] border px-2.5 py-1.5 text-[12.5px] transition ${on ? 'border-[var(--t-violet)] bg-[color-mix(in_oklab,var(--t-violet)_14%,transparent)] font-semibold' : 'border-line hover:border-line-2'}`}>
+                <button key={s.id} type="button" onClick={() => setTargets(on ? targets.filter((x) => x !== s.id) : [...targets, s.id])} className={`flex items-center gap-2 rounded-[6px] border px-2.5 py-1.5 text-[12.5px] transition ${on ? 'border-[var(--t-violet)] bg-[color-mix(in_oklab,var(--t-violet)_14%,transparent)] font-semibold' : 'border-line hover:border-line-2'}`}>
                   <StoreMark name={s.name} brand={s.brand} size={20} /> {s.name}
                   {!s.writable && <span className="text-[10.5px] font-normal text-ink-3">dry run</span>}
                   {on && <Check className="size-3.5" />}
@@ -471,7 +471,7 @@ function ImportPanel({ stores, canImport, canManage, maxMb }: { stores: StoreCar
           )}
         </div>
 
-        <div className="rounded-[14px] bg-elev-2/60">
+        <div className="rounded-[6px] bg-elev-2/60">
           <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center justify-between px-3.5 py-2.5 text-[12.5px] font-medium">
             <span>
               Options <span className="font-normal text-ink-3">· tags {o.tags === 'MERGE' ? 'added' : 'replaced'}, photos {o.images === 'MERGE' ? 'added' : 'replaced'}, new as {o.newStatus === 'DRAFT' ? 'draft' : 'active'}{o.writeStock ? ', stock written' : ''}</span>
@@ -525,7 +525,7 @@ function ImportPanel({ stores, canImport, canManage, maxMb }: { stores: StoreCar
           )}
         </div>
 
-        {error && <div className="rounded-[12px] bg-[var(--b-critical)] px-3 py-2 text-[12px] text-[var(--b-critical-ink)]">{error}</div>}
+        {error && <div className="rounded-[6px] bg-[var(--b-critical)] px-3 py-2 text-[12px] text-[var(--b-critical-ink)]">{error}</div>}
 
         <div className="mt-auto flex items-center justify-between gap-3 pt-1">
           <span className="flex items-center gap-1.5 text-[11.5px] text-ink-3">
