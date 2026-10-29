@@ -47,6 +47,7 @@ function account(): GmtcAccount {
     serviceType: env('GMTC_SERVICE') || 'NEXT DAY',
     movementType: env('GMTC_MOVEMENT_TYPE') || 'con',
     consignmentType: env('GMTC_CONSIGNMENT_TYPE') || 'FORWARD',
+    destinationPincode: env('GMTC_DESTINATION_PINCODE') || 'Dajeej',
     origin: {
       name: env('GMTC_SHIPPER_NAME') || 'D&H International - Labesny',
       phone: env('GMTC_SHIPPER_PHONE') || '96522649224',
@@ -76,7 +77,7 @@ export async function createConsignment(order: GmtcOrder, opts: { service?: stri
     return { waybill: waybillFrom(readGmtcAnswer<CreateAnswer>(res.status, await res.text())), service: acc.serviceType };
   } catch (e) {
     if (e instanceof GmtcError && /DESTINATION_HUB_NOT_FOUND/.test(e.message))
-      throw new GmtcError(`UPS (GMTC) does not recognise the area "${body.destination_details.pincode}" on ${order.number}. Correct the area in the address, then book again.`, e.status);
+      throw new GmtcError(`UPS (GMTC) does not recognise the area "${body.destination_details.city}" on ${order.number}. Correct the area in the address, then book again.`, e.status);
     throw e;
   }
 }
