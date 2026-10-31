@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildConsignment, classifyGmtc, gmtcCod, GmtcError, kuwaitPhone, mapTrack, readGmtcAnswer, serviceAt, waybillFrom, type GmtcAccount, type GmtcOrder } from '../gmtc-map';
+import { buildConsignment, classifyGmtc, collectedAt, gmtcCod, GmtcError, kuwaitPhone, mapTrack, readGmtcAnswer, serviceAt, waybillFrom, type GmtcAccount, type GmtcOrder } from '../gmtc-map';
 
 const acc: GmtcAccount = {
   customerCode: 'D&H',
@@ -114,5 +114,24 @@ describe('serviceAt (same day before the 2 pm pickup, Kuwait time)', () => {
   it('without a cutoff, always the usual service', () => {
     expect(serviceAt(new Date('2026-10-31T06:00:00Z'), '', 'NEXT DAY')).toBe('NEXT DAY');
     expect(serviceAt(new Date('2026-10-31T06:00:00Z'), 'off', 'NEXT DAY')).toBe('NEXT DAY');
+  });
+});
+
+describe('collectedAt (shipped only once the driver has the parcel)', () => {
+  const at = (iso: string) => new Date(iso);
+  it('#1155: a hub scan before the pickup is not a collection', () => {
+    expect(collectedAt([{ code: 'pickup_awaited', at: at('2026-10-30T13:38:44Z') }, { code: 'reachedathub', at: at('2026-10-30T13:52:44Z') }])).toBeNull();
+  });
+  it('the pickup_completed scan is', () => {
+    const u = [
+      { code: 'pickup_awaited', at: at('2026-10-30T13:38:44Z') },
+      { code: 'reachedathub', at: at('2026-10-30T13:52:44Z') },
+      { code: 'pickup_completed', at: at('2026-10-31T11:55:47Z') },
+      { code: 'reachedathub', at: at('2026-10-31T11:55:53Z') },
+    ];
+    expect(collectedAt(u)).toEqual(at('2026-10-31T11:55:47Z'));
+  });
+  it('a delivery step counts even if the pickup scan is missing', () => {
+    expect(collectedAt([{ code: 'pickup_awaited', at: at('2026-10-31T04:00:00Z') }, { code: 'delivered', at: at('2026-10-31T14:59:00Z') }])).toEqual(at('2026-10-31T14:59:00Z'));
   });
 });
