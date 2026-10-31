@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildConsignment, classifyGmtc, gmtcCod, GmtcError, kuwaitPhone, mapTrack, readGmtcAnswer, waybillFrom, type GmtcAccount, type GmtcOrder } from '../gmtc-map';
+import { buildConsignment, classifyGmtc, gmtcCod, GmtcError, kuwaitPhone, mapTrack, readGmtcAnswer, serviceAt, waybillFrom, type GmtcAccount, type GmtcOrder } from '../gmtc-map';
 
 const acc: GmtcAccount = {
   customerCode: 'D&H',
@@ -103,4 +103,16 @@ describe('classifyGmtc', () => {
     ['rto_delivered', 'returned'],
     ['cancelled', 'cancelled'],
   ])('%s → %s', (status, cls) => expect(classifyGmtc(status)).toBe(cls));
+});
+
+describe('serviceAt (same day before the 2 pm pickup, Kuwait time)', () => {
+  it('books SAME DAY before 14:00 Kuwait and the usual service from 14:00', () => {
+    expect(serviceAt(new Date('2026-10-31T10:59:00Z'), '14:00', 'NEXT DAY')).toBe('SAME DAY'); // 13:59 Kuwait
+    expect(serviceAt(new Date('2026-10-31T11:00:00Z'), '14:00', 'NEXT DAY')).toBe('NEXT DAY'); // 14:00 Kuwait
+    expect(serviceAt(new Date('2026-10-31T21:30:00Z'), '14:00', 'NEXT DAY')).toBe('SAME DAY'); // 00:30 next day, Kuwait
+  });
+  it('without a cutoff, always the usual service', () => {
+    expect(serviceAt(new Date('2026-10-31T06:00:00Z'), '', 'NEXT DAY')).toBe('NEXT DAY');
+    expect(serviceAt(new Date('2026-10-31T06:00:00Z'), 'off', 'NEXT DAY')).toBe('NEXT DAY');
+  });
 });

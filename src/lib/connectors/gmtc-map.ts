@@ -17,6 +17,18 @@ export class GmtcError extends Error {
   }
 }
 
+/**
+ * The service for a consignment booked at `at`. GMTC collects once a day at 2 pm and only that pickup
+ * delivers the same day (Mohamed Alaa, 31 Oct; Moody wants same day): booked before the cutoff (Kuwait
+ * time, "HH:MM") → SAME DAY, after it → the usual service. No cutoff → always the usual service.
+ */
+export function serviceAt(at: Date, cutoff: string, usual: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(cutoff.trim());
+  if (!m) return usual;
+  const kuwait = (at.getUTCHours() * 60 + at.getUTCMinutes() + 180) % 1440; // UTC+3, no daylight saving
+  return kuwait < Number(m[1]) * 60 + Number(m[2]) ? 'SAME DAY' : usual;
+}
+
 /** The account side of a consignment: GMTC's codes for us and the pickup point (the D&H warehouse). */
 export type GmtcAccount = {
   customerCode: string;
