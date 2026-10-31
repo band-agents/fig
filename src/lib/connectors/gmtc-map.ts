@@ -171,6 +171,16 @@ export function mapTrack(a: TrackAnswer, now = new Date()): TrackUpdate[] {
   return out;
 }
 
+/**
+ * When the driver really took the parcel: GMTC's pickup_completed scan (or a later delivery step, which
+ * needs the parcel in hand). Hub scans alone do not count: #1155 (30 Oct) got "reachedathub" 14 minutes
+ * after booking, a day before the driver came, and the console marked it shipped and fulfilled it.
+ */
+export function collectedAt(updates: Pick<TrackUpdate, 'code' | 'at'>[]): Date | null {
+  const hit = updates.find((u) => /pickup_?completed|picked_?up|^picked$|out_?for_?delivery|^delivered$|^rto/.test(u.code.toLowerCase().replace(/[\s-]/g, '_')));
+  return hit?.at ?? null;
+}
+
 /** Shipsy statuses → what the console does with them. Cancelled is its own answer: nothing moves. */
 export function classifyGmtc(status: string): TrackClass | 'cancelled' | 'awaiting' {
   const s = status.toLowerCase().replace(/[\s-]/g, '_');

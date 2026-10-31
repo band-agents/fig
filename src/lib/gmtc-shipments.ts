@@ -10,7 +10,7 @@ import { publish } from './bus';
 import { forbidden, invalid, notFound } from './errors';
 import { can, seesChannel } from './domain/perms';
 import { isAllowed, ORDER_FLOW, type OrderStage } from './domain/stages';
-import { cancelConsignment, classifyGmtc, createConsignment, GMTC_COURIER, gmtcConfigured, gmtcCreateAt, gmtcEnv, trackConsignments } from './connectors';
+import { cancelConsignment, classifyGmtc, collectedAt, createConsignment, GMTC_COURIER, gmtcConfigured, gmtcCreateAt, gmtcEnv, trackConsignments } from './connectors';
 
 const UPS: Actor = { id: null, name: 'UPS (GMTC)', dept: null };
 
@@ -96,8 +96,10 @@ export async function trackUps() {
     try {
       if (cls === 'cancelled' || cls === 'awaiting' || cls === 'info') continue;
       if (['ready', 'picking', 'packed'].includes(o.stage)) {
-        // anything past "awaiting pickup" means GMTC has the parcel
-        await walkTo(o, 'shipped', when, 'Collected by UPS');
+        // shipped only once the driver has it: a hub scan before the pickup is not a collection (#1155)
+        const collected = collectedAt(a.updates);
+        if (!collected) continue;
+        await walkTo(o, 'shipped', collected, 'Collected by UPS');
         moved++;
         if (cls === 'picked_up' || cls === 'in_transit') continue;
         const [now] = await db.select({ stage: schema.orders.stage }).from(schema.orders).where(eq(schema.orders.id, o.id));

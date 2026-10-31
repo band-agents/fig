@@ -16,7 +16,7 @@ import {
 } from './gmtc-map';
 import type { TrackUpdate } from './aramex-map';
 
-export { classifyGmtc, GmtcError } from './gmtc-map';
+export { classifyGmtc, collectedAt, GmtcError } from './gmtc-map';
 
 const env = (name: string) => process.env[name]?.trim() || '';
 
