@@ -7,6 +7,7 @@ import {
   GmtcError,
   mapTrack,
   readGmtcAnswer,
+  serviceAt,
   waybillFrom,
   type CreateAnswer,
   type GmtcAccount,
@@ -66,11 +67,28 @@ function assertReady() {
   if (!gmtcConfigured()) throw new GmtcError('UPS (GMTC) is not configured: GMTC_API_KEY and GMTC_CUSTOMER_CODE are missing.');
 }
 
-/** Creates the consignment and returns GMTC's waybill (DNH…). One call; never retried, so no doubles. */
-export async function createConsignment(order: GmtcOrder, opts: { service?: string } = {}): Promise<{ waybill: string; service: string }> {
+/**
+ * Creates the consignment and returns GMTC's waybill (DNH…). Not retried on a network failure, so no
+ * doubles. Without a chosen service: SAME DAY before GMTC_SAME_DAY_BEFORE (default 14:00 Kuwait, the daily
+ * pickup; empty = never), else GMTC_SERVICE. If GMTC refuses SAME DAY (a refusal creates nothing), it is
+ * booked again as GMTC_SERVICE.
+ */
+export async function createConsignment(order: GmtcOrder, opts: { service?: string; at?: Date } = {}): Promise<{ waybill: string; service: string }> {
   assertReady();
   const acc = account();
-  if (opts.service) acc.serviceType = opts.service;
+  const usual = acc.serviceType;
+  const cutoff = process.env.GMTC_SAME_DAY_BEFORE === undefined ? '14:00' : env('GMTC_SAME_DAY_BEFORE');
+  acc.serviceType = opts.service || serviceAt(opts.at ?? new Date(), cutoff, usual);
+  try {
+    return await create(order, acc);
+  } catch (e) {
+    if (!opts.service && acc.serviceType !== usual && e instanceof GmtcError && /refused it/.test(e.message) && !/DESTINATION_HUB_NOT_FOUND/.test(e.message))
+      return create(order, { ...acc, serviceType: usual });
+    throw e;
+  }
+}
+
+async function create(order: GmtcOrder, acc: GmtcAccount): Promise<{ waybill: string; service: string }> {
   const body = buildConsignment(order, acc);
   const res = await fetchRetry(path('upload/softdata/v2'), { method: 'POST', headers: headers(), body: JSON.stringify(body) }, { label: 'UPS (GMTC)', tries: 1, timeoutMs: 30_000 });
   try {
