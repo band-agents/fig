@@ -10,10 +10,14 @@ cd "$(dirname "$0")"
 
 before=$(git rev-parse --short HEAD)
 stamp=$(date +%F_%H%M)
-mkdir -p backups
+# deploy/backups also takes the nightly dumps the backup container writes (as root): when it is not ours
+# to write, the dump goes to ~/console-dumps
+dumps=backups
+mkdir -p "$dumps" 2>/dev/null || true
+[ -w "$dumps" ] || { dumps="$HOME/console-dumps"; mkdir -p "$dumps"; }
 echo "1/3 database dump"
-docker compose exec -T db pg_dump -U relay relay | gzip > "backups/relay-before-${before}-${stamp}.sql.gz"
-ls -lh "backups/relay-before-${before}-${stamp}.sql.gz" | awk '{print "    " $5 " " $9}'
+docker compose exec -T db pg_dump -U relay relay | gzip > "${dumps}/relay-before-${before}-${stamp}.sql.gz"
+ls -lh "${dumps}/relay-before-${before}-${stamp}.sql.gz" | awk '{print "    " $5 " " $9}'
 
 echo "2/3 code and image"
 git -C .. pull --ff-only --quiet
