@@ -7,7 +7,7 @@ import { refresh } from 'next/cache';
 import { eq, sql } from 'drizzle-orm';
 import { getDb, schema } from '@/lib/db';
 import { assertCanAct, createSession, currentUser, destroySession, realUser, VIEW_AS, VIEW_AS_BRAND } from '@/lib/auth/session';
-import { hashPassword, passwordProblem, verifyPassword } from '@/lib/auth/password';
+import { hashPassword, passwordProblem, tempPassword, verifyPassword } from '@/lib/auth/password';
 import { actorFor, addNote, assign, moveOrder, moveReturn, openReturn, refundCancelled, retryStore, setHold, putSetting, setShipFrom } from '@/lib/engine';
 import { RelayError } from '@/lib/errors';
 import { checkBranches } from '@/lib/ship-from';
@@ -16,6 +16,7 @@ import type { OrderStage, ReturnReason, ReturnStage } from '@/lib/domain/stages'
 import { demoMode } from '@/lib/demo';
 import { BUSINESS_COOKIE, businessesFor, readView } from '@/lib/business';
 import { mailConfigured, sendMail } from '@/lib/mail';
+import { logActivity } from '@/lib/stock/core';
 import { joinEmail, tempEmail } from '@/lib/mail-invite';
 
 export type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -405,6 +406,42 @@ export async function tempPasswordAction(userId: string, tempPassword: string) {
     await db.update(schema.users).set({ passwordHash: await hashPassword(tempPassword), mustChangePassword: true, failedLogins: 0, lockedUntil: null }).where(eq(schema.users.id, userId));
     await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
     return 'Temporary password set';
+  });
+}
+
+/**
+ * Team & access → "New password for everyone" (Dan, 1 Nov): every active teammate except you gets a
+ * new temporary password by email, the same email as "Give a temporary password". On their next
+ * sign-in they choose their own. Admins only. Each password is made here, mailed once and never shown.
+ * When the mail does not go, that person keeps the password they had; when it goes, their old
+ * sessions end.
+ */
+export async function resetAllPasswordsAction() {
+  return run(async () => {
+    const u = await me();
+    if (u.role !== 'admin' || !can(u, 'team', 3)) throw new RelayError('forbidden', 'Only an admin can send everyone a new password.');
+    if (!mailConfigured()) throw new RelayError('invalid', 'Email is not set up yet: add the SMTP settings to relay/.env.local.');
+    const db = await getDb();
+    // the console's own accounts (labesny@dh-dco.local, the demo floor's) have no mailbox
+    const people = (await db.select().from(schema.users).where(eq(schema.users.active, true))).filter((t) => t.id !== u.id && !/\.local$/i.test(t.email));
+    const sent: string[] = [];
+    const failed: string[] = [];
+    for (const t of people) {
+      const password = tempPassword();
+      const role = ROLES[t.role as Role]?.label ?? t.role;
+      await db.update(schema.users).set({ passwordHash: await hashPassword(password), mustChangePassword: true, failedLogins: 0, lockedUntil: null }).where(eq(schema.users.id, t.id));
+      const res = await sendMail(tempEmail({ to: t.email, name: t.name, by: u.name, role, password, reset: true }));
+      if (res.ok) {
+        await db.delete(schema.sessions).where(eq(schema.sessions.userId, t.id));
+        sent.push(t.name);
+      } else {
+        await db.update(schema.users).set({ passwordHash: t.passwordHash, mustChangePassword: t.mustChangePassword }).where(eq(schema.users.id, t.id));
+        failed.push(`${t.name} (${res.note})`);
+      }
+    }
+    await logActivity({ id: u.id, name: u.name }, { area: 'team', kind: 'passwords', message: `New passwords emailed to ${sent.length} teammates${failed.length ? `, ${failed.length} not sent` : ''}` });
+    refresh();
+    return failed.length ? `Emailed ${sent.length}. Not sent: ${failed.join('; ')}` : `New passwords emailed to all ${sent.length} teammates.`;
   });
 }
 

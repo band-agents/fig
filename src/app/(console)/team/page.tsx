@@ -1,10 +1,11 @@
 import { asc, sql } from 'drizzle-orm';
 import { requireUser, sendHome } from '@/lib/auth/session';
 import { getDb, schema } from '@/lib/db';
-import { canSee, effectiveScopes, PAGES, ROLES, scopesFor, type Page, type Role } from '@/lib/domain/perms';
+import { can, canSee, effectiveScopes, PAGES, ROLES, scopesFor, type Page, type Role } from '@/lib/domain/perms';
 import { CHANNELS } from '@/lib/channels';
 import { PageHeader } from '@/components/ui/bits';
 import { TeamTable } from '@/components/team/team-table';
+import { ResetAllButton } from '@/components/team/reset-all';
 import { demoMode } from '@/lib/demo';
 import { ImportButton } from '@/components/ui/import-button';
 import { ExportButton } from '@/components/ui/export-button';
@@ -30,6 +31,9 @@ export default async function TeamPage() {
         sub="Each person's job, stores and brands. Nobody can give more access than they hold."
         right={
           <>
+            {me.role === 'admin' && can(me, 'team', 3) && !me.previewing && (
+              <ResetAllButton people={users.filter((u) => u.active && u.id !== me.id && !u.email.toLowerCase().endsWith('.local')).map((u) => ({ name: u.name, email: u.email }))} mailReady={mailConfigured()} />
+            )}
             {mayImport(me, 'team') && <ImportButton kind="team" {...IMPORT_LABEL.team} label="Import teammates" mailReady={mailConfigured()} />}
             <ExportButton
               name="team"
