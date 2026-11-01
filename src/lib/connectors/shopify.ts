@@ -644,6 +644,25 @@ export async function registerOrderWebhooks(c: ChannelDef, address: string, appl
   return { have, missing, created };
 }
 
+const WEBHOOK_DELETE = `mutation RelayWebhookGone($id: ID!) { webhookSubscriptionDelete(id: $id) { deletedWebhookSubscriptionId userErrors { field message } } }`;
+
+/**
+ * Takes away this app's order webhooks that still point at another address of ours (an older home of
+ * the console, such as the PC's tailnet link), once `keep` receives every topic. Only our own route
+ * (…/api/webhooks/shopify/…) is touched; with `apply` false nothing is written.
+ */
+export async function retireOrderWebhooks(c: ChannelDef, keep: string, apply: boolean) {
+  const have = await orderWebhooks(c);
+  const covered = ORDER_WEBHOOK_TOPICS.every((t) => have.some((w) => w.topic === t && w.uri === keep));
+  const old = have.filter((w) => w.uri !== keep && w.uri.includes('/api/webhooks/shopify/'));
+  const removed: string[] = [];
+  if (apply && covered) for (const w of old) {
+    await mutate(c, WEBHOOK_DELETE, { id: w.id }, 'webhookSubscriptionDelete');
+    removed.push(`${w.topic} ${w.uri}`);
+  }
+  return { covered, old, removed };
+}
+
 // ── Catalogue and stock, for the stockroom ─────────────────────────────────────────────────────
 
 const BULK_CATALOGUE = `{
