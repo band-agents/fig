@@ -50,11 +50,14 @@ Only emails that already have an account get in; anyone else is told to ask an a
 
 ## Updating
 
+The live console runs on Google Cloud (project `dh-dco-console-261101`, server `dh-dco-console`, 34.18.178.132) at
+https://console.dagher-hinnawi.com. Every change goes live there, from `master`, and nowhere else:
+
 ```bash
-cd relay && git pull && cd deploy && docker compose up -d --build
+~/relay/deploy/update.sh   # on the server: database dump, git pull, new image, swap (~15 s), health check
 ```
 
-Migrations run by themselves when the app starts.
+Migrations run by themselves when the app starts. Merge to `master` first; the server only ever runs `master`.
 
 ## Why not Medusa Cloud
 

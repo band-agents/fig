@@ -194,6 +194,40 @@ describe('the plan for one store', () => {
   });
 });
 
+// Dan, 1 Nov: "I can add new products and it also can be updating the current product … make it clear"
+describe('what the file does: add new, update existing, or both', () => {
+  const [p] = read([['Handle', 'Title', 'Option1 Name', 'Option1 Value', 'Variant Barcode', 'Variant Price'], ['lace-bra', 'Lace bra 2', 'Size', 'S', '111', '12']]);
+
+  it('both (the default) creates what the store lacks and updates what it has', () => {
+    expect(planProduct(p, null, LAB).item.action).toBe('create');
+    expect(planProduct(p, existing(), LAB).item.action).toBe('update');
+    expect(planProduct(p, existing(), LAB, { mode: 'both' }).item.action).toBe('update');
+  });
+
+  it('only new: creates, and leaves a product the store has exactly as it is', () => {
+    expect(planProduct(p, null, LAB, { mode: 'new' }).item.action).toBe('create');
+    const kept = planProduct(p, existing(), LAB, { mode: 'new' });
+    expect(kept.item.action).toBe('skip');
+    expect(kept.write).toBeNull();
+    expect(kept.item.issues.map((i) => i.code)).toContain('mode-new');
+  });
+
+  it('only updates: updates, and creates nothing', () => {
+    expect(planProduct(p, existing(), LAB, { mode: 'update' }).item.action).toBe('update');
+    const none = planProduct(p, null, LAB, { mode: 'update' });
+    expect(none.item.action).toBe('skip');
+    expect(none.write).toBeNull();
+    expect(none.item.issues.map((i) => i.code)).toContain('mode-update');
+  });
+
+  it('a Command in the file wins over the choice', () => {
+    const [del] = read([['Handle', 'Command'], ['lace-bra', 'DELETE']]);
+    expect(planProduct(del, existing(), LAB, { mode: 'new' }).item.action).toBe('archive');
+    const [fresh] = read([['Handle', 'Title', 'Command'], ['silk-robe', 'Silk Robe', 'NEW']]);
+    expect(planProduct(fresh, null, LAB, { mode: 'update' }).item.action).toBe('create');
+  });
+});
+
 describe('how FIG and Labesny run (Dan, 27 Oct: tailored to the business)', () => {
   it('makes the menu tags from Gender, Category, Type, Season and Colour, and the brand tag', () => {
     const t = houseTags({ gender: 'Women', category: 'sleep & homewear', subcategory: 'Logo Tshirt', season: 'aw26', colour: 'off-white', vendor: 'Bebe' }, null, true);
