@@ -183,7 +183,7 @@ export function RunBar({ id, lines, blocked, canRun, errors }: { id: string; lin
 type Col = { index: number; header: string; pick: string; how: string; problem?: string; sample: string[] };
 
 /** The columns as read, each one changeable, and the import's options; "Check again" redoes the dry run with them. */
-export function MappingEditor({ id, columns, choices, options, canEdit }: { id: string; columns: Col[]; choices: { value: string; label: string }[]; options: { tags: string; images: string; newStatus: string; publishNew: boolean; emptyClears: boolean }; canEdit: boolean }) {
+export function MappingEditor({ id, columns, choices, options, canEdit }: { id: string; columns: Col[]; choices: { value: string; label: string }[]; options: { mode: string; tags: string; images: string; newStatus: string; publishNew: boolean; emptyClears: boolean }; canEdit: boolean }) {
   const [picks, setPicks] = useState<Record<number, string>>({});
   const [o, setO] = useState(options);
   const [pending, start] = useTransition();
@@ -237,6 +237,14 @@ export function MappingEditor({ id, columns, choices, options, canEdit }: { id: 
             <select className="field !h-8 !w-auto !text-[12px]" value={o.tags} onChange={(e) => setO({ ...o, tags: e.target.value })}>
               <option value="MERGE">Add to existing</option>
               <option value="REPLACE">Replace</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            This file
+            <select className="field !h-8 !w-auto !text-[12px]" value={o.mode} onChange={(e) => setO({ ...o, mode: e.target.value })}>
+              <option value="both">Adds new and updates existing</option>
+              <option value="new">Only adds new products</option>
+              <option value="update">Only updates existing products</option>
             </select>
           </label>
           <label className="flex items-center gap-2">

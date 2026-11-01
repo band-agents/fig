@@ -145,6 +145,9 @@ function Review({ id, plan, options, storeOf, sp, qs, canImport }: { id: string;
             <span>
               <b className="font-mono text-ink">{known}</b> of {columns.length} columns used
             </span>
+            <span className="pill" data-tone={options.mode === 'new' ? 'success' : options.mode === 'update' ? 'info' : 'neutral'}>
+              {options.mode === 'new' ? 'Only adds new products' : options.mode === 'update' ? 'Only updates existing products' : 'Adds new and updates existing'}
+            </span>
             {plan.checks.images.checked > 0 && (
               <span className={plan.checks.images.broken.length ? 'text-[var(--t-amber)]' : ''}>
                 {plan.checks.images.broken.length ? `${plan.checks.images.broken.length} of ${plan.checks.images.checked} photo links broken` : `${plan.checks.images.checked} photo links open`}
@@ -283,7 +286,7 @@ function Review({ id, plan, options, storeOf, sp, qs, canImport }: { id: string;
           <h2 className="text-[14px] font-semibold">Columns</h2>
           <span className="text-[12px] text-ink-3">How each column was read. Change any, then Check again.</span>
         </div>
-        <MappingEditor id={id} columns={columns} choices={PICKABLE} options={{ tags: options.tags, images: options.images, newStatus: options.newStatus, publishNew: options.publishNew, emptyClears: options.emptyClears }} canEdit={canImport} />
+        <MappingEditor id={id} columns={columns} choices={PICKABLE} options={{ mode: options.mode ?? 'both', tags: options.tags, images: options.images, newStatus: options.newStatus, publishNew: options.publishNew, emptyClears: options.emptyClears }} canEdit={canImport} />
       </section>
 
       <RunBar id={id} lines={lines} blocked={storeIds.filter((s) => plan.stores[s].blocked).map((s) => storeOf(s).name)} canRun={canImport} errors={errors} />

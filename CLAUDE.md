@@ -19,5 +19,8 @@ FIG's order-fulfilment and returns console (Next.js 16 + Drizzle + Postgres/PGli
 - The local DB (PGlite in `.data/`) belongs to one process: stop `npm run dev` before `npm run seed`, or use
   Rules → Rebuild demo floor while the server runs.
 - After a schema change: `npm run db:generate` (drizzle-kit) and commit the migration in `drizzle/`.
+- **Live = Google Cloud** (Dan, 1 Nov): https://console.dagher-hinnawi.com on the server in `deploy/README.md`, Postgres in
+  Docker. Ship by merging to `master`, then `deploy/update.sh` on the server, with Dan's go (about 15 s down). The PC
+  console (PGlite, `.data/swap.ps1`) is retired: never start it again, it would sync and write to the stores twice.
 - Before handing over: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm test`, `npm run build`.
 - Never read other projects' `.env`/`_secrets` files to wire stores; credentials go in this project's env.

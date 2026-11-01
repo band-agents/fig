@@ -3,10 +3,18 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, Check, ChevronDown, FileSpreadsheet, Info, Loader2, Lock, ShieldCheck, Sparkles, Upload, Wand2, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, Check, CopyPlus, PencilLine, Repeat2, ChevronDown, FileSpreadsheet, Info, Loader2, Lock, ShieldCheck, Sparkles, Upload, Wand2, X } from 'lucide-react';
 import { startExportAction, startImportAction } from '@/app/(console)/catalog/actions';
 import { toast } from '@/components/ui/toast';
 import type { CatalogStore, JobRow } from '@/lib/catalog/jobs';
+import type { ImportMode } from '@/lib/catalog/plan';
+
+/** The three things an import can do, as the shop team says them (Dan, 1 Nov). */
+const MODES: { value: ImportMode; label: string; hint: string; icon: typeof CopyPlus }[] = [
+  { value: 'both', label: 'Add new and update existing', hint: 'New products are created; products the store has are updated.', icon: Repeat2 },
+  { value: 'new', label: 'Only add new products', hint: 'Products the store already has are left exactly as they are.', icon: CopyPlus },
+  { value: 'update', label: 'Only update existing products', hint: 'Nothing new is created; rows for products not in the store are skipped.', icon: PencilLine },
+];
 import { Bar, KIND, KindMark, StatusPill, StoreMark, ago, num } from './bits';
 
 export type StoreCard = CatalogStore & { products: number; live: number; readAt: string | null };
@@ -367,7 +375,7 @@ function ImportPanel({ stores, canImport, canManage, maxMb }: { stores: StoreCar
     return w.length ? w : stores.map((s) => s.id).slice(0, 1);
   });
   const [open, setOpen] = useState(false);
-  const [o, setO] = useState({ tags: 'MERGE' as 'MERGE' | 'REPLACE', images: 'MERGE' as 'MERGE' | 'REPLACE', newStatus: 'DRAFT' as 'DRAFT' | 'ACTIVE', publishNew: true, emptyClears: false, writeStock: false, safeDelete: true });
+  const [o, setO] = useState({ mode: 'both' as ImportMode, tags: 'MERGE' as 'MERGE' | 'REPLACE', images: 'MERGE' as 'MERGE' | 'REPLACE', newStatus: 'DRAFT' as 'DRAFT' | 'ACTIVE', publishNew: true, emptyClears: false, writeStock: false, safeDelete: true });
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const set = <K extends keyof typeof o>(k: K, v: (typeof o)[K]) => setO((x) => ({ ...x, [k]: v }));
@@ -469,6 +477,26 @@ function ImportPanel({ stores, canImport, canManage, maxMb }: { stores: StoreCar
               {readOnly.map((s) => s.name).join(', ')} {readOnly.length === 1 ? 'is' : 'are'} connected read-only: checked, not written.
             </p>
           )}
+        </div>
+
+        <div>
+          <Label>What should this file do?</Label>
+          <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="What should this file do?">
+            {MODES.map((m) => {
+              const on = o.mode === m.value;
+              const Icon = m.icon;
+              return (
+                <button key={m.value} type="button" role="radio" aria-checked={on} onClick={() => set('mode', m.value)} className={`flex items-start gap-2.5 rounded-[6px] border px-3 py-2.5 text-left transition ${on ? 'border-[var(--inv-bg)] bg-elev-2' : 'border-line hover:border-line-3'}`}>
+                  <Icon className={`mt-0.5 size-4 shrink-0 ${on ? 'text-ink' : 'text-ink-3'}`} />
+                  <span className="min-w-0">
+                    <span className="block text-[12.5px] font-semibold">{m.label}</span>
+                    <span className="mt-0.5 block text-[11.5px] leading-snug text-ink-3">{m.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[11px] text-ink-3">A product is matched by its ID or handle; a row with no handle is found by its barcodes. A Command column in the file (NEW, UPDATE, REPLACE, DELETE) overrides this for its rows.</p>
         </div>
 
         <div className="rounded-[6px] bg-elev-2/60">

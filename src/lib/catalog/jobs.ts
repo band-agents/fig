@@ -201,6 +201,7 @@ function clean(p: Principal, o: Partial<ImportJobOptions>): ImportJobOptions {
     ...DEFAULT_OPTIONS,
     emptyClears: false,
     ...o,
+    mode: o.mode === 'new' || o.mode === 'update' ? o.mode : 'both',
     tags: o.tags === 'REPLACE' ? 'REPLACE' : 'MERGE',
     images: o.images === 'REPLACE' ? 'REPLACE' : 'MERGE',
     newStatus: o.newStatus === 'ACTIVE' ? 'ACTIVE' : 'DRAFT',

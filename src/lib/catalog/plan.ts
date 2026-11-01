@@ -43,7 +43,17 @@ export type StoreProduct = {
 export type StoreRules = { taxable?: boolean; houseTags?: boolean; lucidaPrices?: boolean; vendors?: string[]; arabic?: boolean; notes: string[] };
 export type StoreCtx = { id: string; name: string; currency: string; rules: StoreRules };
 
+/**
+ * What the file does to the products it names (Dan, 1 Nov: "make it clear"), for every row without its
+ * own Command: both adds new products and updates the ones the store has (Matrixify's MERGE); new adds
+ * only, leaving products the store has as they are; update changes only products the store has, creating
+ * nothing. A Command in the file (NEW, UPDATE, REPLACE, DELETE, IGNORE) always wins.
+ */
+export type ImportMode = 'both' | 'new' | 'update';
+export const IMPORT_MODES: ImportMode[] = ['both', 'new', 'update'];
+
 export type ImportOptions = {
+  mode: ImportMode; // rows with no Command (MERGE): add and update, add only, or update only
   tags: ListCmd; // when the sheet gives no Tags Command: MERGE adds (the default), REPLACE sets exactly
   images: ListCmd; // when the sheet gives no Image Command
   newStatus: Status; // a new product with no Status
@@ -51,7 +61,7 @@ export type ImportOptions = {
   writeStock: boolean; // Variant Inventory Qty is written (Lucida owns stock otherwise)
   safeDelete: boolean; // DELETE archives instead of deleting
 };
-export const DEFAULT_OPTIONS: ImportOptions = { tags: 'MERGE', images: 'MERGE', newStatus: 'DRAFT', publishNew: true, writeStock: false, safeDelete: true };
+export const DEFAULT_OPTIONS: ImportOptions = { mode: 'both', tags: 'MERGE', images: 'MERGE', newStatus: 'DRAFT', publishNew: true, writeStock: false, safeDelete: true };
 
 export type Change = { field: string; label: string; before: string; after: string; rule?: boolean };
 export type Issue = { level: 'error' | 'warning' | 'info'; code: string; message: string };
@@ -166,6 +176,9 @@ export function planProduct(fp: FileProduct, existing: StoreProduct | null, stor
     return { item: item(archive ? 'archive' : 'delete'), write: { kind: archive ? 'archive' : 'delete', productId: existing.id, metafields: [], stock: [], publish: null, before: { status: existing.status } } };
   }
   if (fp.command === 'NEW' && existing) return err('exists', `Command NEW, but ${store.name} already has “${existing.handle}”.`);
+  // the file's mode, for rows that carry no Command of their own
+  if (fp.command === 'MERGE' && o.mode === 'new' && existing) return { item: item('skip', { issues: [...issues, { level: 'info', code: 'mode-new', message: `Already in ${store.name}: left as it is (this import only adds new products).` }] }), write: null };
+  if (fp.command === 'MERGE' && o.mode === 'update' && !existing) return { item: item('skip', { issues: [...issues, { level: 'info', code: 'mode-update', message: `Not in ${store.name}: not created (this import only updates existing products).` }] }), write: null };
   if (fp.command === 'UPDATE' && !existing) return { item: item('skip', { issues: [...issues, { level: 'info', code: 'absent', message: `Command UPDATE, and ${store.name} does not have it: skipped.` }] }), write: null };
   if (existing?.truncated) return err('too-big', 'More than 100 variants or 50 photos: too big to change safely from a sheet.');
   const creating = !existing;
