@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bostaCity, bostaCod, bostaCollected, BostaError, buildDelivery, classifyBosta, egyptPhone, mapBostaTrack, readBostaAnswer, trackingFrom, type BostaOrder } from '../bosta-map';
+import { bostaCity, bostaCod, bostaCollected, BostaError, buildDelivery, classifyBosta, egyptPhone, mapBostaTrack, pickDistrict, readBostaAnswer, trackingFrom, type BostaCityDistricts, type BostaOrder } from '../bosta-map';
 
 const order: BostaOrder = {
   number: '#1290',
@@ -68,13 +68,40 @@ describe('buildDelivery', () => {
   });
   it('refuses an address Bosta cannot route, with the reason', () => {
     expect(() => buildDelivery({ ...order, address: { ...order.address!, region: 'Atlantis', city: 'Nowhere' } })).toThrow(/does not know the governorate "Atlantis"/);
-    expect(() => buildDelivery({ ...order, address: { ...order.address!, line1: 'x' } })).toThrow(BostaError);
+    expect(() => buildDelivery({ ...order, address: { ...order.address!, line1: 'x', line2: '', city: '' } })).toThrow(BostaError);
     expect(() => buildDelivery({ ...order, address: null })).toThrow(/no delivery address/);
   });
   it('sends the webhook and pickup location only when set', () => {
     expect(body).not.toHaveProperty('webhookUrl');
     const b = buildDelivery(order, { businessLocationId: 'loc1', webhookUrl: 'https://c/x', webhookAuth: 's' });
     expect(b).toMatchObject({ businessLocationId: 'loc1', webhookUrl: 'https://c/x', webhookCustomHeaders: { Authorization: 's' } });
+  });
+});
+
+describe('districts', () => {
+  const d = (zoneName: string, districtName: string, zoneOtherName = '', districtOtherName = '') => ({ zoneId: `z-${zoneName}`, zoneName, zoneOtherName, districtId: `d-${districtName}`, districtName, districtOtherName, dropOffAvailability: true });
+  const cairo: BostaCityDistricts = { cityId: 'c', cityName: 'Cairo', districts: [d('Nasr City', 'ElHay 06 (Nasr City)', 'مدينه نصر'), d('Masr ElGedida', 'Almazah', 'مصر الجديده'), d('ElMaadi', 'ElMaadi', 'المعادي'), d('New Cairo', '1st Settlement', 'القاهره الجديده'), d('Agouza', 'Mohandesiin', 'العجوزه', 'المهندسين')] };
+  const giza: BostaCityDistricts = { cityId: 'g', cityName: 'Giza', districts: [d('6 October', '6 October', '٦ اكتوبر'), d('ElHaram', 'Nazlet ElBatran', 'الهرم')] };
+  it('finds the area in what the customer typed, English, Arabic or a known nickname', () => {
+    expect(pickDistrict(cairo, { line1: '12 Abbas St', city: 'Nasr city' })?.zoneName).toBe('Nasr City');
+    expect(pickDistrict(cairo, { line1: '16 Corniche', city: "ma'adi" })?.zoneName).toBe('ElMaadi');
+    expect(pickDistrict(cairo, { line1: '16 Corniche El Maadi', city: 'Cairo' })?.zoneName).toBe('ElMaadi');
+    expect(pickDistrict(cairo, { line1: '١١٤ شارع جسر السويس', city: 'مصر الجديدة' })?.zoneName).toBe('Masr ElGedida');
+    expect(pickDistrict(cairo, { line1: 'Les Rois compound', city: '5th Settlement' })?.zoneName).toBe('New Cairo');
+    expect(pickDistrict(cairo, { line1: 'Square 1226', city: 'Sheraton heliopolis' })?.zoneName).toBe('Masr ElGedida');
+    expect(pickDistrict(cairo, { line1: '1 Some Street', city: 'Cairo' })).toBeNull();
+  });
+  it('looks across Cairo and Giza and books the city Bosta files the area under', () => {
+    const b = buildDelivery({ ...order, address: { ...order.address!, region: 'Giza', city: 'Giza', line1: '27 Mohy el Deen - Mohandessin' } }, { districts: [cairo, giza] });
+    expect(b.dropOffAddress).toMatchObject({ city: 'Cairo', districtId: 'd-Mohandesiin' });
+    const o = buildDelivery({ ...order, address: { ...order.address!, region: '6th of October', city: 'اكتوبر', line1: 'Building 5, El Hay 7' } }, { districts: [cairo, giza] });
+    expect(o.dropOffAddress).toMatchObject({ city: 'Giza', districtId: 'd-6 October' });
+  });
+  it('refuses with the reason when no district is named', () => {
+    expect(() => buildDelivery({ ...order, address: { ...order.address!, city: 'Cairo', line1: '1 Some Street' } }, { districts: [cairo, giza] })).toThrow(/needs the district/);
+  });
+  it('a too-short street line borrows the rest of the address', () => {
+    expect(buildDelivery({ ...order, address: { ...order.address!, line1: '3', line2: 'Floor 2' } }).dropOffAddress.firstLine).toBe('3, Floor 2, Nasr City');
   });
 });
 

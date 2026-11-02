@@ -2,7 +2,7 @@ import 'server-only';
 // Bosta (Egypt): FIG's courier. Creates deliveries, fetches the air waybill, tracks, terminates.
 // BOSTA_ENV says which server the key belongs to: Bosta's staging (stg-app) until the live key is in.
 import { fetchRetry } from './http';
-import { BostaError, buildDelivery, mapBostaTrack, readBostaAnswer, trackingFrom, type BostaOrder, type CreateAnswer, type TrackAnswer } from './bosta-map';
+import { BostaError, buildDelivery, mapBostaTrack, readBostaAnswer, trackingFrom, type BostaCityDistricts, type BostaOrder, type CreateAnswer, type TrackAnswer } from './bosta-map';
 import type { TrackUpdate } from './aramex-map';
 
 export { BostaError, bostaCity, bostaCollected, bostaTrackingUrl, classifyBosta } from './bosta-map';
@@ -25,6 +25,7 @@ export const bostaCreateAt = (): 'ready' | 'packed' | 'manual' => {
 };
 
 export const BOSTA_COURIER = 'Bosta';
+const EGYPT = '60e4482c7cb7d4bc4849c4d5'; // Bosta's id for Egypt (GET /countries)
 
 const base = () => (env('BOSTA_BASE_URL') || (bostaEnv() === 'live' ? 'https://app.bosta.co' : 'https://stg-app.bosta.co')).replace(/\/+$/, '') + '/api/v2';
 const headers = () => ({ Authorization: env('BOSTA_API_KEY'), 'Content-Type': 'application/json', Accept: 'application/json' });
@@ -33,10 +34,23 @@ function assertReady() {
   if (!bostaConfigured()) throw new BostaError('Bosta is not configured: BOSTA_ENABLED=true and BOSTA_API_KEY are needed.');
 }
 
+let districtCache: { at: number; list: BostaCityDistricts[] } | null = null;
+
+/** Bosta's districts for every city (public, ~4,000 rows), kept for 12 hours. */
+async function districts(): Promise<BostaCityDistricts[]> {
+  if (districtCache && Date.now() - districtCache.at < 12 * 3600_000) return districtCache.list;
+  const res = await fetchRetry(`${base()}/cities/getAllDistricts?countryId=${EGYPT}`, { headers: { Accept: 'application/json' } }, { label: 'Bosta', tries: 3, timeoutMs: 30_000 });
+  const list = readBostaAnswer<BostaCityDistricts[]>(res.status, await res.text());
+  if (!Array.isArray(list) || !list.length) throw new BostaError('Bosta sent no district list.');
+  districtCache = { at: Date.now(), list };
+  return list;
+}
+
 /** Creates the delivery and returns Bosta's tracking number. Not retried on a network failure, so no doubles. */
 export async function createDelivery(order: BostaOrder): Promise<{ tracking: string; id: string | null }> {
   assertReady();
   const body = buildDelivery(order, {
+    districts: await districts(),
     businessLocationId: env('BOSTA_BUSINESS_LOCATION_ID') || undefined,
     webhookUrl: env('BOSTA_WEBHOOK_URL') || undefined,
     webhookAuth: env('BOSTA_WEBHOOK_SECRET') || undefined,
@@ -69,8 +83,9 @@ export async function trackDeliveries(trackings: string[]): Promise<Map<string, 
   const out = new Map<string, { code: number; type: string | null; updates: TrackUpdate[] }>();
   for (const t of [...new Set(trackings.map((x) => x.trim()).filter(Boolean))]) {
     const res = await fetchRetry(`${base()}/deliveries/business/${encodeURIComponent(t)}`, { headers: headers() }, { label: 'Bosta', tries: 3, timeoutMs: 20_000 });
-    if (res.status === 404) continue; // not this account's
-    out.set(t, mapBostaTrack(readBostaAnswer<TrackAnswer>(res.status, await res.text())));
+    const text = await res.text();
+    if (res.status === 404 || /"errorCode":\s*1066/.test(text)) continue; // "Delivery not found." (a 400): not this account's
+    out.set(t, mapBostaTrack(readBostaAnswer<TrackAnswer>(res.status, text)));
   }
   return out;
 }

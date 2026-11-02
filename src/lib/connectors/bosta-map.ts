@@ -71,6 +71,72 @@ export function bostaCity(a: Pick<Address, 'region' | 'city' | 'area'> | null | 
   return null;
 }
 
+/** One city of GET /cities/getAllDistricts: Bosta needs a district on every drop-off (error 777 without one). */
+export type BostaDistrict = { zoneId: string; zoneName: string; zoneOtherName?: string; districtId: string; districtName: string; districtOtherName?: string; dropOffAvailability?: boolean };
+export type BostaCityDistricts = { cityId: string; cityName: string; districts: BostaDistrict[] };
+
+/** "ElMaadi", "El Maadi", "المعادي" and "maadi" all read the same. */
+function squash(s: string) {
+  return s
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/[ىئ]/g, 'ي')
+    .split(/[^a-z0-9؀-ۿ]+/)
+    .map((w) => w.replace(/^ال(?=..)/, ''))
+    .filter((w) => w && w !== 'el' && w !== 'al')
+    .join('');
+}
+
+/** How FIG customers write places Bosta lists under another name (checked on 100 FIG orders, 3 Nov 2026). */
+const ALIASES: [RegExp, string][] = [
+  [/heliopolis|هليوبوليس|مصر الجديد|ard el ?golf|ارض الجولف|korba|الكوربة/i, 'Masr ElGedida'],
+  [/(5th|fifth|1st|first|3rd|third) settlement|tagamm?o|التجمع|katameya|القطامية|rehab|الرحاب/i, 'New Cairo'],
+  [/city ?stars|سيتي ?(ا)?ستارز|سيتى ?(ا)?ستارز|abbas el ?akk?ad|makram ebeid|مكرم عبيد|عباس العقاد/i, 'Nasr City'],
+  [/october|اكتوبر|أكتوبر/i, '6 October'],
+  [/zayed|زايد/i, 'ElSheikh Zayed'],
+  [/mahall?a|المحلة|المحله/i, 'ElMahala ElKobra'],
+  [/zagazig|الزقازيق/i, 'ElZakazik'],
+  [/mansoura|المنصورة|المنصوره/i, 'ElMansourah'],
+  [/dokki|الدقي/i, 'Dokki'],
+  [/mohand(e|i)s|المهندسين/i, 'Mohandesiin'],
+  [/haram|الهرم/i, 'ElHaram'],
+  [/faisal|فيصل/i, 'Faisal'],
+  [/madint?y|مدينتي/i, 'Madinaty'],
+  [/stanley|san ?stefano|sporting|cleopatra|g(i|a)na?kl(i|e)s|ستانلي|سان ستيفانو|جناكليس/i, 'Qesm ElRaml'],
+  [/ain ?shams|عين شمس/i, 'Ein Shams'],
+  [/z(a|e)(i|y)?too?n|الزيتون/i, 'ElZeytoun'],
+  [/qobb?a|kobb?a|القبة|القبه/i, 'Hadaiq ElQobbah'],
+  [/smouha|سموحة/i, 'Smouha'],
+];
+
+/**
+ * The district the address names, inside the governorate's city: the longest district or area name found in
+ * what the customer typed (city, area, street lines; English or Arabic). A district name wins over an area
+ * (zone) name; an area gives its first district. Null when nothing matches: the team corrects the address.
+ */
+export function pickDistrict(city: BostaCityDistricts, a: Pick<Address, 'city' | 'area' | 'line1' | 'line2'> | null | undefined): BostaDistrict | null {
+  const raw = [a?.area, a?.city, a?.line1, a?.line2].filter(Boolean).join(' ');
+  const hay = squash([raw, ...ALIASES.filter(([re]) => re.test(raw)).map(([, name]) => name)].join(' '));
+  if (!hay) return null;
+  let best: { d: BostaDistrict; len: number; district: boolean } | null = null;
+  for (const d of city.districts) {
+    if (d.dropOffAvailability === false) continue;
+    for (const [name, district] of [
+      [d.districtName, true],
+      [d.districtOtherName, true],
+      [d.zoneName, false],
+      [d.zoneOtherName, false],
+    ] as const) {
+      const n = name ? squash(name) : '';
+      if (n.length < 4 || !hay.includes(n)) continue;
+      if (!best || n.length > best.len || (n.length === best.len && district && !best.district)) best = { d, len: n.length, district };
+    }
+  }
+  return best?.d ?? null;
+}
+
 /** Egyptian mobiles as Bosta wants them: 01xxxxxxxxx. Anything else is left as digits. */
 export function egyptPhone(raw: string | null | undefined) {
   const d = (raw ?? '').replace(/\D/g, '').replace(/^00/, '');
@@ -89,13 +155,29 @@ export function bostaCod(o: Pick<Order, 'paymentStatus' | 'total' | 'currency'>)
   return toMajor(o.total, o.currency);
 }
 
-export function buildDelivery(o: BostaOrder, opts: { businessLocationId?: string; webhookUrl?: string; webhookAuth?: string } = {}) {
+export function buildDelivery(o: BostaOrder, opts: { districts?: BostaCityDistricts[]; businessLocationId?: string; webhookUrl?: string; webhookAuth?: string } = {}) {
   const a = o.address;
-  const line1 = [a?.line1, a?.area].filter((x) => x?.trim()).join(', ').trim();
+  let line1 = [a?.line1, a?.area].filter((x) => x?.trim()).join(', ').trim();
   if (!a || !line1) throw new BostaError(`${o.number} has no delivery address.`);
+  // a street line of "3" (a building number) still reaches Bosta's minimum with the rest of what the customer typed
+  if (line1.length <= 5) line1 = [line1, a.line2, a.city].filter((x) => x?.trim()).join(', ');
   if (line1.length <= 5) throw new BostaError(`${o.number}: the address "${line1}" is too short for Bosta (more than 5 characters). Complete it, then book again.`);
   const city = bostaCity(a);
   if (!city) throw new BostaError(`${o.number}: Bosta does not know the governorate "${a.region || a.city || 'nothing'}". Correct the governorate in the address, then book again.`);
+  let district: BostaDistrict | null = null;
+  let dropCity = city;
+  if (opts.districts) {
+    // Greater Cairo is one place to customers, two to Bosta (Mohandessin and Agouza sit under Cairo there)
+    for (const c of city === 'Cairo' ? ['Cairo', 'Giza'] : city === 'Giza' ? ['Giza', 'Cairo'] : [city]) {
+      const list = opts.districts.find((x) => x.cityName === c);
+      district = list ? pickDistrict(list, a) : null;
+      if (district) {
+        dropCity = c;
+        break;
+      }
+    }
+    if (!district) throw new BostaError(`${o.number}: Bosta needs the district, and "${[a.city, a.area].filter(Boolean).join(', ') || a.line1}" names none Bosta knows in ${city}. Add the area (e.g. Nasr City, Maadi, Sheikh Zayed) to the address, then book again.`);
+  }
   const name = (a.name || o.customerName || '').trim() || 'Customer';
   const [firstName, ...rest] = name.split(/\s+/);
   const pieces = Math.max(1, o.lines.reduce((n, l) => n + l.quantity, 0));
@@ -108,7 +190,8 @@ export function buildDelivery(o: BostaOrder, opts: { businessLocationId?: string
     cod: bostaCod(o),
     allowToOpenPackage: false, // opening needs product photos sent with the order (Bosta error 2150)
     dropOffAddress: {
-      city,
+      city: dropCity,
+      ...(district ? { districtId: district.districtId } : {}),
       firstLine: line1.slice(0, 250),
       secondLine: [a.line2, a.city && a.city !== a.region ? a.city : null].filter(Boolean).join(', ').slice(0, 250) || undefined,
     },
