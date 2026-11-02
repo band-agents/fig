@@ -154,6 +154,6 @@ describe('buildReturnPickup', () => {
   });
 
   it('refuses a return whose order has no Kuwait area, like an order would', () => {
-    expect(() => buildReturnPickup({ number: 'RMA-1', amount: 1, currency: 'KWD', order: { ...order, address: { line1: 'x', city: 'Kuwait' } }, lines: [] }, acc)).toThrow(GmtcError);
+    expect(() => buildReturnPickup({ number: 'RMA-1', amount: 1, currency: 'KWD', order: { ...order, address: { line1: 'x', city: 'Kuwait', country: 'KW' } }, lines: [] }, acc)).toThrow(GmtcError);
   });
 });

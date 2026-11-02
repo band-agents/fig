@@ -16,6 +16,7 @@ export function ReturnDialog({ orderId, lines, currency, policy, canOverride, on
   const [qty, setQty] = useState<Record<string, number>>({});
   const [reason, setReason] = useState<ReturnReason>('too_small');
   const [resolution, setResolution] = useState<'refund' | 'exchange' | 'credit'>('refund');
+  const [method, setMethod] = useState<'pickup' | 'store'>(policy.storeOnly ? 'store' : 'pickup');
   const [note, setNote] = useState('');
   const [override, setOverride] = useState(false);
   const [pending, start] = useTransition();
@@ -59,7 +60,7 @@ export function ReturnDialog({ orderId, lines, currency, policy, canOverride, on
           </li>
         ))}
       </ul>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className={`mt-4 grid gap-3 ${policy.storeOnly ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
         <label>
           <span className="mb-1 block text-xs text-ink-3">Reason</span>
           <select className="field" value={reason} onChange={(e) => setReason(e.target.value as ReturnReason)}>
@@ -78,6 +79,15 @@ export function ReturnDialog({ orderId, lines, currency, policy, canOverride, on
             <option value="credit">Store credit</option>
           </select>
         </label>
+        {!policy.storeOnly && (
+          <label>
+            <span className="mb-1 block text-xs text-ink-3">Coming back by</span>
+            <select className="field" value={method} onChange={(e) => setMethod(e.target.value as typeof method)}>
+              <option value="pickup">Courier collects it (UPS in Kuwait)</option>
+              <option value="store">Customer brings it to a store</option>
+            </select>
+          </label>
+        )}
       </div>
       <label className="mt-3 block">
         <span className="mb-1 block text-xs text-ink-3">Note {override && <span className="text-critical">(required for an override)</span>}</span>
@@ -99,7 +109,7 @@ export function ReturnDialog({ orderId, lines, currency, policy, canOverride, on
             disabled={pending || !picked.length || blocked}
             onClick={() =>
               start(async () => {
-                const r = await openReturnAction(orderId, { items: picked.map((l) => ({ orderItemId: l.id, quantity: qty[l.id] })), reason, note: note || undefined, resolution, override });
+                const r = await openReturnAction(orderId, { items: picked.map((l) => ({ orderItemId: l.id, quantity: qty[l.id] })), reason, note: note || undefined, resolution, method, override });
                 if (r.ok) {
                   toast(`Return ${r.message} opened`);
                   onClose();
