@@ -69,8 +69,9 @@ export async function trackDeliveries(trackings: string[]): Promise<Map<string, 
   const out = new Map<string, { code: number; type: string | null; updates: TrackUpdate[] }>();
   for (const t of [...new Set(trackings.map((x) => x.trim()).filter(Boolean))]) {
     const res = await fetchRetry(`${base()}/deliveries/business/${encodeURIComponent(t)}`, { headers: headers() }, { label: 'Bosta', tries: 3, timeoutMs: 20_000 });
-    if (res.status === 404) continue; // not this account's
-    out.set(t, mapBostaTrack(readBostaAnswer<TrackAnswer>(res.status, await res.text())));
+    const text = await res.text();
+    if (res.status === 404 || /"errorCode":\s*1066/.test(text)) continue; // "Delivery not found." (a 400): not this account's
+    out.set(t, mapBostaTrack(readBostaAnswer<TrackAnswer>(res.status, text)));
   }
   return out;
 }
