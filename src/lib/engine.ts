@@ -645,6 +645,7 @@ export async function openReturn(
   if (!opts.quiet) publish({ kind: 'return', id: ret.id, number, channelId: o.channelId, stage: 'requested', actor: actor.name, message: msg });
   /* A copy for the Labesny app's admin; sent after the return is saved, and never in the way of it. */
   if (!opts.quiet) void mirrorReturn(ret.id);
+  if (!opts.quiet && ret.method === 'pickup') courierFollowsReturn(ret.id, 'requested');
   return ret;
 }
 
@@ -674,6 +675,12 @@ export async function moveReturn(
     if (to === 'rejected') input = { ...input, reason: review.reason };
   }
   if (t.needs?.includes('reason') && !input.reason?.trim()) throw invalid('Give a reason.');
+  // a Kuwait home pickup carries its UPS waybill already, or gets one booked here; any other courier is typed in
+  if (to === 'pickup' && !input.tracking?.trim()) {
+    const ups = await import('./gmtc-returns');
+    if (r.tracking) input = { ...input, tracking: r.tracking };
+    else if (ups.upsCollects(r) && !opts.quiet) input = { ...input, tracking: await ups.bookReturnPickup(actor, r.id) };
+  }
   if (t.needs?.includes('tracking') && !input.tracking?.trim()) throw invalid('Add the pickup waybill.');
   if (t.needs?.includes('note') && !input.note?.trim()) throw invalid('Add a note.');
   if (to === 'inspected' && !input.inspection) throw invalid('Record the inspection result.');
@@ -725,6 +732,12 @@ export async function moveReturn(
   }
   if (!opts.quiet) publish({ kind: 'return', id: r.id, number: r.number, channelId: r.channelId, stage: to, actor: actor.name, message: `${r.number} → ${meta.label}` });
   if (!opts.quiet) void mirrorReturn(r.id);
+  if (!opts.quiet && (to === 'approved' || to === 'rejected')) courierFollowsReturn(r.id, to);
+}
+
+/** Kuwait home pickups: UPS is booked, moved on and cancelled with the return. Lazy and never awaited, like the orders' courier. */
+function courierFollowsReturn(returnId: string, to: ReturnStage) {
+  keepAlive(import('./gmtc-returns').then((m) => m.courierFollowsReturn(returnId, to)).catch(() => {}));
 }
 
 // ── Lookups used by several screens ─────────────────────────────────────────────────────────────
