@@ -6,7 +6,7 @@ import { MailTest } from '@/components/channels/mail-test';
 import { requireUser, sendHome } from '@/lib/auth/session';
 import { getDb, schema } from '@/lib/db';
 import { CHANNELS, channelConfigured, warehouseLabel } from '@/lib/channels';
-import { aramexConfigured, gmtcConfigured, gmtcEnv, lucidaConfigured } from '@/lib/connectors';
+import { aramexConfigured, bostaConfigured, bostaEnv, gmtcConfigured, gmtcEnv, lucidaConfigured } from '@/lib/connectors';
 import { can, canSee } from '@/lib/domain/perms';
 import { writeBackEnabled, writeBackMode } from '@/lib/writeback';
 import { ago } from '@/lib/format';
@@ -36,6 +36,7 @@ export default async function ChannelsPage() {
   const extras = [
     { icon: Truck, name: 'Aramex', on: aramexConfigured(), what: 'Live tracking: shipped → out for delivery → delivered or refused, every few minutes.', env: ['ARAMEX_USERNAME', 'ARAMEX_PASSWORD', 'ARAMEX_ACCOUNT_NUMBER', 'ARAMEX_ACCOUNT_PIN', 'ARAMEX_ACCOUNT_ENTITY', 'ARAMEX_ACCOUNT_COUNTRY_CODE', 'a country with its own account: ARAMEX_JO_* (same names)'] },
     { icon: Truck, name: `UPS Kuwait (GMTC)${gmtcConfigured() && gmtcEnv() === 'staging' ? ' · test account' : ''}`, on: gmtcConfigured(), what: 'Labesny parcels in Kuwait: booked by itself when an order is ready to pick, label from the courier desk, cancelled with the order, and the courier scans move it to shipped, out for delivery, delivered or refused.', env: ['GMTC_ENABLED=true', 'GMTC_API_KEY', 'GMTC_CUSTOMER_CODE', 'GMTC_ENV=staging|live', 'GMTC_CREATE_AT=ready|packed|manual'] },
+    { icon: Truck, name: `Bosta (Egypt)${bostaConfigured() && bostaEnv() === 'staging' ? ' · test account' : ''}`, on: bostaConfigured(), what: 'FIG parcels in Egypt: booked by itself when an order is ready to pick, air waybill from the courier desk, cancelled with the order, and the Bosta scans move it to shipped (Shopify emails the tracking link), out for delivery, delivered or refused.', env: ['BOSTA_ENABLED=true', 'BOSTA_API_KEY', 'BOSTA_ENV=staging|live', 'BOSTA_CREATE_AT=ready|packed|manual', 'BOSTA_CHANNELS=fig-web,fig-app'] },
     { icon: Boxes, name: 'Lucida ERP', on: lucidaConfigured(), what: 'Stock on hand by barcode at pick time, so a missing piece is caught before the picker walks the aisle.', env: ['LUCIDA_ACCOUNTS (JSON: [{username,password}, …])'] },
     { icon: PencilLine, name: `Write-back to Shopify${writeBackMode() === 'dry' ? ' (dry run)' : ''}`, on: writeBackEnabled(), what: 'What the floor does goes to the store: stage tags, holds, fulfilment with the waybill (customer emailed), delivery steps, cash marked paid, cancels (restocked, no refund) and refunds. Stock and prices stay with Lucida.', env: ['RELAY_WRITE_BACK=true', 'RELAY_WRITE_BACK=dry to see without sending'] },
     { icon: Mail, name: 'Email (team invitations)', on: mailConfigured(), what: `Team invitations and logins go by email from the company's own mailbox${mailConfigured() ? ` (${process.env.SMTP_USER} via ${process.env.SMTP_HOST})` : ''}.`, env: ['SMTP_HOST (e.g. mail.dagher-hinnawi.com, smtp.gmail.com, smtp.office365.com)', 'SMTP_PORT (465, or 587)', 'SMTP_USER (the sending mailbox)', 'SMTP_PASS (its password; Gmail: an app password)', 'MAIL_FROM (optional: DH & DCO <no-reply@…>)'], test: can(me, 'team', 3) || can(me, 'channels', 3) },

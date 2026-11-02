@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ExternalLink, MessageCircle, PackageCheck, PackageOpen, Printer, RotateCcw, Truck, TriangleAlert } from 'lucide-react';
-import { bookUpsAction } from '@/app/actions';
+import { bookBostaAction, bookUpsAction } from '@/app/actions';
 import { fmt, recommend } from '@/lib/domain/courier-rates';
 import { gmtcArea } from '@/lib/connectors/kuwait-areas';
 import { toast } from '@/components/ui/toast';
@@ -14,13 +14,14 @@ import { RTO_REASONS } from '@/lib/domain/stages';
 import { CHANNEL } from '@/lib/channels';
 import { ago, money } from '@/lib/format';
 import { aramexTrackingUrl } from '@/lib/connectors/aramex-map';
+import { bostaTrackingUrl } from '@/lib/connectors/bosta-map';
 import { ChannelChip, Empty, Payment, ReturnPill, StagePill } from '@/components/ui/bits';
 import { SlaChip } from '@/components/ui/sla';
 import { OrderLink, ReasonModal, Spin, useMover } from './shared';
 
 type View = 'handover' | 'road' | 'exceptions' | 'rto' | 'pickups';
 
-export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, scopes, ups = null }: { view: View; packed: OrderRow[]; road: OrderRow[]; exceptions: OrderRow[]; rto: OrderRow[]; pickups: ReturnRow[]; scopes: Scopes; ups?: 'staging' | 'live' | null }) {
+export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, scopes, ups = null, bosta = null }: { view: View; packed: OrderRow[]; road: OrderRow[]; exceptions: OrderRow[]; rto: OrderRow[]; pickups: ReturnRow[]; scopes: Scopes; ups?: 'staging' | 'live' | null; bosta?: { env: 'staging' | 'live'; channels: string[] } | null }) {
   const m = useMover();
   const [booking, startBooking] = useTransition();
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -33,6 +34,16 @@ export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, sc
       else toast(r.error, { tone: 'error' });
     });
   };
+  const bookBosta = (id: string) => {
+    setBookingId(id);
+    startBooking(async () => {
+      const r = await bookBostaAction(id);
+      setBookingId(null);
+      if (r.ok) toast(r.message ?? 'Booked with Bosta');
+      else toast(r.error, { tone: 'error' });
+    });
+  };
+  const bostaFor = (o: OrderRow) => Boolean(bosta?.channels.includes(o.channelId)) && !o.tracking && (!o.courier || o.courier === CHANNEL[o.channelId]?.carrier || o.courier === 'Bosta');
   const ships = (scopes.shipping ?? 0) >= 2;
   const desk = (scopes.returns ?? 0) >= 2;
   const [waybills, setWaybills] = useState<Record<string, string>>({});
@@ -66,13 +77,13 @@ export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, sc
                 {o.total != null && o.paymentMethod === 'cod' && <span className="font-mono text-[12px]">collect {money(o.total, o.currency)}</span>}
                 {CHANNEL[o.channelId]?.country === 'KW' && !o.tracking && o.total != null && <CheapestCourier area={gmtcArea(o.city, { within: true })} pieces={o.items} cod={o.paymentMethod === 'cod' ? o.total : 0} ups={Boolean(ups)} />}
                 <SlaChip due={o.dueAt} since={o.stageAt} held={o.onHold} />
-                {ships && o.courier === 'UPS Kuwait' && o.tracking ? (
+                {ships && (o.courier === 'UPS Kuwait' || o.courier === 'Bosta') && o.tracking ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-[12px] text-ink-2">UPS {o.tracking}</span>
+                    <span className="font-mono text-[12px] text-ink-2">{o.courier === 'Bosta' ? 'Bosta' : 'UPS'} {o.tracking}</span>
                     <a href={`/orders/${o.id}/label`} target="_blank" rel="noreferrer" className="btn btn-quiet btn-sm">
                       <Printer className="size-3.5" /> Label
                     </a>
-                    <button onClick={() => m.order(o.id, 'shipped', { tracking: o.tracking!, courier: 'UPS Kuwait' })} disabled={m.pending} className="btn btn-primary btn-sm">
+                    <button onClick={() => m.order(o.id, 'shipped', { tracking: o.tracking!, courier: o.courier! })} disabled={m.pending} className="btn btn-primary btn-sm">
                       <Spin on={m.busy === `${o.id}:shipped`} />
                       <Truck className="size-3.5" /> Handed over
                     </button>
@@ -83,6 +94,12 @@ export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, sc
                     <button onClick={() => bookUps(o.id)} disabled={booking} className="btn btn-primary btn-sm" title={ups === 'staging' ? 'GMTC test account: no real pickup is booked' : undefined}>
                       <Spin on={booking && bookingId === o.id} />
                       <Truck className="size-3.5" /> Book UPS{ups === 'staging' ? ' (test)' : ''}
+                    </button>
+                  )}
+                  {bostaFor(o) && (
+                    <button onClick={() => bookBosta(o.id)} disabled={booking} className="btn btn-primary btn-sm" title={bosta?.env === 'staging' ? 'Bosta test account: no real pickup is booked' : undefined}>
+                      <Spin on={booking && bookingId === o.id} />
+                      <Truck className="size-3.5" /> Book Bosta{bosta?.env === 'staging' ? ' (test)' : ''}
                     </button>
                   )}
                   <form
@@ -140,6 +157,10 @@ export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, sc
                   {o.tracking && o.courier === 'UPS Kuwait' ? (
                     <a href={`/orders/${o.id}/label`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-ink-2 hover:text-ink" title="UPS (GMTC) label">
                       UPS {o.tracking} <Printer className="size-3" />
+                    </a>
+                  ) : o.tracking && o.courier === 'Bosta' ? (
+                    <a href={bostaTrackingUrl(o.tracking)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-ink-2 hover:text-ink" title="Bosta tracking">
+                      Bosta {o.tracking} <ExternalLink className="size-3" />
                     </a>
                   ) : o.tracking && (
                     <a href={aramexTrackingUrl(o.tracking, ch?.country === 'KW' ? 'kw' : 'eg')} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-ink-2 hover:text-ink">

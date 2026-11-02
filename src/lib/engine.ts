@@ -393,6 +393,10 @@ async function setStage(
   if (o.source !== 'demo' && (to === 'cancelled' || to === 'ready' || to === 'packed') && CHANNEL[o.channelId]?.country === 'KW') {
     keepAlive(import('./gmtc-shipments').then((m) => m.courierFollowsOrder(o.id, to)).catch(() => {}));
   }
+  // FIG parcels in Egypt: Bosta, the same way
+  if (o.source !== 'demo' && (to === 'cancelled' || to === 'ready' || to === 'packed') && CHANNEL[o.channelId]?.country === 'EG') {
+    keepAlive(import('./bosta-shipments').then((m) => m.bostaFollowsOrder(o.id, to)).catch(() => {}));
+  }
 }
 
 /** A person moves an order. The transition must exist, and their access must cover its area. */
