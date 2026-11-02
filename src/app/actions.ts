@@ -145,6 +145,22 @@ export async function bookUpsAction(orderId: string, service?: 'NEXT DAY' | 'SAM
   });
 }
 
+/** Books a FIG order in Egypt with Bosta now: the tracking number comes back from Bosta, nobody types it. */
+export async function bookBostaAction(orderId: string) {
+  return run(async () => {
+    const u = await me();
+    const { createBostaShipment } = await import('@/lib/bosta-shipments');
+    const { BostaError } = await import('@/lib/connectors');
+    try {
+      const tracking = await createBostaShipment(actorFor(u), orderId);
+      return `Booked with Bosta: ${tracking}`;
+    } catch (e) {
+      if (e instanceof BostaError) throw new RelayError('invalid', e.message);
+      throw e;
+    }
+  });
+}
+
 /** Keeps the chosen courier on an open order (Courier assignment page). */
 export async function assignCourierAction(orderId: string, courier: string) {
   return run(async () => {
