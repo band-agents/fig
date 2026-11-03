@@ -174,6 +174,11 @@ export async function ingestOrder(inc: IncomingOrder, opts: Opts & { autopilot?:
       patch.paymentStatus = inc.paymentStatus;
       await record({ orderId: existing.id, at, actorName: channelLabel(inc.channelId), kind: 'payment', message: `Payment is now ${inc.paymentStatus.replace('_', ' ')} on ${channelLabel(inc.channelId)}` });
     }
+    // a failed card followed by cash on delivery (#1159) changes how they pay, not only whether they have
+    if (existing.paymentMethod !== inc.paymentMethod && inc.paymentMethod) {
+      patch.paymentMethod = inc.paymentMethod;
+      await record({ orderId: existing.id, at, actorName: channelLabel(inc.channelId), kind: 'payment', message: `Paying by ${inc.paymentMethod === 'cod' ? 'cash on delivery' : inc.paymentMethod} on ${channelLabel(inc.channelId)} (was ${existing.paymentMethod})` });
+    }
     if (Object.keys(patch).length > 2) await db.update(schema.orders).set(patch).where(eq(schema.orders.id, existing.id));
     await applyPlatformFacts(existing.id, inc);
     if (!opts.quiet) publish({ kind: 'order', id: existing.id, number: existing.number, channelId: existing.channelId, message: 'updated' });
@@ -387,6 +392,10 @@ async function setStage(
   // lazily (it calls back into this module) and never awaited: a courier hiccup must not stop an order.
   if (o.source !== 'demo' && (to === 'cancelled' || to === 'ready' || to === 'packed') && CHANNEL[o.channelId]?.country === 'KW') {
     keepAlive(import('./gmtc-shipments').then((m) => m.courierFollowsOrder(o.id, to)).catch(() => {}));
+  }
+  // FIG parcels in Egypt: Bosta, the same way
+  if (o.source !== 'demo' && (to === 'cancelled' || to === 'ready' || to === 'packed') && CHANNEL[o.channelId]?.country === 'EG') {
+    keepAlive(import('./bosta-shipments').then((m) => m.bostaFollowsOrder(o.id, to)).catch(() => {}));
   }
 }
 

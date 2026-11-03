@@ -66,9 +66,13 @@ export function kuwaitPhone(raw: string | null | undefined) {
   return d;
 }
 
-/** Cash the courier collects: only an unpaid cash-on-delivery order; blank otherwise, as GMTC asked. */
+/**
+ * Cash the courier collects: whatever an unpaid order still owes, blank once it is paid, as GMTC asked.
+ * Unpaid is enough, whatever the method says: #1159 (31 Oct) read as KNET after three failed card tries,
+ * went with nothing to collect, and the driver left 71.500 KD at the door.
+ */
 export function gmtcCod(o: Pick<Order, 'paymentMethod' | 'paymentStatus' | 'total' | 'currency'>): string {
-  if (o.paymentMethod !== 'cod' || ['paid', 'cod_collected', 'refunded'].includes(o.paymentStatus)) return '';
+  if (!['cod_due', 'pending'].includes(o.paymentStatus)) return '';
   return String(toMajor(o.total, o.currency));
 }
 

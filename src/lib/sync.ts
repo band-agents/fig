@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, eq, inArray, isNotNull, isNull, ne, or } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, ne, notInArray, or } from 'drizzle-orm';
 import { getDb, schema } from './db';
 import { CHANNEL, CHANNELS, channelConfigured, type ChannelDef } from './channels';
 import { connectorFor, aramexConfigured, classifyUpdate, trackShipments, type TrackUpdate } from './connectors';
@@ -73,15 +73,16 @@ export async function checkChannel(c: ChannelDef): Promise<ConnectionCheck> {
   }
 }
 
-/** Every courier in one pass: Aramex for its parcels, UPS (GMTC) for Kuwait's parcels and return pickups. */
+/** Every courier in one pass: Aramex for its parcels, UPS (GMTC) for Kuwait's parcels and return pickups, Bosta for FIG's in Egypt. */
 export async function trackCouriers() {
-  const [{ trackUps }, { trackUpsReturns }] = await Promise.all([import('./gmtc-shipments'), import('./gmtc-returns')]);
-  const [aramex, ups, upsReturns] = await Promise.all([
+  const [{ trackUps }, { trackUpsReturns }, { trackBosta }] = await Promise.all([import('./gmtc-shipments'), import('./gmtc-returns'), import('./bosta-shipments')]);
+  const [aramex, ups, upsReturns, bosta] = await Promise.all([
     trackAramex().catch((e) => ({ ok: false, note: `Aramex: ${e instanceof Error ? e.message : e}` })),
     trackUps().catch((e) => ({ ok: false, note: `UPS: ${e instanceof Error ? e.message : e}` })),
     trackUpsReturns().catch((e) => ({ ok: false, note: `UPS returns: ${e instanceof Error ? e.message : e}` })),
+    trackBosta().catch((e) => ({ ok: false, note: `Bosta: ${e instanceof Error ? e.message : e}` })),
   ]);
-  return { ok: aramex.ok || ups.ok, note: [aramex.note, ups.note, upsReturns.note].join(' · ') };
+  return { ok: aramex.ok || ups.ok || bosta.ok, note: [aramex.note, ups.note, upsReturns.note, bosta.note].join(' · ') };
 }
 
 /** Asks Aramex about every live parcel still on the road and moves orders when the courier says so. */
@@ -91,7 +92,7 @@ async function trackAramex() {
   const open = await db
     .select()
     .from(schema.orders)
-    .where(and(inArray(schema.orders.stage, ['shipped', 'delivering']), isNotNull(schema.orders.tracking), ne(schema.orders.source, 'demo'), or(isNull(schema.orders.courier), ne(schema.orders.courier, 'UPS Kuwait'))));
+    .where(and(inArray(schema.orders.stage, ['shipped', 'delivering']), isNotNull(schema.orders.tracking), ne(schema.orders.source, 'demo'), or(isNull(schema.orders.courier), notInArray(schema.orders.courier, ['UPS Kuwait', 'Bosta']))));
   if (!open.length) return { ok: true, note: 'Nothing on the road' };
   // Each country's parcels go to its own Aramex account (ARAMEX_JO_* for Jordan), else the default one.
   const byCountry = new Map<string, typeof open>();

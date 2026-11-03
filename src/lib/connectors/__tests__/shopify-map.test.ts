@@ -332,6 +332,10 @@ describe('Shopify payment mapping', () => {
     [['manual'], 'AUTHORIZED', 'EG', 'card', 'pending'],
     [['Paymob'], 'REFUNDED', 'EG', 'card', 'refunded'],
     [['Paymob'], 'VOIDED', 'EG', 'card', 'voided'],
+    // #1159: three failed MyFatoorah tries, then cash on delivery
+    [['MyFatoorah', 'Cash on Delivery (COD)'], 'PENDING', 'KW', 'cod', 'cod_due'],
+    [['MyFatoorah', 'Cash on Delivery (COD)'], 'PAID', 'KW', 'cod', 'paid'],
+    [['Cash on Delivery (COD)', 'MyFatoorah'], 'PAID', 'KW', 'knet', 'paid'],
   ] as const)('%j %s in %s → %s / %s', (gateways, fin, country, method, status) => {
     expect(shopifyPayment([...gateways], fin, country)).toEqual({ paymentMethod: method, paymentStatus: status });
   });

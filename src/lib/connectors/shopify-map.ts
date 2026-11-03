@@ -176,17 +176,16 @@ export function shopifyPayment(
   financialStatus: string | null | undefined,
   country: Country,
 ): Pick<IncomingOrder, 'paymentMethod' | 'paymentStatus'> {
-  const g = (gateways ?? []).join(' | ').toLowerCase();
   const fin = (financialStatus ?? '').toUpperCase();
+  /* Shopify lists every gateway the customer tried, in order. #1159 (31 Oct) was MyFatoorah three
+     times failed, then cash on delivery: the last one is how they pay, and an order still owed with
+     cash on the list is cash on delivery, or the courier is never told to collect it. */
+  const tried = (gateways ?? []).map((x) => x.trim()).filter(Boolean).map((x) => gatewayMethod(x, country));
+  const unpaid = !['PAID', 'REFUNDED', 'PARTIALLY_REFUNDED', 'VOIDED'].includes(fin);
   let method: IncomingOrder['paymentMethod'];
-  // Wallets first: "Vodafone Cash" is a wallet, not cash on delivery.
-  if (/wallet|vodafone/.test(g)) method = 'wallet';
-  else if (/instapay/.test(g)) method = 'instapay';
-  else if (/knet|myfatoorah/.test(g)) method = country === 'KW' ? 'knet' : 'card';
-  else if (/cash|\bcod\b/.test(g)) method = 'cod';
-  else if (/paymob|hyperpay|card|stripe|checkout|shopify_payments/.test(g)) method = 'card';
-  else if (!g.trim()) method = fin === 'PENDING' ? 'cod' : 'card';
-  else method = 'card';
+  if (unpaid && tried.includes('cod')) method = 'cod';
+  else if (tried.length) method = tried[tried.length - 1];
+  else method = fin === 'PENDING' ? 'cod' : 'card';
 
   let status: IncomingOrder['paymentStatus'];
   if (fin === 'PAID') status = 'paid';
@@ -195,6 +194,16 @@ export function shopifyPayment(
   else if (fin === 'VOIDED') status = 'voided';
   else status = method === 'cod' ? 'cod_due' : 'pending';
   return { paymentMethod: method, paymentStatus: status };
+}
+
+function gatewayMethod(gateway: string, country: Country): IncomingOrder['paymentMethod'] {
+  const g = gateway.toLowerCase();
+  // Wallets first: "Vodafone Cash" is a wallet, not cash on delivery.
+  if (/wallet|vodafone/.test(g)) return 'wallet';
+  if (/instapay/.test(g)) return 'instapay';
+  if (/knet|myfatoorah/.test(g)) return country === 'KW' ? 'knet' : 'card';
+  if (/cash|\bcod\b/.test(g)) return 'cod';
+  return 'card';
 }
 
 // ── App orders pushed into Shopify ─────────────────────────────────────────────────────────────

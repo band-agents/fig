@@ -63,6 +63,11 @@ describe('buildConsignment', () => {
 });
 
 describe('gmtcCod / kuwaitPhone', () => {
+  it('collects what an unpaid order owes, whatever the method says (#1159)', () => {
+    expect(gmtcCod({ paymentMethod: 'cod', paymentStatus: 'cod_due', total: 71_500, currency: 'KWD' })).toBe('71.5');
+    expect(gmtcCod({ paymentMethod: 'knet', paymentStatus: 'pending', total: 71_500, currency: 'KWD' })).toBe('71.5');
+    expect(gmtcCod({ paymentMethod: 'knet', paymentStatus: 'paid', total: 71_500, currency: 'KWD' })).toBe('');
+  });
   it('collects nothing once cash is in', () => {
     expect(gmtcCod({ paymentMethod: 'cod', paymentStatus: 'cod_collected', total: 1000, currency: 'KWD' })).toBe('');
   });
