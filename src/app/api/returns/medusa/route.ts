@@ -8,6 +8,7 @@ import type { RefundMethod } from '@/lib/domain/refund-methods';
 import { httpError, invalid, notFound } from '@/lib/errors';
 import { readPhotos, savePhotos } from '@/lib/return-photos';
 import { CHANNEL } from '@/lib/channels';
+import { findBranch } from '@/lib/domain/branches';
 import { toMinor } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,8 @@ export async function POST(req: Request) {
       note?: string;
       refund_method?: RefundMethod;
       branch?: string | null;
+      /** The shop's name as the site knows it, for a shop id the console doesn't have (FIG's). */
+      branch_name?: string | null;
       pickup?: 'home' | 'shop';
       photos?: unknown;
       via?: 'portal' | 'app';
@@ -93,13 +96,16 @@ export async function POST(req: Request) {
     const toShop = body.pickup !== 'home' || refundMethod === 'cash_at_store' || order.storeOnly;
     const brand = CHANNEL[o.channelId]?.brand ?? '';
     const site = brand === 'FIG' ? 'figeg.com' : brand === 'Labesny' ? 'labesny.com' : 'the website';
+    const known = findBranch(brand || 'FIG', CHANNEL[o.channelId]?.country ?? 'EG', body.branch ?? null);
+    const shopNote = !known && body.branch_name?.trim() ? `Shop chosen: ${body.branch_name.trim()}` : '';
+    const note = [shopNote, body.note?.trim()].filter(Boolean).join(' · ') || undefined;
     const amount = Number(body.amount);
     const bonus = Number(body.bonus ?? 0);
 
     const ret = await openReturn({ id: null, name: `Customer (${body.via === 'app' ? `${brand || 'the'} app` : site} · ${o.number})`, dept: null }, o.id, {
       items: picked,
       reason,
-      note: body.note?.trim() || undefined,
+      note,
       refundMethod,
       method: toShop ? 'store' : 'pickup',
       branch: body.branch ?? null,
