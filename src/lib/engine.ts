@@ -1,4 +1,5 @@
 import 'server-only';
+import { money } from './format';
 import { and, desc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import { getDb, schema } from './db';
 import { CHANNEL, channelLabel } from './channels';
@@ -653,7 +654,7 @@ export async function openReturn(
     .returning();
   await db.insert(schema.returnItems).values(picked.map((p) => ({ returnId: ret.id, orderItemId: p.orderItemId, quantity: p.quantity, reason: input.reason })));
   const via = input.openedVia === 'portal' ? ' · opened by the customer' : input.openedVia === 'app' ? ' · opened in the app' : '';
-  const paid = refund.bonus > 0 ? ` · ${refund.method.replace(/_/g, ' ')} +${refund.bonus} bonus` : ` · ${refund.method.replace(/_/g, ' ')}`;
+  const paid = refund.bonus > 0 ? ` · ${refund.method.replace(/_/g, ' ')} +${money(refund.bonus, o.currency)} bonus` : ` · ${refund.method.replace(/_/g, ' ')}`;
   const msg = `Return ${number} opened · ${picked.length} item${picked.length > 1 ? 's' : ''}${paid}${via}${site ? ' · from the website' : ''}${overriding ? ' · policy overridden' : ''}`;
   await record({ orderId, returnId: ret.id, at: now, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'stage', toStage: 'requested', message: msg, data: input.note ? { note: input.note } : undefined });
   await refreshCustomer(o.customerId);
