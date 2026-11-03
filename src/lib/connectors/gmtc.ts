@@ -4,6 +4,7 @@ import 'server-only';
 import { fetchRetry } from './http';
 import {
   buildConsignment,
+  buildReturnPickup,
   GmtcError,
   mapTrack,
   readGmtcAnswer,
@@ -12,6 +13,7 @@ import {
   type CreateAnswer,
   type GmtcAccount,
   type GmtcOrder,
+  type GmtcReturn,
   type TrackAnswer,
 } from './gmtc-map';
 import type { TrackUpdate } from './aramex-map';
@@ -96,6 +98,21 @@ async function create(order: GmtcOrder, acc: GmtcAccount): Promise<{ waybill: st
   } catch (e) {
     if (e instanceof GmtcError && /DESTINATION_HUB_NOT_FOUND/.test(e.message))
       throw new GmtcError(`UPS (GMTC) does not recognise the area "${body.destination_details.city}" on ${order.number}. Correct the area in the address, then book again.`, e.status);
+    throw e;
+  }
+}
+
+/** Books a return pickup at the customer's door (always the usual service) and returns its waybill. */
+export async function createReturnPickup(r: GmtcReturn): Promise<{ waybill: string; service: string }> {
+  assertReady();
+  const acc = account();
+  const body = buildReturnPickup(r, acc);
+  const res = await fetchRetry(path('upload/softdata/v2'), { method: 'POST', headers: headers(), body: JSON.stringify(body) }, { label: 'UPS (GMTC)', tries: 1, timeoutMs: 30_000 });
+  try {
+    return { waybill: waybillFrom(readGmtcAnswer<CreateAnswer>(res.status, await res.text())), service: acc.serviceType };
+  } catch (e) {
+    if (e instanceof GmtcError && /HUB_NOT_FOUND/.test(e.message))
+      throw new GmtcError(`UPS (GMTC) does not recognise the area "${body.origin_details.city}" on ${r.number}. Correct the area in the order's address, then book again.`, e.status);
     throw e;
   }
 }

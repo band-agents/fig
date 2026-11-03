@@ -211,7 +211,7 @@ export async function listOrders(input: {
 }
 
 /** Everything the portal shows about one order, from its row. */
-async function portalOrder(o: typeof schema.orders.$inferSelect): Promise<PortalOrder> {
+export async function portalOrder(o: typeof schema.orders.$inferSelect): Promise<PortalOrder> {
   const db = await getDb();
   const channel = CHANNEL[o.channelId];
   const policy = policyFor(channel?.brand ?? 'FIG', channel?.country ?? 'EG');

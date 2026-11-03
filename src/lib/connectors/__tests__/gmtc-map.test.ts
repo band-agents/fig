@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildConsignment, classifyGmtc, collectedAt, gmtcCod, GmtcError, kuwaitPhone, mapTrack, readGmtcAnswer, serviceAt, waybillFrom, type GmtcAccount, type GmtcOrder } from '../gmtc-map';
+import { buildConsignment, buildReturnPickup, classifyGmtc, collectedAt, gmtcCod, GmtcError, kuwaitPhone, mapTrack, readGmtcAnswer, serviceAt, waybillFrom, type GmtcAccount, type GmtcOrder } from '../gmtc-map';
 
 const acc: GmtcAccount = {
   customerCode: 'D&H',
@@ -138,5 +138,27 @@ describe('collectedAt (shipped only once the driver has the parcel)', () => {
   });
   it('a delivery step counts even if the pickup scan is missing', () => {
     expect(collectedAt([{ code: 'pickup_awaited', at: at('2026-10-31T04:00:00Z') }, { code: 'delivered', at: at('2026-10-31T14:59:00Z') }])).toEqual(at('2026-10-31T14:59:00Z'));
+  });
+});
+
+describe('buildReturnPickup', () => {
+  const body = buildReturnPickup({ number: 'RMA-4101', amount: 9_750, currency: 'KWD', order, lines: [{ title: 'Logo Tee', quantity: 1 }] }, acc);
+
+  it('is a REVERSE consignment: collected at the customer, delivered to the warehouse', () => {
+    expect(body.consignment_type).toBe('REVERSE');
+    expect(body.origin_details).toMatchObject({ city: 'Salmiya', phone: '96550000000', address_line_1: 'Block 1, Street 2, House 3' });
+    expect(body.destination_details).toMatchObject({ name: 'D&H International - Labesny', address_line_1: 'D&H Warehouse', city: 'Dajeej' });
+  });
+
+  it('names the return for the driver and collects no cash', () => {
+    expect(body.customer_reference_number).toBe('RMA-4101');
+    expect(body.description).toContain('RMA-4101');
+    expect(body.description).toContain('1150');
+    expect(body.cod_amount).toBe('');
+    expect(body.declared_value).toBe(9.75);
+  });
+
+  it('refuses a return whose order has no Kuwait area, like an order would', () => {
+    expect(() => buildReturnPickup({ number: 'RMA-1', amount: 1, currency: 'KWD', order: { ...order, address: { line1: 'x', city: 'Kuwait', country: 'KW' } }, lines: [] }, acc)).toThrow(GmtcError);
   });
 });

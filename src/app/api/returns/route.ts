@@ -39,6 +39,8 @@ export async function POST(req: Request) {
     photos?: unknown;
     refundMethod?: RefundMethod;
     branch?: string;
+    /** home: UPS collects it at their door (Kuwait); shop: they bring it to the branch they chose. */
+    pickup?: 'home' | 'shop';
     via?: 'portal' | 'app';
   };
   try {
@@ -87,7 +89,7 @@ export async function POST(req: Request) {
     /* Coming to a shop means saying which shop — one of the shops for the brands going back, as
        long as that brand has a shop in the market at all. */
     const branch = branches.find((b) => b.id === body.branch) ?? null;
-    const comingToABranch = refundMethod === 'cash_at_store' || order.storeOnly;
+    const comingToABranch = body.pickup === 'shop' || refundMethod === 'cash_at_store' || order.storeOnly;
     if (comingToABranch && branches.length && !branch) {
       throw invalid('Choose the branch you would like to come to.');
     }
@@ -103,6 +105,7 @@ export async function POST(req: Request) {
         reason,
         note: body.note?.trim() || undefined,
         refundMethod,
+        method: comingToABranch ? 'store' : 'pickup',
         branch: branch?.id ?? null,
         openedVia: body.via === 'app' ? 'app' : 'portal',
       }

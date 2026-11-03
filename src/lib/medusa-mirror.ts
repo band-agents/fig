@@ -12,10 +12,12 @@ import { toMajor } from './format';
  * a Medusa that is down must not stop a customer opening a return or the floor moving one.
  *
  *   MEDUSA_RETURNS_URL      https://labesny-app.medusajs.app/hooks/returns   (off when unset)
- *   MEDUSA_RETURNS_SECRET   the same value as RETURNS_MIRROR_SECRET in Medusa
+ *   MEDUSA_RETURNS_URL_FIG  https://fig-fashion-app.medusajs.app/hooks/returns   (FIG's; off when unset)
+ *   MEDUSA_RETURNS_SECRET   the same value as RETURNS_MIRROR_SECRET in both Medusas
  *   RELAY_PUBLIC_URL        where Relay is reached, for the "Open in Relay" button
  *
- * Only Labesny's channels are sent; the other brands' returns have nowhere to go in that admin.
+ * Labesny's returns go to Labesny's Medusa and FIG's to FIG's (3 Nov 2026); other brands have no
+ * Medusa admin, so theirs are not sent.
  * Money goes in the currency's main unit (15.250 KD), which is how Medusa holds it, not in fils.
  */
 
@@ -133,7 +135,11 @@ export function signMirrorBody(body: string, secret: string) {
   return createHmac('sha256', secret).update(body).digest('hex');
 }
 
-export const mirrorConfigured = () => !!(process.env.MEDUSA_RETURNS_URL && process.env.MEDUSA_RETURNS_SECRET);
+/** Where a brand's returns are copied to, or null when that brand has no Medusa connected. */
+export const mirrorUrlFor = (brand: string | undefined) =>
+  (brand === 'Labesny' ? process.env.MEDUSA_RETURNS_URL : brand === 'FIG' ? process.env.MEDUSA_RETURNS_URL_FIG : undefined)?.trim() || null;
+
+export const mirrorConfigured = () => !!((process.env.MEDUSA_RETURNS_URL || process.env.MEDUSA_RETURNS_URL_FIG) && process.env.MEDUSA_RETURNS_SECRET);
 
 /**
  * Reads the return as it now stands and sends it. Resolves to what happened, for logs and tests;
@@ -153,7 +159,8 @@ export async function mirrorReturn(returnId: string): Promise<'sent' | 'off' | '
     const [ret] = await db.select().from(schema.returns).where(eq(schema.returns.id, returnId));
     if (!ret) return 'skipped';
     const channel = CHANNEL[ret.channelId];
-    if (channel?.brand !== 'Labesny') return 'skipped';
+    const url = mirrorUrlFor(channel?.brand);
+    if (!url) return 'skipped';
 
     const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, ret.orderId));
     const picked = await db
@@ -184,7 +191,7 @@ export async function mirrorReturn(returnId: string): Promise<'sent' | 'off' | '
     });
 
     const body = JSON.stringify(snapshot);
-    const res = await fetch(process.env.MEDUSA_RETURNS_URL!, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

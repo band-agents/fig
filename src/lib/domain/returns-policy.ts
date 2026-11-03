@@ -10,7 +10,8 @@ const BRAS_TOO = /\b(bra|bras|bralette|brief|briefs|panty|panties|knicker|knicke
 export const POLICIES: Record<string, ReturnPolicy> = {
   'FIG:EG': { windowDays: 14, nonReturnable: INTIMATES, storeOnly: false, label: '14 days from delivery; underwear, swim bottoms, earrings and beauty are final sale' },
   "Women'secret:EG": { windowDays: 14, nonReturnable: INTIMATES, storeOnly: false, label: '14 days from delivery; underwear and swim bottoms are final sale' },
-  'Labesny:KW': { windowDays: 14, nonReturnable: BRAS_TOO, storeOnly: true, label: '14 days; no returns on bras and panties; returns at brand stores in Kuwait malls' },
+  // home pickup by UPS or a brand store, the customer's choice (Dan, 2 Nov)
+  'Labesny:KW': { windowDays: 14, nonReturnable: BRAS_TOO, storeOnly: false, label: '14 days; no returns on bras and panties; UPS collects from home, or bring it to a brand store in a Kuwait mall' },
   "Women'secret:KW": { windowDays: 14, nonReturnable: BRAS_TOO, storeOnly: true, label: '14 days; no returns on bras and panties; returns at brand stores' },
 };
 

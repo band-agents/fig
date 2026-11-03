@@ -22,7 +22,7 @@ export function connectorFor(c: ChannelDef): Connector | null {
 export { medusa, shopify, woo };
 export { aramexConfigured, aramexOwnAccounts, aramexTrackingUrl, AramexError, classifyUpdate, createShipmentDraft, trackShipments, withClientInfo } from './aramex';
 export type { ShipmentDraft, ShipmentOrder, TrackClass, TrackUpdate } from './aramex';
-export { cancelConsignment, classifyGmtc, collectedAt, consignmentLabel, createConsignment, GMTC_COURIER, gmtcConfigured, gmtcCreateAt, gmtcEnv, GmtcError, trackConsignments } from './gmtc';
+export { cancelConsignment, classifyGmtc, collectedAt, consignmentLabel, createConsignment, createReturnPickup, GMTC_COURIER, gmtcConfigured, gmtcCreateAt, gmtcEnv, GmtcError, trackConsignments } from './gmtc';
 export { BOSTA_COURIER, bostaCity, bostaCollected, bostaConfigured, bostaCreateAt, bostaEnv, BostaError, bostaTrackingUrl, classifyBosta, createDelivery, deliveryLabel, terminateDelivery, trackDeliveries } from './bosta';
 export { lucidaConfigured, stockByBarcode } from './lucida';
 export type { StockFigure } from './lucida';

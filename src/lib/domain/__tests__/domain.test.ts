@@ -144,11 +144,11 @@ describe('sla', () => {
 });
 
 describe('returns policy', () => {
-  it('knows Labesny takes no bras or panties back and returns in store', () => {
+  it('knows Labesny takes no bras or panties back and collects from home or a store', () => {
     const p = policyFor('Labesny', 'KW');
     expect(itemReturnable(p, { title: 'Lace balconette bra', category: 'Bras' })).toBe(false);
     expect(itemReturnable(p, { title: 'Linen trousers', category: 'Trousers' })).toBe(true);
-    expect(p.storeOnly).toBe(true);
+    expect(p.storeOnly).toBe(false);
   });
   it('closes the window after 14 days', () => {
     const p = policyFor('FIG', 'EG');

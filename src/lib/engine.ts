@@ -572,6 +572,11 @@ export async function openReturn(
     /** The shop they are bringing it to, as an id from domain/branches.ts. */
     branch?: string | null;
     override?: boolean;
+    /** A return the customer opened on the store's own website (its Medusa backend). The site has
+        already held it to the published rules and shown the customer what they get back, so the
+        console records it as asked rather than refusing it on its own copy of the order, and keeps
+        the site's amount (Dan, 3 Nov 2026: every website return reaches the console). */
+    site?: { amount: number; bonus: number };
   },
   opts: Opts = {},
 ) {
@@ -582,7 +587,8 @@ export async function openReturn(
     if (!seesChannel(actor.principal, o.channelId)) throw forbidden();
     if (!can(actor.principal, 'returns', 2) && !can(actor.principal, 'intake', 2)) throw forbidden('Opening a return needs Customer care or Returns access.');
   }
-  if (!['delivered', 'settled'].includes(o.stage)) throw invalid('Only delivered orders can be returned.');
+  const site = input.site;
+  if (!site && !['delivered', 'settled'].includes(o.stage)) throw invalid('Only delivered orders can be returned.');
   const channel = CHANNEL[o.channelId];
   const policy = policyFor(channel?.brand ?? 'FIG', channel?.country ?? 'EG');
   const now = opts.at ?? new Date();
@@ -592,7 +598,7 @@ export async function openReturn(
   if (!picked.length) throw invalid('Pick at least one item.');
   const finalSale = picked.filter((p) => p.line && !p.line.returnable);
   const overriding = (!elig.ok || finalSale.length > 0) && input.override;
-  if (!overriding) {
+  if (!overriding && !site) {
     if (!elig.ok) throw invalid(elig.why);
     if (finalSale.length) throw invalid(`${finalSale[0].line!.title} is final sale under this store's policy.`);
   }
@@ -611,7 +617,7 @@ export async function openReturn(
     policy,
     settled: o.paymentStatus !== 'pending' && o.paymentStatus !== 'cod_due',
   });
-  const refund = resolveRefund(input.refundMethod ?? 'original', options);
+  const refund = site ? { method: input.refundMethod ?? 'original', amount: site.amount, bonus: site.bonus } : resolveRefund(input.refundMethod ?? 'original', options);
 
   /* A branch is only ever one of ours, and only for this order's own market. An id that is not on
      that list is dropped rather than stored: a return that says it is going to a shop that does not
@@ -634,7 +640,7 @@ export async function openReturn(
       reason: input.reason,
       reasonNote: input.note ?? null,
       resolution: input.resolution ?? resolutionFor(refund.method),
-      method: policy.storeOnly ? 'store' : (input.method ?? 'pickup'),
+      method: site ? (input.method ?? 'store') : policy.storeOnly ? 'store' : (input.method ?? 'pickup'),
       refundMethod: refund.method,
       currency: o.currency,
       /* What the customer receives, bonus included, so finance never has to recompute it. */
@@ -648,12 +654,13 @@ export async function openReturn(
   await db.insert(schema.returnItems).values(picked.map((p) => ({ returnId: ret.id, orderItemId: p.orderItemId, quantity: p.quantity, reason: input.reason })));
   const via = input.openedVia === 'portal' ? ' · opened by the customer' : input.openedVia === 'app' ? ' · opened in the app' : '';
   const paid = refund.bonus > 0 ? ` · ${refund.method.replace(/_/g, ' ')} +${refund.bonus} bonus` : ` · ${refund.method.replace(/_/g, ' ')}`;
-  const msg = `Return ${number} opened · ${picked.length} item${picked.length > 1 ? 's' : ''}${paid}${via}${overriding ? ' · policy overridden' : ''}`;
+  const msg = `Return ${number} opened · ${picked.length} item${picked.length > 1 ? 's' : ''}${paid}${via}${site ? ' · from the website' : ''}${overriding ? ' · policy overridden' : ''}`;
   await record({ orderId, returnId: ret.id, at: now, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'stage', toStage: 'requested', message: msg, data: input.note ? { note: input.note } : undefined });
   await refreshCustomer(o.customerId);
   if (!opts.quiet) publish({ kind: 'return', id: ret.id, number, channelId: o.channelId, stage: 'requested', actor: actor.name, message: msg });
   /* A copy for the Labesny app's admin; sent after the return is saved, and never in the way of it. */
   if (!opts.quiet) void mirrorReturn(ret.id);
+  if (!opts.quiet && ret.method === 'pickup') courierFollowsReturn(ret.id, 'requested');
   return ret;
 }
 
@@ -683,6 +690,12 @@ export async function moveReturn(
     if (to === 'rejected') input = { ...input, reason: review.reason };
   }
   if (t.needs?.includes('reason') && !input.reason?.trim()) throw invalid('Give a reason.');
+  // a Kuwait home pickup carries its UPS waybill already, or gets one booked here; any other courier is typed in
+  if (to === 'pickup' && !input.tracking?.trim()) {
+    const ups = await import('./gmtc-returns');
+    if (r.tracking) input = { ...input, tracking: r.tracking };
+    else if (ups.upsCollects(r) && !opts.quiet) input = { ...input, tracking: await ups.bookReturnPickup(actor, r.id) };
+  }
   if (t.needs?.includes('tracking') && !input.tracking?.trim()) throw invalid('Add the pickup waybill.');
   if (t.needs?.includes('note') && !input.note?.trim()) throw invalid('Add a note.');
   if (to === 'inspected' && !input.inspection) throw invalid('Record the inspection result.');
@@ -734,6 +747,12 @@ export async function moveReturn(
   }
   if (!opts.quiet) publish({ kind: 'return', id: r.id, number: r.number, channelId: r.channelId, stage: to, actor: actor.name, message: `${r.number} → ${meta.label}` });
   if (!opts.quiet) void mirrorReturn(r.id);
+  if (!opts.quiet && (to === 'approved' || to === 'rejected')) courierFollowsReturn(r.id, to);
+}
+
+/** Kuwait home pickups: UPS is booked, moved on and cancelled with the return. Lazy and never awaited, like the orders' courier. */
+function courierFollowsReturn(returnId: string, to: ReturnStage) {
+  keepAlive(import('./gmtc-returns').then((m) => m.courierFollowsReturn(returnId, to)).catch(() => {}));
 }
 
 // ── Lookups used by several screens ─────────────────────────────────────────────────────────────

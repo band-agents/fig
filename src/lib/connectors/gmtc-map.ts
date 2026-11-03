@@ -133,6 +133,35 @@ export function buildConsignment(o: GmtcOrder, acc: GmtcAccount) {
 
 export type Consignment = ReturnType<typeof buildConsignment>;
 
+export type GmtcReturn = {
+  number: string; // RMA-4101
+  amount: number;
+  currency: string;
+  order: Pick<Order, 'number' | 'customerName' | 'phone' | 'address'>;
+  lines: { title: string; quantity: number }[];
+};
+
+/**
+ * A return collected at the customer's door: the order's consignment the other way round, the customer's
+ * address the origin and the warehouse the destination. Shipsy calls it REVERSE (proved on GMTC's staging
+ * account, 2 Nov 2026: DNH000027 came back pickup_awaited and cancelled cleanly). Nothing is collected in
+ * cash, and the RMA number rides in customer_reference_number so the driver's sheet names the return.
+ */
+export function buildReturnPickup(r: GmtcReturn, acc: GmtcAccount) {
+  const forward = buildConsignment(
+    { ...r.order, currency: r.currency, total: r.amount, paymentMethod: 'prepaid', paymentStatus: 'paid', lines: r.lines.map((l) => ({ ...l, unitPrice: 0 })) },
+    acc,
+  );
+  return {
+    ...forward,
+    consignment_type: 'REVERSE',
+    customer_reference_number: r.number,
+    description: `Return ${r.number}, order ${r.order.number.replace(/^#/, '')}: ${forward.description}`.slice(0, 250),
+    origin_details: forward.destination_details,
+    destination_details: forward.origin_details,
+  };
+}
+
 type ShipsyError = { error?: { message?: string; reason?: string; statusCode?: number } };
 
 /** Reads a Shipsy JSON answer; errors come back as { error: { message, reason } } with a 4xx. */
