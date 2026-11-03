@@ -20,6 +20,13 @@ import { reviewContext } from '@/lib/return-query';
 
 export const metadata = { title: 'Return' };
 
+/** Where the customer asked for their money, in the words the floor uses. */
+const REFUND_TO: Record<string, string> = {
+  original: 'Back to their card',
+  store_credit: 'Account credit',
+  cash_at_store: 'Cash from the shop',
+};
+
 export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
   const me = await requireUser();
   if (!can(me, 'returns', 1) && !can(me, 'orders', 1)) notFound();
@@ -138,6 +145,16 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
               ))}
             </ul>
             <div className="space-y-1 border-t border-line px-5 py-4 text-[12.5px]">
+              {/* Everything the customer chose when they opened it (Dan, 3 Nov 2026), so nobody has to ask again. */}
+              <div className="mb-2 text-ink-3">What the customer chose</div>
+              <div className="flex justify-between">
+                <span className="text-ink-3">Refund to</span>
+                <span>{REFUND_TO[r.refundMethod] ?? r.refundMethod.replace(/_/g, ' ')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-ink-3">How it comes back</span>
+                <span>{r.method === 'store' ? 'They bring it to the shop (free)' : 'Courier collects it (fee on the customer)'}</span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-ink-3">Reason</span>
                 <span>{RETURN_REASONS[r.reason as ReturnReason]}</span>
@@ -208,6 +225,21 @@ export default async function ReturnPage(props: PageProps<'/returns/[id]'>) {
                 <StagePill stage={o.stage} />
                 <span>{can(me, 'customers', 1) ? o.customerName : maskName(o.customerName)}</span>
               </div>
+              {/* How to reach the customer about this return, for those allowed to see it. */}
+              {can(me, 'customers', 1) && (o.phone || o.email) && (
+                <div className="mt-2 space-y-0.5 text-[12.5px]">
+                  {o.phone && (
+                    <div>
+                      <a href={`tel:${o.phone}`} className="font-mono hover:underline">{o.phone}</a>
+                    </div>
+                  )}
+                  {o.email && (
+                    <div>
+                      <a href={`mailto:${o.email}`} className="hover:underline">{o.email}</a>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="mt-3 grid grid-cols-2 gap-2 text-[11.5px]">
                 <div className="rounded-lg bg-elev-2 px-2.5 py-2">
                   <div className="text-ink-4">Delivered</div>

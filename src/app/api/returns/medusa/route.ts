@@ -7,21 +7,27 @@ import { signMirrorBody } from '@/lib/medusa-mirror';
 import type { RefundMethod } from '@/lib/domain/refund-methods';
 import { httpError, invalid, notFound } from '@/lib/errors';
 import { readPhotos, savePhotos } from '@/lib/return-photos';
+import { CHANNEL } from '@/lib/channels';
+import { toMinor } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
 type Line = { sku?: string | null; barcode?: string | null; title?: string; quantity?: number };
 
 /**
- * Where the Labesny app's backend (Medusa) sends a return a customer opened on labesny.com or in the
- * app, so the console holds every return and works it (Dan, 2 Nov: "everyone sees each other"). Medusa
+ * Where FIG's and Labesny's app backends (Medusa) send a return a customer opened on figeg.com,
+ * labesny.com or in the app, so the console holds every return and works it (Dan, 2 Nov: "everyone
+ * sees each other"; 3 Nov: every website return, with everything the customer chose). Medusa
  * has already checked the customer against the Shopify order; this opens the return on the console's
  * copy of that order, books the UPS pickup when they asked to be collected at home, and answers the RMA
  * number. The console then sends its copy back to Medusa (medusa-mirror.ts), as it does for every return.
  *
  *   POST /api/returns/medusa    x-relay-signature: <hex HMAC-SHA256 of the body, MEDUSA_RETURNS_SECRET>
  *   { shopify_order_id, items: [{ sku, barcode, title, quantity }], reason, note, refund_method,
- *     branch, pickup: "home" | "shop", photos[], via: "portal" | "app" }
+ *     branch, pickup: "home" | "shop", photos[], via: "portal" | "app", amount, bonus }
+ *
+ * amount and bonus are what the site showed the customer, in the currency's main unit (EGP 1,082.00,
+ * 15.250 KD); the return keeps them rather than working its own out, since the customer was promised them.
  *
  * Shopify's line ids are not kept here, so each line is found by its barcode or SKU, then its title.
  */
@@ -44,6 +50,8 @@ export async function POST(req: Request) {
       pickup?: 'home' | 'shop';
       photos?: unknown;
       via?: 'portal' | 'app';
+      amount?: number;
+      bonus?: number;
     };
     try {
       body = JSON.parse(raw);
@@ -81,10 +89,14 @@ export async function POST(req: Request) {
     if (!isReturnReason(reason)) throw invalid('Choose a reason for the return.');
     const photos = readPhotos(body.photos, { required: false });
     const refundMethod: RefundMethod = body.refund_method ?? 'original';
-    // collected at home unless they said they will bring it, or the refund is cash at a shop
-    const toShop = body.pickup === 'shop' || refundMethod === 'cash_at_store' || order.storeOnly;
+    // collected only when they asked for it (the fee is theirs, Dan 3 Nov); otherwise they bring it to the shop
+    const toShop = body.pickup !== 'home' || refundMethod === 'cash_at_store' || order.storeOnly;
+    const brand = CHANNEL[o.channelId]?.brand ?? '';
+    const site = brand === 'FIG' ? 'figeg.com' : brand === 'Labesny' ? 'labesny.com' : 'the website';
+    const amount = Number(body.amount);
+    const bonus = Number(body.bonus ?? 0);
 
-    const ret = await openReturn({ id: null, name: `Customer (${body.via === 'app' ? 'Labesny app' : 'labesny.com'} · ${o.number})`, dept: null }, o.id, {
+    const ret = await openReturn({ id: null, name: `Customer (${body.via === 'app' ? `${brand || 'the'} app` : site} · ${o.number})`, dept: null }, o.id, {
       items: picked,
       reason,
       note: body.note?.trim() || undefined,
@@ -92,6 +104,7 @@ export async function POST(req: Request) {
       method: toShop ? 'store' : 'pickup',
       branch: body.branch ?? null,
       openedVia: body.via === 'app' ? 'app' : 'portal',
+      site: Number.isFinite(amount) && amount >= 0 ? { amount: toMinor(amount, o.currency), bonus: Number.isFinite(bonus) && bonus > 0 ? toMinor(bonus, o.currency) : 0 } : undefined,
     });
     if (photos.length) await savePhotos(ret.id, photos);
 

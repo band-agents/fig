@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildSnapshot, mirrorConfigured, mirrorReturn, signMirrorBody } from '../medusa-mirror';
+import { buildSnapshot, mirrorConfigured, mirrorReturn, mirrorUrlFor, signMirrorBody } from '../medusa-mirror';
 
 const ret = {
   id: 'ret_1',
@@ -64,5 +64,22 @@ describe('mirrorReturn', () => {
     expect(await mirrorReturn('ret_1')).toBe('off');
     process.env.MEDUSA_RETURNS_URL = 'https://example.test/hooks/returns';
     expect(mirrorConfigured()).toBe(false);
+  });
+});
+
+describe('which Medusa a return is copied to (3 Nov 2026)', () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  it("sends Labesny's to Labesny's Medusa and FIG's to FIG's, and nobody else's", () => {
+    process.env.MEDUSA_RETURNS_URL = 'https://labesny.example/hooks/returns';
+    process.env.MEDUSA_RETURNS_URL_FIG = 'https://fig.example/hooks/returns';
+    expect(mirrorUrlFor('Labesny')).toBe('https://labesny.example/hooks/returns');
+    expect(mirrorUrlFor('FIG')).toBe('https://fig.example/hooks/returns');
+    expect(mirrorUrlFor('Celio')).toBeNull();
+    delete process.env.MEDUSA_RETURNS_URL_FIG;
+    expect(mirrorUrlFor('FIG')).toBeNull();
   });
 });
