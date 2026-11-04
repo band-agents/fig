@@ -55,6 +55,16 @@ describe('pages each job sees', () => {
     expect(landingFor(job('care'))).toBe('/orders');
   });
 
+  // Dan, 4 Nov: the online team does customer service and the websites' products, on every store and brand
+  it('gives the online team customer care plus the catalogue import, and lands them on the orders', () => {
+    expect(sees('online')).toEqual(['today', 'orders', 'returns', 'inventory', 'listings', 'webItems', 'leaks', 'catalog']);
+    expect(landingFor(job('online'))).toBe('/orders');
+    expect(worksOrders(job('online'))).toBe(true);
+    expect(can(job('online'), 'catalog', 2)).toBe(true);
+    expect(can(job('online'), 'catalog', 3)).toBe(false); // no delete or revert
+    expect(can(job('online'), 'customers', 2)).toBe(true);
+  });
+
   it('gives finance its queue, cash, orders, returns, purchase orders, insights and the money picture', () => {
     expect(sees('finance')).toEqual(['today', 'orders', 'financeQueue', 'returns', 'brands', 'analytics', 'purchasing', 'production', 'insights', 'leaks', 'targets', 'profit', 'financials', 'cash']);
   });
