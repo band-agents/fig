@@ -300,3 +300,30 @@ export function mapBostaTrack(a: TrackAnswer, now = new Date()): { code: number;
   }
   return { code, type, updates };
 }
+
+/**
+ * A Customer Return Pickup (type 25): Bosta collects the parcel from the customer and brings it to our
+ * pickup location. Same address rules as a delivery, but the customer's address is the pickupAddress, no
+ * cash is collected (Bosta takes only refund COD on a CRP) and the reference is the RMA, not the order.
+ */
+export function buildReturnPickup(r: { number: string; order: BostaOrder; lines: Pick<OrderItem, 'title' | 'quantity'>[] }, opts: { districts?: BostaCityDistricts[]; businessLocationId?: string } = {}) {
+  const base = buildDelivery({ ...r.order, paymentStatus: 'paid', lines: r.lines }, { districts: opts.districts, businessLocationId: opts.businessLocationId });
+  const { dropOffAddress, cod: _cod, allowToOpenPackage: _open, businessReference: _ref, notes: _notes, type: _type, ...rest } = base;
+  return {
+    ...rest,
+    type: 25, // Customer Return Pickup
+    pickupAddress: dropOffAddress,
+    notes: `Return ${r.number} of FIG ${r.order.number}`.slice(0, 200),
+    businessReference: `FIG-${r.number}`,
+  };
+}
+
+/** A return pickup's state → what the return does: 23/41 the driver has it, 46 it reached us. */
+export function classifyBostaReturn(code: number): 'awaiting' | 'collected' | 'received' | 'cancelled' | 'exception' | 'info' {
+  if (code === 48 || code === 49) return 'cancelled';
+  if (code === 46 || code === 60) return 'received';
+  if (code === 23 || code === 24 || code === 30 || code === 41) return 'collected';
+  if (code === 10 || code === 11 || code === 20 || code === 21 || code === 22) return 'awaiting';
+  if (code === 47 || code === 100 || code === 101 || code === 103) return 'exception';
+  return 'info';
+}

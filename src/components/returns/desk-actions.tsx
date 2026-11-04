@@ -21,7 +21,11 @@ export function DeskActions({ id, number, stage, method, scopes, review, compact
   // approving or declining a request asks for the review the refund team reads
   const [deciding, setDeciding] = useState<'approved' | 'rejected' | null>(null);
   const [inspect, setInspect] = useState(false);
-  const flows = (RETURN_FLOW[stage as ReturnStage] ?? []).filter((t) => mayTake(scopes, t)).filter((t) => !(t.to === 'pickup' && method === 'store'));
+  // a shop return is completed when the shop has it; a courier pickup only once the parcel is back
+  const flows = (RETURN_FLOW[stage as ReturnStage] ?? [])
+    .filter((t) => mayTake(scopes, t))
+    .filter((t) => !(t.to === 'pickup' && method === 'store'))
+    .filter((t) => !(stage === 'approved' && method !== 'store' && (t.to === 'refunded' || t.to === 'received')));
   if (!flows.length) return null;
   const shown = compact ? flows.slice(0, 1) : flows;
   return (
@@ -30,7 +34,7 @@ export function DeskActions({ id, number, stage, method, scopes, review, compact
         <button
           key={t.to}
           disabled={m.pending}
-          onClick={() => (t.to === 'approved' || t.to === 'rejected' ? setDeciding(t.to) : t.to === 'inspected' ? setInspect(true) : t.needs?.length ? setNeed(t) : m.ret(id, t.to))}
+          onClick={() => (t.to === 'refunded' && !window.confirm(`Complete ${number}? The customer is paid back the way they chose and the store emails them.`) ? undefined : t.to === 'approved' || t.to === 'rejected' ? setDeciding(t.to) : t.to === 'inspected' ? setInspect(true) : t.needs?.length ? setNeed(t) : m.ret(id, t.to))}
           className={`btn ${compact ? 'btn-sm' : ''} ${t.tone === 'primary' ? 'btn-primary' : t.tone === 'danger' ? 'btn-danger' : 'btn-quiet'}`}
         >
           {m.busy === `${id}:${t.to}` && <Loader2 className="size-3.5 animate-spin" />}

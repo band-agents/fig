@@ -2,10 +2,10 @@ import 'server-only';
 // Bosta (Egypt): FIG's courier. Creates deliveries, fetches the air waybill, tracks, terminates.
 // BOSTA_ENV says which server the key belongs to: Bosta's staging (stg-app) until the live key is in.
 import { fetchRetry } from './http';
-import { BostaError, buildDelivery, mapBostaTrack, readBostaAnswer, trackingFrom, type BostaCityDistricts, type BostaOrder, type CreateAnswer, type TrackAnswer } from './bosta-map';
+import { BostaError, buildDelivery, buildReturnPickup, mapBostaTrack, readBostaAnswer, trackingFrom, type BostaCityDistricts, type BostaOrder, type CreateAnswer, type TrackAnswer } from './bosta-map';
 import type { TrackUpdate } from './aramex-map';
 
-export { BostaError, bostaCity, bostaCollected, bostaTrackingUrl, classifyBosta } from './bosta-map';
+export { BostaError, bostaCity, bostaCollected, bostaTrackingUrl, classifyBosta, classifyBostaReturn } from './bosta-map';
 
 const env = (name: string) => process.env[name]?.trim() || '';
 
@@ -59,6 +59,18 @@ export async function createDelivery(order: BostaOrder): Promise<{ tracking: str
   const a = readBostaAnswer<CreateAnswer>(res.status, await res.text());
   return { tracking: trackingFrom(a), id: a._id ?? null };
 }
+
+/** Books a Customer Return Pickup for a return and returns its tracking number. Not retried, so no doubles. */
+export async function createBostaReturnPickup(r: Parameters<typeof buildReturnPickup>[0]): Promise<{ tracking: string; id: string | null }> {
+  assertReady();
+  const body = buildReturnPickup(r, { districts: await districts(), businessLocationId: env('BOSTA_BUSINESS_LOCATION_ID') || undefined });
+  const res = await fetchRetry(`${base()}/deliveries?apiVersion=1`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }, { label: 'Bosta', tries: 1, timeoutMs: 30_000 });
+  const a = readBostaAnswer<CreateAnswer>(res.status, await res.text());
+  return { tracking: trackingFrom(a), id: a._id ?? null };
+}
+
+/** When a home-pickup return gets its Bosta pickup: as soon as care approves it (Dan, 5 Nov), or only by hand. */
+export const bostaReturnAt = (): 'approved' | 'manual' => (env('BOSTA_RETURN_AT').toLowerCase() === 'manual' ? 'manual' : 'approved');
 
 /** The air waybill as a PDF (A4 unless BOSTA_AWB=A6 for the Zebra printer). Bosta sends it base64 inside JSON. */
 export async function deliveryLabel(tracking: string): Promise<Uint8Array> {

@@ -143,23 +143,31 @@ export const RETURN_STAGE: Record<ReturnStage, StageMeta> = {
 
 export const RETURN_TRACK: ReturnStage[] = ['requested', 'approved', 'pickup', 'in_transit', 'received', 'inspected', 'refund_pending', 'refunded'];
 
+/** Completing a return pays the customer the way they chose (store credit, back to the card, cash at a
+    shop) and the store emails them; it is one step for the returns desk, whatever stage it is at. */
+const complete = (tone: Transition<ReturnStage>['tone']): Transition<ReturnStage> => ({ to: 'refunded', label: 'Complete return', area: 'returns', also: ['finance'], level: 3, tone });
+
 export const RETURN_FLOW: Record<ReturnStage, Transition<ReturnStage>[]> = {
   requested: [
     { to: 'approved', label: 'Approve return', area: 'returns', tone: 'primary' },
     { to: 'rejected', label: 'Reject', area: 'returns', tone: 'danger', needs: ['reason'] },
   ],
+  // a shop return opens here with nobody's approval (Dan, 5 Nov 2026); completing it pays the customer back
   approved: [
+    complete('primary'),
     { to: 'pickup', label: 'Book courier pickup', area: 'shipping', tone: 'primary', needs: ['tracking'] },
     { to: 'received', label: 'Dropped at a store', area: 'returns', tone: 'quiet' },
+    { to: 'rejected', label: 'Reject', area: 'returns', tone: 'danger', needs: ['reason'] },
   ],
   pickup: [{ to: 'in_transit', label: 'Collected from customer', area: 'shipping', tone: 'primary' }],
   in_transit: [{ to: 'received', label: 'Received at warehouse', area: 'returns', tone: 'primary' }],
-  received: [{ to: 'inspected', label: 'Record inspection', area: 'returns', tone: 'primary' }],
+  received: [complete('primary'), { to: 'inspected', label: 'Record inspection', area: 'returns', tone: 'quiet' }],
   inspected: [
-    { to: 'refund_pending', label: 'Send for refund', area: 'returns', tone: 'primary' },
+    complete('primary'),
+    { to: 'refund_pending', label: 'Send for refund', area: 'returns', tone: 'quiet' },
     { to: 'closed', label: 'Close (exchange / credit)', area: 'returns', tone: 'quiet', needs: ['note'] },
   ],
-  refund_pending: [{ to: 'refunded', label: 'Refund issued', area: 'finance', level: 3, tone: 'primary' }],
+  refund_pending: [complete('primary')],
   refunded: [],
   closed: [],
   rejected: [],
