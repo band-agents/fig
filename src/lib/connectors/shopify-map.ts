@@ -243,6 +243,36 @@ export const sizeFromTitle = (variantTitle: string | null | undefined) =>
     .map((p) => p.trim())
     .find((p) => SIZE_TOKEN.test(p)) ?? null;
 
+/**
+ * A line that is not goods: a discount or fee the old store wrote as a line. FIG's WooCommerce orders,
+ * copied into Shopify, carry "First Order Discount (10%)" at a minus price and "77,00 EGP fee" with no
+ * code (Dan, 4 Nov: a discount is not something to pick). Nothing to pick, pack or return.
+ */
+export const notGoods = (i: Pick<IncomingItem, 'sku' | 'barcode' | 'title' | 'unitPrice'>) =>
+  i.unitPrice < 0 || (!i.sku && !i.barcode && /\b(fee|discount|coupon|voucher)\b/i.test(i.title));
+
+/** The goods, and what the minus lines took off: that is a discount, so subtotal − discount + shipping still makes the total. */
+function goodsOf(lines: IncomingItem[]) {
+  const items = lines.filter((i) => i.quantity > 0 && !notGoods(i));
+  const credit = lines.filter((i) => i.quantity > 0 && i.unitPrice < 0).reduce((s, i) => s - i.unitPrice * i.quantity, 0);
+  return { items, credit };
+}
+
+/**
+ * FIG's old WooCommerce orders were copied into Shopify tagged `migrated` and `woo-status-<status>`, with
+ * no fulfilments, so Shopify lists finished orders as unfulfilled. They are history: the old status says
+ * how each ended, and none is work for the floor. An old order still open there (processing, on hold)
+ * is left as it is.
+ */
+export function migratedFacts(tags: string[], at: Date): IncomingOrder['platform'] | null {
+  if (!tags.includes('migrated')) return null;
+  const status = tags.find((t) => t.startsWith('woo-status-'))?.slice('woo-status-'.length);
+  if (status === 'completed') return { fulfilled: { at }, delivered: { at }, history: true };
+  if (status === 'refunded') return { cancelled: { at, reason: 'Refunded on the old FIG store' }, refunded: true, history: true };
+  if (status === 'cancelled' || status === 'failed') return { cancelled: { at, reason: 'Cancelled on the old FIG store' }, history: true };
+  return null;
+}
+
 function lineItem(l: ShopifyLineNode, currency: string): IncomingItem {
   const named = (l.variant?.selectedOptions ?? []).find((o) => SIZE_NAME.test(o.name));
   return {
@@ -262,7 +292,8 @@ function lineItem(l: ShopifyLineNode, currency: string): IncomingItem {
 export function mapShopifyOrder(c: ChannelDef, n: ShopifyOrderNode): IncomingOrder {
   const currency = (str(n.currentTotalPriceSet?.shopMoney?.currencyCode) ?? c.currency).toUpperCase();
   const amt = (m: MoneyBag | undefined) => minor(m?.shopMoney?.amount, currency);
-  const discount = amt(n.totalDiscountsSet);
+  const { items, credit } = goodsOf((n.lineItems?.nodes ?? []).map((l) => lineItem(l, currency)));
+  const discount = amt(n.totalDiscountsSet) + credit;
   const ship = n.shippingAddress ?? null;
   const cust = n.customer ?? null;
   const placedAt = date(n.processedAt) ?? date(n.createdAt) ?? new Date();
@@ -282,6 +313,7 @@ export function mapShopifyOrder(c: ChannelDef, n: ShopifyOrderNode): IncomingOrd
   const delivered = fulfillments.find((f) => f.status !== 'CANCELLED' && (f.displayStatus === 'DELIVERED' || date(f.deliveredAt)));
   if (delivered) platform.delivered = { at: date(delivered.deliveredAt) ?? date(delivered.createdAt) ?? placedAt };
   if ((n.displayFinancialStatus ?? '').toUpperCase() === 'REFUNDED') platform.refunded = true;
+  Object.assign(platform, { ...migratedFacts(n.tags ?? [], placedAt), ...platform });
 
   return {
     channelId: origin?.channelId ?? c.id,
@@ -304,7 +336,7 @@ export function mapShopifyOrder(c: ChannelDef, n: ShopifyOrderNode): IncomingOrd
     discount,
     total: amt(n.currentTotalPriceSet),
     ...shopifyPayment(n.paymentGatewayNames, n.displayFinancialStatus, c.country),
-    items: (n.lineItems?.nodes ?? []).map((l) => lineItem(l, currency)).filter((i) => i.quantity > 0),
+    items,
     note: str(n.note),
     tags: n.tags ?? [],
     ...(Object.keys(platform).length ? { platform } : {}),
@@ -317,7 +349,25 @@ export function mapShopifyRestOrder(c: ChannelDef, p: ShopifyRestOrder): Incomin
   const externalId = str(p.admin_graphql_api_id) ?? (str(p.id) ? `gid://shopify/Order/${str(p.id)}` : null);
   if (!externalId) return null;
   const currency = (str(p.currency) ?? c.currency).toUpperCase();
-  const discount = minor(p.current_total_discounts ?? p.total_discounts, currency);
+  const { items, credit } = goodsOf(
+    (p.line_items ?? []).map((l) => ({
+      sku: str(l.sku),
+      barcode: null,
+      title: str(l.title) ?? 'Item',
+      variant: str(l.variant_title),
+      size: str((l.properties ?? []).find((x) => SIZE_NAME.test(x.name))?.value) ?? sizeFromTitle(l.variant_title),
+      brand: str(l.vendor),
+      category: null,
+      image: null,
+      quantity: Math.max(0, Math.trunc(num(l.quantity)) || 0),
+      unitPrice: minor(l.price, currency),
+    })),
+  );
+  const discount = minor(p.current_total_discounts ?? p.total_discounts, currency) + credit;
+  const tags = (p.tags ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
   const ship = p.shipping_address ?? null;
   const cust = p.customer ?? null;
   const placedAt = date(p.processed_at) ?? date(p.created_at) ?? new Date();
@@ -343,21 +393,7 @@ export function mapShopifyRestOrder(c: ChannelDef, p: ShopifyRestOrder): Incomin
   const delivered = done.find((f) => f.shipment_status === 'delivered');
   if (delivered) platform.delivered = { at: date(delivered.updated_at) ?? date(delivered.created_at) ?? placedAt };
   if ((p.financial_status ?? '').toLowerCase() === 'refunded') platform.refunded = true;
-
-  const items: IncomingItem[] = (p.line_items ?? [])
-    .map((l) => ({
-      sku: str(l.sku),
-      barcode: null,
-      title: str(l.title) ?? 'Item',
-      variant: str(l.variant_title),
-      size: str((l.properties ?? []).find((x) => SIZE_NAME.test(x.name))?.value) ?? sizeFromTitle(l.variant_title),
-      brand: str(l.vendor),
-      category: null,
-      image: null,
-      quantity: Math.max(0, Math.trunc(num(l.quantity)) || 0),
-      unitPrice: minor(l.price, currency),
-    }))
-    .filter((i) => i.quantity > 0);
+  Object.assign(platform, { ...migratedFacts(tags, placedAt), ...platform });
 
   return {
     channelId: origin?.channelId ?? c.id,
@@ -382,10 +418,7 @@ export function mapShopifyRestOrder(c: ChannelDef, p: ShopifyRestOrder): Incomin
     ...shopifyPayment(p.payment_gateway_names, p.financial_status, c.country),
     items,
     note: str(p.note),
-    tags: (p.tags ?? '')
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean),
+    tags,
     ...(Object.keys(platform).length ? { platform } : {}),
   };
 }

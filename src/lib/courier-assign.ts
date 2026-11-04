@@ -37,9 +37,13 @@ export type AssignRow = {
   rec: Recommendation;
 };
 
+/** The person's Kuwait-company stores in view: the rate sheet's. An empty list on the person means every store. */
+export const kuwaitStores = (p: Pick<Principal, 'channels'>) =>
+  (p.channels?.length ? p.channels : Object.keys(CHANNEL)).filter((c) => CHANNEL[c]?.country === 'KW');
+
 /** Open orders, not yet with a waybill, of the person's Kuwait-company stores, each with its recommendation. */
 export async function ordersToAssign(p: Principal, limit = 300): Promise<AssignRow[]> {
-  const channels = (p.channels ?? []).filter((c) => CHANNEL[c]?.country === 'KW');
+  const channels = kuwaitStores(p);
   if (!channels.length) return [];
   const db = await getDb();
   const rows = await db

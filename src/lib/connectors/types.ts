@@ -28,6 +28,8 @@ export type IncomingOrder = {
     fulfilled?: { at: Date; tracking?: string | null; company?: string | null; url?: string | null };
     delivered?: { at: Date };
     refunded?: boolean;
+    /** An old store's order, closed as history: no stock moves, no courier, no write-back. */
+    history?: boolean;
   };
 };
 

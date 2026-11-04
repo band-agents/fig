@@ -295,7 +295,7 @@ export async function ingestOrder(inc: IncomingOrder, opts: Opts & { autopilot?:
 }
 
 /** Facts from the store only ever move an order forward, so a slow webhook can't undo the floor's work. */
-async function applyPlatformFacts(orderId: string, inc: IncomingOrder) {
+export async function applyPlatformFacts(orderId: string, inc: Pick<IncomingOrder, 'channelId' | 'platform'>) {
   const f = inc.platform;
   if (!f) return false;
   const db = await getDb();
@@ -304,15 +304,15 @@ async function applyPlatformFacts(orderId: string, inc: IncomingOrder) {
   const order = (s: string) => ['new', 'confirming', 'finance', 'ready', 'picking', 'packed', 'shipped', 'delivering', 'delivered', 'settled'].indexOf(s);
   const who: Actor = { id: null, name: channelLabel(inc.channelId), dept: null };
   if (f.cancelled && !['cancelled', 'settled', 'rto', 'rto_closed'].includes(o.stage)) {
-    await setStage(o, 'cancelled', who, { at: f.cancelled.at, reason: f.cancelled.reason ?? 'Cancelled in the store', viaPlatform: true });
+    await setStage(o, 'cancelled', who, { at: f.cancelled.at, reason: f.cancelled.reason ?? 'Cancelled in the store', viaPlatform: true, history: f.history });
     return true;
   }
   if (f.delivered && order(o.stage) >= 0 && order(o.stage) < order('delivered')) {
-    await setStage(o, 'delivered', who, { at: f.delivered.at, viaPlatform: true });
+    await setStage(o, 'delivered', who, { at: f.delivered.at, viaPlatform: true, history: f.history });
     return true;
   }
   if (f.fulfilled && order(o.stage) >= 0 && order(o.stage) < order('shipped')) {
-    await setStage(o, 'shipped', who, { at: f.fulfilled.at, tracking: f.fulfilled.tracking ?? undefined, courier: f.fulfilled.company ?? undefined, trackingUrl: f.fulfilled.url ?? undefined, viaPlatform: true });
+    await setStage(o, 'shipped', who, { at: f.fulfilled.at, tracking: f.fulfilled.tracking ?? undefined, courier: f.fulfilled.company ?? undefined, trackingUrl: f.fulfilled.url ?? undefined, viaPlatform: true, history: f.history });
     return true;
   }
   return false;
@@ -336,7 +336,7 @@ async function setStage(
   o: typeof schema.orders.$inferSelect,
   to: OrderStage,
   actor: Actor,
-  input: MoveInput & { at?: Date; viaPlatform?: boolean; autopilot?: string } = {},
+  input: MoveInput & { at?: Date; viaPlatform?: boolean; history?: boolean; autopilot?: string } = {},
 ) {
   const db = await getDb();
   const at = input.at ?? new Date();
@@ -386,6 +386,8 @@ async function setStage(
     await refreshCustomer(o.customerId);
     invalidateRiskContext();
   }
+  // an old store's order closed as history (it never went through this floor) moves no stock and books no courier
+  if (input.history) return;
   // the stockroom follows: pieces come off the shelf when the parcel leaves, back on if it is refused
   if (['packed', 'shipped', 'delivering', 'delivered', 'rto_closed'].includes(to)) await stockFollowsOrder(o.id, to, at, actor.name);
   if (!input.viaPlatform) queueWriteBack(o.id, to, input);
