@@ -7,6 +7,8 @@ import {
   customerDataHidden,
   mapShopifyOrder,
   mapShopifyRestOrder,
+  migratedFacts,
+  notGoods,
   orderSelection,
   pagePlan,
   scopeReport,
@@ -402,5 +404,65 @@ describe('query shape and scopes', () => {
     expect(sizeFromTitle('Black / XL')).toBe('XL');
     expect(sizeFromTitle('38 / Navy')).toBe('38');
     expect(sizeFromTitle('Default Title')).toBeNull();
+  });
+});
+
+// Dan, 4 Nov: FIG's old WooCommerce orders, copied into Shopify, put #193625 in Pick & pack with its
+// "First Order Discount (10%)" as a line to pick, though it was refunded in December.
+describe('old-store orders copied into FIG Shopify', () => {
+  const line = (title: string, amount: string, sku: string | null) => ({
+    title,
+    variantTitle: null,
+    quantity: 1,
+    sku,
+    vendor: null,
+    image: null,
+    originalUnitPriceSet: { shopMoney: { amount, currencyCode: 'EGP' } },
+    variant: null,
+  });
+  const migrated: ShopifyOrderNode = {
+    ...labesnyNode,
+    id: 'gid://shopify/Order/7000000193625',
+    name: '#193625',
+    displayFinancialStatus: 'REFUNDED',
+    displayFulfillmentStatus: 'UNFULFILLED',
+    tags: ['migrated', 'woo-193625', 'woo-status-refunded'],
+    currentTotalPriceSet: { shopMoney: { amount: '1417.00', currencyCode: 'EGP' } },
+    currentSubtotalPriceSet: { shopMoney: { amount: '1417.00', currencyCode: 'EGP' } },
+    totalShippingPriceSet: { shopMoney: { amount: '0', currencyCode: 'EGP' } },
+    totalDiscountsSet: { shopMoney: { amount: '0', currencyCode: 'EGP' } },
+    lineItems: {
+      nodes: [line('Carpisa CHATILLON V2 HANDBAG For Women', '1575.00', '8052103478455'), line('First Order Discount (10%)', '-158.00', null), line('77,00 EGP fee', '77.00', null)],
+    },
+    fulfillments: [],
+  };
+
+  it('keeps only the goods: a minus line is a discount, a fee is not a piece', () => {
+    const o = mapShopifyOrder(figWeb, migrated);
+    expect(o.items.map((i) => i.title)).toEqual(['Carpisa CHATILLON V2 HANDBAG For Women']);
+    expect(o).toMatchObject({ discount: 15800, subtotal: 157500, total: 141700 });
+    expect(notGoods({ sku: null, barcode: null, title: 'Coffee mug', unitPrice: 5000 })).toBe(false);
+    expect(notGoods({ sku: 'X1', barcode: null, title: 'Gift card', unitPrice: 0 })).toBe(false);
+  });
+
+  it('closes them as history from their old status, never as work', () => {
+    const at = new Date('2025-12-26T15:24:45Z');
+    expect(mapShopifyOrder(figWeb, migrated).platform).toMatchObject({ cancelled: { reason: 'Refunded on the old FIG store' }, refunded: true, history: true });
+    expect(migratedFacts(['migrated', 'woo-status-completed'], at)).toEqual({ fulfilled: { at }, delivered: { at }, history: true });
+    expect(migratedFacts(['migrated', 'woo-status-cancelled'], at)?.cancelled?.reason).toBe('Cancelled on the old FIG store');
+    expect(migratedFacts(['migrated', 'woo-status-processing'], at)).toBeNull(); // still open there: left alone
+    expect(migratedFacts(['woo-status-completed'], at)).toBeNull(); // not a copied order
+    expect(mapShopifyOrder(labesnyWeb, labesnyNode).platform?.history).toBeUndefined();
+  });
+
+  it('does the same for the REST webhook copy', () => {
+    const o = mapShopifyRestOrder(figWeb, {
+      ...figRest,
+      tags: 'migrated, woo-status-completed',
+      line_items: [...(figRest.line_items ?? []), { title: 'First Order Discount (10%)', quantity: 1, sku: null, price: '-100.00' }],
+    })!;
+    expect(o.items.map((i) => i.title)).toEqual(['Linen Shirt', 'Chino Pants']);
+    expect(o.discount).toBe(20000 + 10000);
+    expect(o.platform).toMatchObject({ delivered: {}, history: true });
   });
 });
