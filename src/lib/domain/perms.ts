@@ -124,6 +124,12 @@ export const ROLES = {
     blurb: 'Confirms orders with customers, opens returns, keeps people informed.',
     scopes: { orders: 2, intake: 2, returns: 2, customers: 2, money: 1 },
   },
+  // Dan, 4 Nov: the online team does both, customer service and the websites' products, on every store
+  online: {
+    label: 'Online care & content',
+    blurb: 'Customer care plus the websites’ products: confirms orders, opens returns, and imports and updates listings from Excel.',
+    scopes: { orders: 2, intake: 2, returns: 2, customers: 2, money: 1, stock: 1, catalog: 2 },
+  },
   finance: {
     label: 'Finance',
     blurb: 'Clears payments, reconciles courier cash, issues refunds, sees what is owed to suppliers.',
@@ -239,7 +245,7 @@ export const canSee = (p: { role?: string; scopes: Scopes } | null | undefined, 
 export const worksOrders = (p: Pick<Principal, 'scopes'> | null | undefined) => canAny(p, ['overview', 'intake', 'finance', 'fulfilment', 'shipping', 'returns']);
 
 /** Where someone lands after signing in: their job's own page, or the Command centre if they run the floor, or the first page they can open. */
-const JOB_LANDING: Partial<Record<Role, Page>> = { uploader: 'catalog', brand: 'brands', care: 'orders', finance: 'financeQueue', fulfilment: 'pick', shipping: 'shipping', returns: 'returns', warehouse: 'warehouse', buyer: 'purchasing', planner: 'stockBrief', merchandiser: 'merch', marketing: 'insights' };
+const JOB_LANDING: Partial<Record<Role, Page>> = { uploader: 'catalog', brand: 'brands', care: 'orders', online: 'orders', finance: 'financeQueue', fulfilment: 'pick', shipping: 'shipping', returns: 'returns', warehouse: 'warehouse', buyer: 'purchasing', planner: 'stockBrief', merchandiser: 'merch', marketing: 'insights' };
 const LANDING: Page[] = ['home', 'orders', 'financeQueue', 'pick', 'shipping', 'returns', 'warehouse', 'brands', 'stockBrief', 'purchasing', 'merch', 'insights', 'inventory', 'orders', 'cash', 'team', 'channels', 'rules', 'catalog'];
 export const landingFor = (p: { role?: string; scopes: Scopes }) => {
   const own = JOB_LANDING[p.role as Role];
