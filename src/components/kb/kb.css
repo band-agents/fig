@@ -1,0 +1,350 @@
+/* The Playbook's own touches on top of the console look: a quiet hero, tinted section tiles, the
+   step rail, chat-bubble replies and the annotated screenshots. Colours are the console's tokens,
+   so light and dark both follow. */
+
+.kb-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    radial-gradient(1200px 300px at 85% -40%, color-mix(in srgb, var(--t-violet) 18%, transparent), transparent 70%),
+    radial-gradient(700px 260px at -10% 120%, color-mix(in srgb, var(--gold) 16%, transparent), transparent 70%),
+    var(--bg-elev);
+}
+.kb-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at 70% 0%, black, transparent 65%);
+  opacity: 0.45;
+}
+.kb-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.kb-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--bg-elev);
+  box-shadow: 0 1px 0 var(--line), 0 12px 32px -18px rgb(0 0 0 / 0.35);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.kb-search:focus-within {
+  border-color: var(--t-violet);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--t-violet) 16%, transparent), 0 12px 32px -18px rgb(0 0 0 / 0.35);
+}
+.kb-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: transparent;
+  outline: none;
+  font-size: 15px;
+}
+
+.kb-kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--line-2);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.kb-tile {
+  --tint: var(--t-neutral);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-elev);
+  text-align: left;
+  transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1), border-color 0.18s, box-shadow 0.18s;
+}
+.kb-tile:hover,
+.kb-tile[data-on='1'] {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--tint) 55%, var(--line));
+  box-shadow: 0 14px 30px -20px color-mix(in srgb, var(--tint) 70%, transparent);
+}
+.kb-tile[data-on='1'] {
+  background: color-mix(in srgb, var(--tint) 7%, var(--bg-elev));
+}
+.kb-ico {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--tint);
+  background: color-mix(in srgb, var(--tint) 13%, transparent);
+  flex: none;
+}
+
+.kb-seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-elev-2);
+}
+.kb-seg button {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kb-seg button[data-on='1'] {
+  background: var(--bg-elev);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12), 0 0 0 1px var(--line);
+}
+
+.kb-card {
+  display: block;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-elev);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.kb-card:hover {
+  border-color: var(--line-3);
+  transform: translateY(-1px);
+}
+.kb-card mark,
+.kb-hl {
+  background: color-mix(in srgb, var(--gold) 38%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+/* the article */
+.kb-prose {
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+.kb-h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  scroll-margin-top: 90px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.kb-h2 .n {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+}
+
+.kb-steps {
+  counter-reset: step;
+  position: relative;
+}
+.kb-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 14px;
+  padding-bottom: 18px;
+}
+.kb-step::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 34px;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(var(--line-2), var(--line));
+}
+.kb-step:last-child::before {
+  display: none;
+}
+.kb-step .dot {
+  counter-increment: step;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--tint, var(--t-violet));
+  background: color-mix(in srgb, var(--tint, var(--t-violet)) 12%, var(--bg-elev));
+  border: 1px solid color-mix(in srgb, var(--tint, var(--t-violet)) 40%, transparent);
+}
+.kb-step .dot::before {
+  content: counter(step);
+}
+
+.kb-rule {
+  display: flex;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.kb-rule[data-hard='1'] {
+  border-color: color-mix(in srgb, var(--critical) 45%, var(--line));
+  background: color-mix(in srgb, var(--critical) 6%, var(--bg-elev));
+}
+
+.kb-bubble {
+  position: relative;
+  padding: 12px 14px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  font-size: 13.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+.kb-bubble[dir='rtl'] {
+  border-radius: 14px 14px 4px 14px;
+  font-size: 14.5px;
+}
+.kb-ph {
+  display: inline;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--t-violet) 18%, transparent);
+  color: var(--t-violet);
+  font-weight: 500;
+}
+
+/* annotated screenshots */
+.kb-shot {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  background: var(--bg-elev-2);
+  box-shadow: 0 24px 48px -28px rgb(0 0 0 / 0.45);
+}
+.kb-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.kb-chrome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
+}
+.kb-chrome i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line-3);
+}
+.kb-pin {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #e5484d;
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 0.9), 0 6px 14px rgb(0 0 0 / 0.35);
+  z-index: 3;
+}
+.kb-pin::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid #e5484d;
+  animation: kb-ping 2.4s ease-out infinite;
+}
+@keyframes kb-ping {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.9;
+  }
+  70%,
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+.kb-note {
+  position: absolute;
+  z-index: 4;
+  max-width: 34%;
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: #fff;
+  background: rgb(17 17 17 / 0.92);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+.kb-note b {
+  color: #ff8a8d;
+  margin-right: 4px;
+}
+@media (max-width: 640px) {
+  .kb-note,
+  .kb-arrows {
+    display: none;
+  }
+}
+
+.kb-toc a {
+  display: block;
+  padding: 5px 10px;
+  border-left: 2px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.kb-toc a:hover {
+  color: var(--ink);
+  border-left-color: var(--ink-3);
+}
