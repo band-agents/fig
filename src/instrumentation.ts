@@ -51,16 +51,15 @@ export async function register() {
   };
   setTimeout(tick, 15_000);
   g.__relaySync = setInterval(tick, Math.max(2, minutes) * 60_000);
-  // once a night: the stores' catalogues and stock again from Shopify (new styles, prices, seasons), then
-  // every branch's stock from Lucida (Reports → Stock by branch; nothing while Lucida has no logins)
-  const { maybeReadBranchesTonight } = await import('./lib/branch-stock');
+  // once a night: the stores' catalogues and stock again from Shopify (new styles, prices, seasons).
+  // Never Lucida: stock by branch names every barcode, so it is read only by hand (Reports → Stock by
+  // branch), never on a schedule (Dan and Lucida, 5 Nov 2026)
   const { maybeRefreshCataloguesTonight } = await import('./lib/stock/live');
   setInterval(
     () =>
-      void (async () => {
-        await maybeRefreshCataloguesTonight();
-        await maybeReadBranchesTonight(['KW', 'EG']);
-      })().catch((e) => console.error('[relay] nightly stock reading failed', e instanceof Error ? e.message : e)),
+      void maybeRefreshCataloguesTonight().catch((e) =>
+        console.error('[relay] nightly stock reading failed', e instanceof Error ? e.message : e),
+      ),
     30 * 60_000,
   );
 }

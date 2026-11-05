@@ -8,8 +8,9 @@ import type { Market } from './domain/stock/calendar';
 /**
  * Stock per branch for the whole catalogue (Dan, 25 Oct: "stock level of each product and where").
  * Lucida's StockInquiry with BalanceByStore answers, per barcode, every store holding it; 3,000
- * barcodes a call, once per company database. Read once a night and on demand (within this console's
- * hourly call budget), kept in branch_stock so the reports never wait on Lucida.
+ * barcodes a call, once per company database. It names every barcode, so it is read only by hand
+ * (Reports → Stock by branch, within this console's hourly call budget), never on a schedule (Dan
+ * and Lucida, 5 Nov 2026), and kept in branch_stock so the reports never wait on Lucida.
  */
 
 const BATCH = 3000;
@@ -67,17 +68,4 @@ export function readAllBranches(markets: Market[]): Promise<BranchRun> {
     }
   })();
   return g.__branchRead;
-}
-
-/** The nightly reading: after 3am local, once a day, when Lucida is connected and the budget allows. */
-export async function maybeReadBranchesTonight(markets: Market[], tz = 'Asia/Kuwait') {
-  if (!lucidaConfigured()) return;
-  const hour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: tz }).format(new Date()));
-  if (hour < 3 || hour > 6) return;
-  const last = await lastBranchRun();
-  if (last && Date.now() - Date.parse(last.at) < 20 * 3_600_000) return;
-  const cost = await branchReadCost(markets);
-  if (!cost.possible) return;
-  const run = await readAllBranches(markets);
-  console.log(`[relay] branch stock: ${run.ok ? `${run.rows} rows, ${run.stores} branches, ${run.calls} Lucida calls` : `failed: ${run.note}`}`);
 }
