@@ -307,6 +307,12 @@ export async function applyPlatformFacts(orderId: string, inc: Pick<IncomingOrde
     await setStage(o, 'cancelled', who, { at: f.cancelled.at, reason: f.cancelled.reason ?? 'Cancelled in the store', viaPlatform: true, history: f.history });
     return true;
   }
+  // an old store's delivered order was paid for there: it closes, rather than waiting on Finance for cash
+  // (Dan, 5 Nov: 139 of them sat in "delivered, cash to settle" as EGP 594K at stake)
+  if (f.delivered && f.history && order(o.stage) >= 0 && order(o.stage) < order('settled')) {
+    await setStage(o, 'settled', who, { at: f.delivered.at, viaPlatform: true, history: true });
+    return true;
+  }
   if (f.delivered && order(o.stage) >= 0 && order(o.stage) < order('delivered')) {
     await setStage(o, 'delivered', who, { at: f.delivered.at, viaPlatform: true, history: f.history });
     return true;

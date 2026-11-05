@@ -1,7 +1,8 @@
 // Tidies the orders already in the console from before the 4 Nov fix (the sync applies it to new pulls):
-//  - FIG's old WooCommerce orders copied into Shopify (tag `migrated`) leave the floor: completed ones
-//    become delivered, refunded and cancelled ones cancelled, from their `woo-status-…` tag. Old orders
-//    still open there (processing, on hold) are listed, not touched.
+//  - FIG's old WooCommerce orders copied into Shopify (tag `migrated`) leave the floor, from their
+//    `woo-status-…` tag: completed ones close as settled (5 Nov: not left waiting on Finance for cash),
+//    refunded and cancelled ones are cancelled. Old orders still open there (processing, on hold) are
+//    listed, not touched.
 //  - Discount and fee lines ("First Order Discount (10%)" at a minus price, "77,00 EGP fee") stop being
 //    items: they are taken off the order's lines and its piece count.
 //
@@ -13,7 +14,8 @@ import { applyPlatformFacts } from '../src/lib/engine';
 import { migratedFacts, notGoods } from '../src/lib/connectors/shopify-map';
 
 const apply = process.argv.includes('--apply');
-const FINAL = ['delivered', 'settled', 'cancelled', 'rto', 'rto_closed'];
+// an old store's order is done once closed: delivered ones close too (they were paid for there)
+const FINAL = ['settled', 'cancelled', 'rto', 'rto_closed'];
 
 (async () => {
   const db = await getDb();
@@ -24,7 +26,7 @@ const FINAL = ['delivered', 'settled', 'cancelled', 'rto', 'rto_closed'];
   const moves = new Map<string, number>();
   for (const o of open) {
     const facts = migratedFacts(o.tags ?? [], o.placedAt);
-    const to = facts?.cancelled ? 'cancelled' : facts?.delivered ? 'delivered' : null;
+    const to = facts?.cancelled ? 'cancelled' : facts?.delivered ? 'settled' : null;
     if (!to) {
       left.push(`${o.number} (${o.stage}, ${(o.tags ?? []).find((t) => t.startsWith('woo-status-')) ?? 'no old status'}, ${o.placedAt.toISOString().slice(0, 10)})`);
       continue;
