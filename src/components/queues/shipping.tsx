@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ExternalLink, MessageCircle, PackageCheck, PackageOpen, Printer, RotateCcw, Truck, TriangleAlert } from 'lucide-react';
-import { bookBostaAction, bookUpsAction } from '@/app/actions';
+import { bookAramexAction, bookBostaAction, bookUpsAction } from '@/app/actions';
 import { fmt, recommend } from '@/lib/domain/courier-rates';
 import { gmtcArea } from '@/lib/connectors/kuwait-areas';
 import { toast } from '@/components/ui/toast';
@@ -21,7 +21,7 @@ import { OrderLink, ReasonModal, Spin, useMover } from './shared';
 
 type View = 'handover' | 'road' | 'exceptions' | 'rto' | 'pickups';
 
-export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, scopes, ups = null, bosta = null }: { view: View; packed: OrderRow[]; road: OrderRow[]; exceptions: OrderRow[]; rto: OrderRow[]; pickups: ReturnRow[]; scopes: Scopes; ups?: 'staging' | 'live' | null; bosta?: { env: 'staging' | 'live'; channels: string[] } | null }) {
+export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, scopes, ups = null, bosta = null, aramex = null }: { view: View; packed: OrderRow[]; road: OrderRow[]; exceptions: OrderRow[]; rto: OrderRow[]; pickups: ReturnRow[]; scopes: Scopes; ups?: 'staging' | 'live' | null; bosta?: { env: 'staging' | 'live'; channels: string[] } | null; aramex?: { env: 'uat' | 'live'; channels: string[] } | null }) {
   const m = useMover();
   const [booking, startBooking] = useTransition();
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -43,6 +43,18 @@ export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, sc
       else toast(r.error, { tone: 'error' });
     });
   };
+  const bookAramex = (id: string) => {
+    setBookingId(id);
+    startBooking(async () => {
+      const r = await bookAramexAction(id);
+      setBookingId(null);
+      if (r.ok) toast(r.message ?? 'Booked with Aramex');
+      else toast(r.error, { tone: 'error' });
+    });
+  };
+  // FIG's store default carrier is "Aramex", so only an Egypt order with a waybill on it is an Aramex booking from here
+  const aramexFor = (o: OrderRow) => Boolean(aramex?.channels.includes(o.channelId)) && !o.tracking && (!o.courier || o.courier === CHANNEL[o.channelId]?.carrier);
+  const bookedHere = (o: OrderRow) => Boolean(o.tracking) && (o.courier === 'UPS Kuwait' || o.courier === 'Bosta' || (o.courier === 'Aramex' && CHANNEL[o.channelId]?.country === 'EG'));
   const bostaFor = (o: OrderRow) => Boolean(bosta?.channels.includes(o.channelId)) && !o.tracking && (!o.courier || o.courier === CHANNEL[o.channelId]?.carrier || o.courier === 'Bosta');
   const ships = (scopes.shipping ?? 0) >= 2;
   const desk = (scopes.returns ?? 0) >= 2;
@@ -77,9 +89,9 @@ export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, sc
                 {o.total != null && o.paymentMethod === 'cod' && <span className="font-mono text-[12px]">collect {money(o.total, o.currency)}</span>}
                 {CHANNEL[o.channelId]?.country === 'KW' && !o.tracking && o.total != null && <CheapestCourier area={gmtcArea(o.city, { within: true })} pieces={o.items} cod={o.paymentMethod === 'cod' ? o.total : 0} ups={Boolean(ups)} />}
                 <SlaChip due={o.dueAt} since={o.stageAt} held={o.onHold} />
-                {ships && (o.courier === 'UPS Kuwait' || o.courier === 'Bosta') && o.tracking ? (
+                {ships && bookedHere(o) ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-[12px] text-ink-2">{o.courier === 'Bosta' ? 'Bosta' : 'UPS'} {o.tracking}</span>
+                    <span className="font-mono text-[12px] text-ink-2">{o.courier === 'UPS Kuwait' ? 'UPS' : o.courier} {o.tracking}</span>
                     <a href={`/orders/${o.id}/label`} target="_blank" rel="noreferrer" className="btn btn-quiet btn-sm">
                       <Printer className="size-3.5" /> Label
                     </a>
@@ -100,6 +112,12 @@ export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, sc
                     <button onClick={() => bookBosta(o.id)} disabled={booking} className="btn btn-primary btn-sm" title={bosta?.env === 'staging' ? 'Bosta test account: no real pickup is booked' : undefined}>
                       <Spin on={booking && bookingId === o.id} />
                       <Truck className="size-3.5" /> Book Bosta{bosta?.env === 'staging' ? ' (test)' : ''}
+                    </button>
+                  )}
+                  {aramexFor(o) && (
+                    <button onClick={() => bookAramex(o.id)} disabled={booking} className="btn btn-quiet btn-sm" title={aramex?.env === 'uat' ? 'Aramex test server: no real pickup is booked' : 'Book this one with Aramex instead of Bosta'}>
+                      <Spin on={booking && bookingId === o.id} />
+                      <Truck className="size-3.5" /> Book Aramex{aramex?.env === 'uat' ? ' (test)' : ''}
                     </button>
                   )}
                   <form

@@ -220,3 +220,39 @@ export function buildShipmentDraft(order: ShipmentOrder, account: ShipperAccount
 }
 
 export type ShipmentDraft = ReturnType<typeof buildShipmentDraft>;
+
+// ── CreateShipments / PrintLabel answers ──────────────────────────────────────────────────────
+
+type RawLabel = { LabelURL?: string | null; LabelFileContents?: string | number[] | null };
+
+export type CreateShipmentsResponse = {
+  HasErrors?: boolean;
+  Notifications?: Notification[];
+  Shipments?: { ID?: string | null; Reference1?: string | null; HasErrors?: boolean; Notifications?: Notification[] | null; ShipmentLabel?: RawLabel | null }[] | null;
+};
+
+export type PrintLabelResponse = { HasErrors?: boolean; Notifications?: Notification[]; ShipmentNumber?: string | null; ShipmentLabel?: RawLabel | null };
+
+/**
+ * The waybill of the one shipment sent. Aramex can answer HasErrors on the shipment alone (a city it does
+ * not serve, a missing phone) while the envelope looks fine: that throws with its reasons.
+ */
+export function readCreatedShipment(res: CreateShipmentsResponse): { awb: string; labelUrl: string | null } {
+  const s = res.Shipments?.[0];
+  if (!s) throw new AramexError('Aramex created no shipment and gave no reason.', res.Notifications ?? []);
+  if (s.HasErrors) throw new AramexError(`Aramex refused the shipment: ${describe(s.Notifications ?? []) || 'no reason given'}`, s.Notifications ?? []);
+  const awb = String(s.ID ?? '').trim();
+  if (!awb) throw new AramexError('Aramex sent no waybill number.', s.Notifications ?? []);
+  return { awb, labelUrl: s.ShipmentLabel?.LabelURL?.trim() || null };
+}
+
+/** The label as PDF bytes: WCF sends a byte[] as base64 text or as an array of numbers, depending on the endpoint. */
+export function labelBytes(label: RawLabel | null | undefined): Uint8Array | null {
+  const c = label?.LabelFileContents;
+  if (!c || (Array.isArray(c) && !c.length)) return null;
+  const buf = Array.isArray(c) ? Uint8Array.from(c) : new Uint8Array(Buffer.from(c, 'base64'));
+  return String.fromCharCode(...buf.slice(0, 4)) === '%PDF' ? buf : null;
+}
+
+/** Scans that mean the driver has the parcel: from here the order is on the road. */
+export const aramexCollected = (u: Pick<TrackUpdate, 'code' | 'description'> & { comment?: string }) => ['picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'exception', 'returned'].includes(classifyUpdate(u));

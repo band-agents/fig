@@ -73,9 +73,11 @@ export async function checkChannel(c: ChannelDef): Promise<ConnectionCheck> {
   }
 }
 
-/** Every courier in one pass: Aramex for its parcels, UPS (GMTC) for Kuwait's parcels and return pickups, Bosta for FIG's in Egypt. */
+/** Every courier in one pass: Aramex for its parcels (and FIG's booked ones until collected), UPS (GMTC) for Kuwait's parcels and return pickups, Bosta for FIG's in Egypt. */
 export async function trackCouriers() {
-  const [{ trackUps }, { trackUpsReturns }, { trackBosta }, { trackBostaReturns }] = await Promise.all([import('./gmtc-shipments'), import('./gmtc-returns'), import('./bosta-shipments'), import('./bosta-returns')]);
+  const [{ trackUps }, { trackUpsReturns }, { trackBosta }, { trackBostaReturns }, { trackAramexPickups }] = await Promise.all([import('./gmtc-shipments'), import('./gmtc-returns'), import('./bosta-shipments'), import('./bosta-returns'), import('./aramex-shipments')]);
+  // collections first, so a parcel shipped this pass is tracked on in the same pass
+  const pickups = await trackAramexPickups().catch((e) => ({ ok: false, note: `Aramex pickups: ${e instanceof Error ? e.message : e}` }));
   const [aramex, ups, upsReturns, bosta, bostaReturns] = await Promise.all([
     trackAramex().catch((e) => ({ ok: false, note: `Aramex: ${e instanceof Error ? e.message : e}` })),
     trackUps().catch((e) => ({ ok: false, note: `UPS: ${e instanceof Error ? e.message : e}` })),
@@ -83,7 +85,7 @@ export async function trackCouriers() {
     trackBosta().catch((e) => ({ ok: false, note: `Bosta: ${e instanceof Error ? e.message : e}` })),
     trackBostaReturns().catch((e) => ({ ok: false, note: `Bosta returns: ${e instanceof Error ? e.message : e}` })),
   ]);
-  return { ok: aramex.ok || ups.ok || bosta.ok, note: [aramex.note, ups.note, upsReturns.note, bosta.note, bostaReturns.note].join(' · ') };
+  return { ok: aramex.ok || ups.ok || bosta.ok, note: [aramex.note, pickups.note, ups.note, upsReturns.note, bosta.note, bostaReturns.note].join(' · ') };
 }
 
 /** Asks Aramex about every live parcel still on the road and moves orders when the courier says so. */

@@ -161,6 +161,22 @@ export async function bookBostaAction(orderId: string) {
   });
 }
 
+/** Books a FIG order in Egypt with Aramex now, instead of Bosta: the waybill comes back from Aramex. */
+export async function bookAramexAction(orderId: string) {
+  return run(async () => {
+    const u = await me();
+    const { createAramexShipment } = await import('@/lib/aramex-shipments');
+    const { AramexError } = await import('@/lib/connectors');
+    try {
+      const awb = await createAramexShipment(actorFor(u), orderId);
+      return `Booked with Aramex: ${awb}`;
+    } catch (e) {
+      if (e instanceof AramexError) throw new RelayError('invalid', e.message);
+      throw e;
+    }
+  });
+}
+
 /** Keeps the chosen courier on an open order (Courier assignment page). */
 export async function assignCourierAction(orderId: string, courier: string) {
   return run(async () => {

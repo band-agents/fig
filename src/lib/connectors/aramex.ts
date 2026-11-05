@@ -1,11 +1,16 @@
 import 'server-only';
-// Aramex, FIG's courier: waybill tracking (≤ 50 per call) and CreateShipments drafts. Nothing here
-// creates a shipment; Relay sends a draft only after explicit approval, with credentials attached then.
+// Aramex: waybill tracking (≤ 50 per call) and, for FIG in Egypt, booking: CreateShipments, the label from
+// PrintLabel. ARAMEX_ENABLED=true is the booking switch, so an account can sit in the settings for tracking
+// while the console books nothing. ARAMEX_ENV=uat points every call at Aramex's test server (ws.sbx).
 import { COUNTRIES } from '../channels';
 import { fetchRetry } from './http';
 import {
   AramexError,
   buildShipmentDraft,
+  labelBytes,
+  readCreatedShipment,
+  type CreateShipmentsResponse,
+  type PrintLabelResponse,
   mapTrackingResults,
   readAramexAnswer,
   type ShipmentDraft,
@@ -15,7 +20,7 @@ import {
   type TrackUpdate,
 } from './aramex-map';
 
-export { AramexError, aramexTrackingUrl, classifyUpdate } from './aramex-map';
+export { AramexError, aramexCollected, aramexTrackingUrl, classifyUpdate } from './aramex-map';
 export type { ShipmentDraft, ShipmentOrder, TrackClass, TrackUpdate } from './aramex-map';
 
 const env = (name: string) => process.env[name]?.trim() || '';
@@ -35,8 +40,20 @@ export const aramexConfigured = (country?: string | null) =>
 /** The countries that have an Aramex account of their own. */
 export const aramexOwnAccounts = () => COUNTRIES.filter((c) => ready(`ARAMEX_${c.code}_`)).map((c) => c.code);
 
+/** 'live' unless ARAMEX_ENV=uat: the console says which server a waybill came from. */
+export const aramexEnv = () => (env('ARAMEX_ENV').toLowerCase() === 'uat' ? 'uat' : 'live');
+
+/** Booking, not just tracking: the default (FIG) account plus the switch. Only Egypt books with Aramex. */
+export const aramexBookingConfigured = (country?: string | null) => (!country || country === 'EG') && env('ARAMEX_ENABLED').toLowerCase() === 'true' && ready(DEFAULT);
+
+/** When an Egypt order gets its waybill if Aramex is the automatic courier: ready to pick (as Bosta), packed, or only by hand. */
+export const aramexCreateAt = (): 'ready' | 'packed' | 'manual' => {
+  const v = env('ARAMEX_CREATE_AT').toLowerCase();
+  return v === 'packed' || v === 'manual' ? v : 'ready';
+};
+
 // fig-app's ARAMEX_BASE_URL already ends in /ShippingAPI.V2; accept either form.
-const base = () => (env('ARAMEX_BASE_URL') || 'https://ws.aramex.net').replace(/\/+$/, '').replace(/\/ShippingAPI\.V2$/i, '');
+const base = () => (env('ARAMEX_BASE_URL') || (aramexEnv() === 'uat' ? 'https://ws.sbx.aramex.net' : 'https://ws.aramex.net')).replace(/\/+$/, '').replace(/\/ShippingAPI\.V2$/i, '');
 
 const clientInfo = (p: string) => ({
   UserName: env(`${p}USERNAME`),
@@ -52,13 +69,18 @@ const clientInfo = (p: string) => ({
 /** Aramex answers 400 with an HTML page unless all five references are present, even empty. */
 const transaction = (reference: string) => ({ Reference1: reference, Reference2: '', Reference3: '', Reference4: '', Reference5: '' });
 
-async function call<T extends { HasErrors?: boolean }>(path: string, body: Record<string, unknown>): Promise<T> {
+async function post(path: string, body: Record<string, unknown>, tries = 3) {
   const res = await fetchRetry(
     `${base()}/ShippingAPI.V2/${path}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) },
-    { label: 'Aramex', tries: 3, timeoutMs: 30_000 },
+    { label: 'Aramex', tries, timeoutMs: 30_000 },
   );
-  return readAramexAnswer<T>(res.status, await res.text());
+  return { status: res.status, text: await res.text() };
+}
+
+async function call<T extends { HasErrors?: boolean }>(path: string, body: Record<string, unknown>, tries = 3): Promise<T> {
+  const { status, text } = await post(path, body, tries);
+  return readAramexAnswer<T>(status, text);
 }
 
 /** Each waybill's scans, oldest first, asked with the country's account. Waybills Aramex does not know are absent. */
@@ -125,3 +147,54 @@ export function createShipmentDraft(
 
 /** The approved draft with the country's credentials attached, ready for CreateShipments. Never store or log the result. */
 export const withClientInfo = (draft: ShipmentDraft, country?: string | null) => ({ ClientInfo: clientInfo(prefixFor(country)), ...draft });
+
+export const ARAMEX_COURIER = 'Aramex';
+
+function assertBooking() {
+  if (!aramexBookingConfigured('EG')) throw new AramexError('Aramex booking is not set up: ARAMEX_ENABLED=true and the ARAMEX_* account settings are needed.');
+}
+
+/**
+ * Creates the order's shipment with FIG's account and returns its waybill. Sent once, never retried on a
+ * network failure, so a slow answer cannot book the parcel twice.
+ */
+export async function createShipment(order: ShipmentOrder, now = new Date()): Promise<{ awb: string; labelUrl: string | null }> {
+  assertBooking();
+  const { status, text } = await post('Shipping/Service_1_0.svc/json/CreateShipments', withClientInfo(createShipmentDraft(order, { country: 'EG', now }), 'EG'), 1);
+  let parsed: CreateShipmentsResponse | null = null;
+  try {
+    parsed = JSON.parse(text) as CreateShipmentsResponse;
+  } catch {
+    // not JSON: readAramexAnswer says what came back
+  }
+  // the shipment's own errors say more than the envelope's HasErrors
+  if (parsed?.Shipments?.length) return readCreatedShipment(parsed);
+  return readCreatedShipment(readAramexAnswer<CreateShipmentsResponse>(status, text));
+}
+
+/** The waybill label as a PDF, asked fresh each time (Aramex keeps it; nothing is stored here). */
+export async function shipmentLabel(awb: string): Promise<Uint8Array> {
+  assertBooking();
+  const res = await call<PrintLabelResponse>(
+    'Shipping/Service_1_0.svc/json/PrintLabel',
+    {
+      ClientInfo: clientInfo(DEFAULT),
+      ShipmentNumber: awb,
+      ProductGroup: 'DOM',
+      OriginEntity: env(`${DEFAULT}ACCOUNT_ENTITY`),
+      LabelInfo: { ReportID: Number(env(`${DEFAULT}REPORT_ID`)) || 9839, ReportType: 'RPT' },
+      Transaction: transaction('relay-label'),
+    },
+    2,
+  );
+  const pdf = labelBytes(res.ShipmentLabel);
+  if (pdf) return pdf;
+  // some accounts only answer with a link to the label
+  const url = res.ShipmentLabel?.LabelURL?.trim();
+  if (url) {
+    const r = await fetchRetry(url, {}, { label: 'Aramex', tries: 2, timeoutMs: 30_000 });
+    const buf = new Uint8Array(await r.arrayBuffer());
+    if (String.fromCharCode(...buf.slice(0, 4)) === '%PDF') return buf;
+  }
+  throw new AramexError(`Aramex did not send a printable label for ${awb}.`);
+}
