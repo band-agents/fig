@@ -6,8 +6,6 @@ import { importNewStores, refreshCatalogues } from '@/lib/stock/live';
 import { readUnreadWebsites } from '@/lib/web-items';
 import { releaseRetired } from '@/lib/engine';
 import { addWeeks, weekOf } from '@/lib/domain/stock/calendar';
-import { branchReadCost, readAllBranches } from '@/lib/branch-stock';
-import { lucidaConfigured } from '@/lib/connectors/lucida';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -20,7 +18,7 @@ export const maxDuration = 300;
  *   (no job)       every 5 minutes: the stores' orders, couriers, retired steps, this week's sales, the stock rule
  *   ?job=planner   every 6 hours: the AI planner on the stock as it stands
  *   ?job=nightly   once a night: a newly connected store's first reading, every catalogue and its stock
- *                  again, the websites' listings, then every branch's stock from Lucida
+ *                  again, and the websites' listings. No Lucida: stock by branch is read by hand only
  *
  * RELAY_CRON=on is the switch: while the old server still runs the floor, this copy must not pull the
  * stores or write to them, so the schedule answers "paused" until the move is done.
@@ -37,10 +35,9 @@ async function run(req: Request) {
       await importNewStores();
       const catalogues = await refreshCatalogues();
       await readUnreadWebsites();
-      const markets = ['KW', 'EG'] as const;
-      const cost = lucidaConfigured() ? await branchReadCost([...markets]) : null;
-      const branches = cost?.possible ? await readAllBranches([...markets]) : { skipped: cost ? 'not enough Lucida calls left this hour' : 'Lucida not connected' };
-      return Response.json({ job, catalogues, branches, ms: Date.now() - t0 });
+      // no Lucida here: stock by branch names every barcode, so it is read only by hand (Reports →
+      // Stock by branch), never on a schedule (Dan and Lucida, 5 Nov 2026)
+      return Response.json({ job, catalogues, ms: Date.now() - t0 });
     }
     const [stores, couriers] = await Promise.all([syncAll(), trackCouriers()]);
     await releaseRetired();
