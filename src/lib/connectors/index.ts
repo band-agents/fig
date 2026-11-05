@@ -20,7 +20,9 @@ export function connectorFor(c: ChannelDef): Connector | null {
 }
 
 export { medusa, shopify, woo };
-export { aramexConfigured, aramexOwnAccounts, aramexTrackingUrl, AramexError, classifyUpdate, createShipmentDraft, trackShipments, withClientInfo } from './aramex';
+export { ARAMEX_COURIER, aramexBookingConfigured, aramexCanCancel, cancelShipment, aramexCollected, aramexConfigured, aramexCreateAt, aramexEnv, aramexOwnAccounts, aramexTrackingUrl, AramexError, classifyUpdate, createShipment, createShipmentDraft, shipmentLabel, trackShipments, withClientInfo } from './aramex';
+export { egyptAutoCourier } from './eg-courier';
+export type { EgyptCourier } from './eg-courier';
 export type { ShipmentDraft, ShipmentOrder, TrackClass, TrackUpdate } from './aramex';
 export { cancelConsignment, classifyGmtc, collectedAt, consignmentLabel, createConsignment, createReturnPickup, GMTC_COURIER, gmtcConfigured, gmtcCreateAt, gmtcEnv, GmtcError, trackConsignments } from './gmtc';
 export { BOSTA_COURIER, bostaCity, bostaCollected, bostaConfigured, bostaCreateAt, bostaEnv, BostaError, bostaReturnAt, bostaTrackingUrl, classifyBosta, classifyBostaReturn, createBostaReturnPickup, createDelivery, deliveryLabel, terminateDelivery, trackDeliveries } from './bosta';

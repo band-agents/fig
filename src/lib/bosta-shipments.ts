@@ -10,7 +10,7 @@ import { publish } from './bus';
 import { forbidden, invalid, notFound } from './errors';
 import { can, seesChannel } from './domain/perms';
 import { isAllowed, ORDER_FLOW, type OrderStage } from './domain/stages';
-import { BOSTA_COURIER, bostaCollected, bostaConfigured, bostaCreateAt, bostaEnv, bostaTrackingUrl, classifyBosta, createDelivery, terminateDelivery, trackDeliveries } from './connectors';
+import { BOSTA_COURIER, bostaCollected, bostaConfigured, bostaCreateAt, bostaEnv, bostaTrackingUrl, classifyBosta, createDelivery, egyptAutoCourier, terminateDelivery, trackDeliveries } from './connectors';
 
 const BOSTA: Actor = { id: null, name: 'Bosta', dept: null };
 
@@ -60,7 +60,9 @@ export async function bostaFollowsOrder(orderId: string, to: OrderStage) {
     const at = bostaCreateAt();
     // a courier the team assigned wins: an order given to Aramex or Mylerz is never booked with Bosta
     const chosen = o.courier && o.courier !== CHANNEL[o.channelId]?.carrier ? o.courier : null; // the store's default carrier is no choice
-    if (at !== 'manual' && to === at && !o.tracking && (!chosen || chosen === BOSTA_COURIER)) await createBostaShipment({ ...BOSTA, name: 'System' }, o.id);
+    // with nobody's choice on the order, Bosta books it only while it is Egypt's automatic courier (EG_AUTO_COURIER)
+    const mine = chosen ? chosen === BOSTA_COURIER : egyptAutoCourier() === 'bosta';
+    if (at !== 'manual' && to === at && !o.tracking && mine) await createBostaShipment({ ...BOSTA, name: 'System' }, o.id);
   } catch (e) {
     const why = e instanceof Error ? e.message : String(e);
     if (to === 'cancelled') await record({ orderId: o.id, at: new Date(), actorId: null, actorName: BOSTA.name, dept: null, kind: 'courier', message: `Bosta delivery ${o.tracking} NOT cancelled: ${why}` });

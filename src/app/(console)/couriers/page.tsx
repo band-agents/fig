@@ -2,7 +2,7 @@ import { Truck } from 'lucide-react';
 import { requireUser, sendHome } from '@/lib/auth/session';
 import { can, canSee } from '@/lib/domain/perms';
 import { ordersToAssign, kuwaitStores } from '@/lib/courier-assign';
-import { bostaConfigured, gmtcConfigured } from '@/lib/connectors';
+import { aramexBookingConfigured, bostaConfigured, egyptAutoCourier, gmtcConfigured } from '@/lib/connectors';
 import { Empty, PageHeader } from '@/components/ui/bits';
 import { CourierBoard } from '@/components/couriers/board';
 import { CourierCompare } from '@/components/finance/courier-compare';
@@ -19,18 +19,19 @@ export const metadata = { title: 'Courier assignment' };
 export default async function CouriersPage() {
   const me = await requireUser();
   if (!canSee(me, 'couriers')) sendHome(me);
+  const auto = egyptAutoCourier() === 'aramex' ? 'Aramex' : 'Bosta';
   if (!kuwaitStores(me).length)
     return (
       <div className="space-y-5">
-        <PageHeader eyebrow="Queues" title="Courier assignment" sub="FIG ships every order with Bosta, so there is no courier to choose." />
+        <PageHeader eyebrow="Queues" title="Courier assignment" sub={`FIG ships with ${auto}${aramexBookingConfigured('EG') ? ' by default; any order can go with the other courier from Shipping' : ', so there is no courier to choose'}.`} />
         <div className="panel">
           <Empty
             icon={Truck}
-            title="FIG goes with Bosta"
+            title={`FIG goes with ${auto}`}
             body={
-              bostaConfigured('EG')
-                ? 'Each FIG order is booked with Bosta when it reaches Ready, with its waybill and tracking. Orders that missed it have a Book Bosta button in Shipping.'
-                : 'Each FIG order is booked with Bosta from the Shipping queue.'
+              (auto === 'Aramex' ? aramexBookingConfigured('EG') : bostaConfigured('EG'))
+                ? `Each FIG order is booked with ${auto} when it reaches Ready, with its waybill and tracking. Orders that missed it have a Book ${auto} button in Shipping${aramexBookingConfigured('EG') && bostaConfigured('EG') ? `, beside Book ${auto === 'Bosta' ? 'Aramex' : 'Bosta'}` : ''}.`
+                : `Each FIG order is booked with ${auto} from the Shipping queue.`
             }
             action={{ href: '/queue/shipping', label: 'Open Shipping' }}
           />
