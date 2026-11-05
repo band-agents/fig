@@ -20,7 +20,7 @@ export function connectorFor(c: ChannelDef): Connector | null {
 }
 
 export { medusa, shopify, woo };
-export { ARAMEX_COURIER, aramexBookingConfigured, aramexCollected, aramexConfigured, aramexCreateAt, aramexEnv, aramexOwnAccounts, aramexTrackingUrl, AramexError, classifyUpdate, createShipment, createShipmentDraft, shipmentLabel, trackShipments, withClientInfo } from './aramex';
+export { ARAMEX_COURIER, aramexBookingConfigured, aramexCanCancel, cancelShipment, aramexCollected, aramexConfigured, aramexCreateAt, aramexEnv, aramexOwnAccounts, aramexTrackingUrl, AramexError, classifyUpdate, createShipment, createShipmentDraft, shipmentLabel, trackShipments, withClientInfo } from './aramex';
 export { egyptAutoCourier } from './eg-courier';
 export type { EgyptCourier } from './eg-courier';
 export type { ShipmentDraft, ShipmentOrder, TrackClass, TrackUpdate } from './aramex';

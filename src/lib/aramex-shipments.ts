@@ -11,7 +11,7 @@ import { forbidden, invalid, notFound } from './errors';
 import { can, seesChannel } from './domain/perms';
 import type { OrderStage } from './domain/stages';
 import { shipsWithBosta } from './bosta-shipments';
-import { ARAMEX_COURIER, aramexBookingConfigured, aramexCollected, aramexCreateAt, aramexEnv, aramexTrackingUrl, createShipment, egyptAutoCourier, trackShipments } from './connectors';
+import { ARAMEX_COURIER, aramexBookingConfigured, aramexCanCancel, aramexCollected, aramexCreateAt, aramexEnv, aramexTrackingUrl, cancelShipment, createShipment, egyptAutoCourier, trackShipments } from './connectors';
 
 const ARAMEX: Actor = { id: null, name: 'Aramex', dept: null };
 
@@ -44,8 +44,8 @@ export async function createAramexShipment(actor: Actor, orderId: string) {
 
 /**
  * The engine calls this after every stage change (never awaited, never allowed to stop an order): book at the
- * configured stage when Aramex is Egypt's automatic courier. Aramex's API cannot cancel a waybill, so a
- * cancelled order's waybill is left for the team to cancel with Aramex, and the order says so.
+ * configured stage when Aramex is Egypt's automatic courier, and cancel the waybill with the order (V3, which
+ * needs its own client id and secret; without them the order says the waybill is still open at Aramex).
  */
 export async function aramexFollowsOrder(orderId: string, to: OrderStage) {
   if (!aramexBookingConfigured('EG')) return;
@@ -54,7 +54,13 @@ export async function aramexFollowsOrder(orderId: string, to: OrderStage) {
   if (!o || !shipsWithAramex(o) || o.source === 'demo') return;
   try {
     if (to === 'cancelled') {
-      if (isAramex(o)) await record({ orderId: o.id, at: new Date(), actorId: null, actorName: ARAMEX.name, dept: null, kind: 'courier', message: `Aramex waybill ${o.tracking} is still open: cancel it with Aramex (their API cannot)` });
+      if (!isAramex(o)) return;
+      if (!aramexCanCancel()) {
+        await record({ orderId: o.id, at: new Date(), actorId: null, actorName: ARAMEX.name, dept: null, kind: 'courier', message: `Aramex waybill ${o.tracking} is still open: cancel it with Aramex` });
+        return;
+      }
+      await cancelShipment(o.tracking!, `${o.number} cancelled`);
+      await record({ orderId: o.id, at: new Date(), actorId: null, actorName: ARAMEX.name, dept: null, kind: 'courier', message: `Aramex waybill ${o.tracking} cancelled with the order` });
       return;
     }
     if (egyptAutoCourier() !== 'aramex') return;
@@ -63,7 +69,9 @@ export async function aramexFollowsOrder(orderId: string, to: OrderStage) {
     const chosen = o.courier && o.courier !== CHANNEL[o.channelId]?.carrier ? o.courier : null;
     if (at !== 'manual' && to === at && !o.tracking && !chosen) await createAramexShipment({ ...ARAMEX, name: 'System' }, o.id);
   } catch (e) {
-    if (to !== 'cancelled') await flagException(ARAMEX, o.id, `Aramex booking failed: ${e instanceof Error ? e.message : String(e)}`.slice(0, 240)).catch(() => {});
+    const why = e instanceof Error ? e.message : String(e);
+    if (to === 'cancelled') await record({ orderId: o.id, at: new Date(), actorId: null, actorName: ARAMEX.name, dept: null, kind: 'courier', message: `Aramex waybill ${o.tracking} NOT cancelled: ${why}` });
+    else await flagException(ARAMEX, o.id, `Aramex booking failed: ${why}`.slice(0, 240)).catch(() => {});
   }
 }
 

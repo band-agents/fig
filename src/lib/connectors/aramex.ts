@@ -1,7 +1,8 @@
 import 'server-only';
 // Aramex: waybill tracking (≤ 50 per call) and, for FIG in Egypt, booking: CreateShipments, the label from
 // PrintLabel. ARAMEX_ENABLED=true is the booking switch, so an account can sit in the settings for tracking
-// while the console books nothing. ARAMEX_ENV=uat points every call at Aramex's test server (ws.sbx).
+// while the console books nothing. ARAMEX_ENV=uat points every call at Aramex's test server (ws.uat, from
+// Hany's Postman collection, 1 Nov; the server's IP has to be allowed there first).
 import { COUNTRIES } from '../channels';
 import { fetchRetry } from './http';
 import {
@@ -53,7 +54,7 @@ export const aramexCreateAt = (): 'ready' | 'packed' | 'manual' => {
 };
 
 // fig-app's ARAMEX_BASE_URL already ends in /ShippingAPI.V2; accept either form.
-const base = () => (env('ARAMEX_BASE_URL') || (aramexEnv() === 'uat' ? 'https://ws.sbx.aramex.net' : 'https://ws.aramex.net')).replace(/\/+$/, '').replace(/\/ShippingAPI\.V2$/i, '');
+const base = () => (env('ARAMEX_BASE_URL') || (aramexEnv() === 'uat' ? 'https://ws.uat.aramex.net' : 'https://ws.aramex.net')).replace(/\/+$/, '').replace(/\/ShippingAPI\.V2$/i, '');
 
 const clientInfo = (p: string) => ({
   UserName: env(`${p}USERNAME`),
@@ -197,4 +198,33 @@ export async function shipmentLabel(awb: string): Promise<Uint8Array> {
     if (String.fromCharCode(...buf.slice(0, 4)) === '%PDF') return buf;
   }
   throw new AramexError(`Aramex did not send a printable label for ${awb}.`);
+}
+
+/** Cancelling needs Aramex's V3 client id and secret on top of the account (ARAMEX_CLIENT_ID / ARAMEX_CLIENT_SECRET). */
+export const aramexCanCancel = () => aramexBookingConfigured('EG') && Boolean(env('ARAMEX_CLIENT_ID') && env('ARAMEX_CLIENT_SECRET'));
+
+/** Cancels a waybill Aramex has not collected yet (ShippingAPI.V3 CancelShipment). */
+export async function cancelShipment(awb: string, comment: string): Promise<void> {
+  if (!aramexCanCancel()) throw new AramexError('Aramex cancelling is not set up: ARAMEX_CLIENT_ID and ARAMEX_CLIENT_SECRET are needed.');
+  const res = await fetchRetry(
+    `${base()}/ShippingAPI.V3/api/ShippingApi/CancelShipment`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Client-ID': env('ARAMEX_CLIENT_ID'), 'Client-Secret': env('ARAMEX_CLIENT_SECRET') },
+      body: JSON.stringify({ ShipmentNumber: awb, Comment: comment.slice(0, 200) }),
+    },
+    { label: 'Aramex', tries: 2, timeoutMs: 30_000 },
+  );
+  const text = await res.text();
+  // V3 answers in its own shape; a refusal still says HasErrors or comes back as an HTTP error
+  if (res.status >= 400 || /"HasErrors"s*:s*true/i.test(text) || /"(IsSuccess|Success)"s*:s*false/i.test(text)) {
+    let why = text.replace(/<[^>]+>/g, ' ').replace(/s+/g, ' ').trim().slice(0, 300);
+    try {
+      const j = JSON.parse(text) as { Notifications?: { Code?: string; Message?: string }[]; Message?: string; message?: string };
+      why = j.Notifications?.map((n) => `${n.Code ?? ''} ${n.Message ?? ''}`.trim()).join('; ') || j.Message || j.message || why;
+    } catch {
+      // not JSON: the page text says it
+    }
+    throw new AramexError(`Aramex did not cancel ${awb}: ${why || `HTTP ${res.status}`}`);
+  }
 }
