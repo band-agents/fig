@@ -19,6 +19,7 @@ import { InstantLinks } from '@/components/shell/instant-links';
 import { NAV } from '@/components/shell/nav';
 import { canSee } from '@/lib/domain/perms';
 import { MEASURE_COOKIE, MeasureProvider } from '@/components/ui/measure';
+import { kbIndex } from '@/lib/kb';
 
 export default async function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
@@ -54,7 +55,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
           </div>
         </div>
       </NavProvider>
-      <CommandPalette me={me} />
+      <CommandPalette me={me} kb={kbIndex()} />
       {real?.role === 'admin' && <ViewAs current={user.previewing ?? null} brand={user.previewing === 'brand' ? (user.brands?.[0] ?? null) : null} brands={viewBrands} />}
       <InstantLinks warm={warm} />
       <Toaster />

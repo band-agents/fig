@@ -217,6 +217,8 @@ export const PAGES = {
   team: { label: 'Team & access', href: '/team', see: (l: Lv) => l('team') >= 1 },
   rules: { label: 'Rules & SLAs', href: '/rules', see: (l: Lv) => l('settings') >= 1 || l('stock') >= 3 },
   catalog: { label: 'Import & export', href: '/catalog', see: (l: Lv) => l('catalog') >= 1 },
+  // the Playbook: every SOP, policy, decision and ready reply, for everyone who signs in
+  kb: { label: 'Playbook', href: '/kb', see: () => true },
 } as const satisfies Record<string, { label: string; href: string; see: (l: Lv) => boolean }>;
 export type Page = keyof typeof PAGES;
 type Lv = (a: Area) => number;
@@ -225,7 +227,7 @@ type Lv = (a: Area) => number;
 export const READ_ONLY_ROLES: string[] = ['viewer', 'brand'];
 
 /** A brand manager's pages: their brands, the reports, stock and buying. Nothing from the order floor. */
-export const BRAND_PAGES: Page[] = ['today', 'leaks', 'targets', 'profit', 'rescue', 'brands', 'analytics', 'insights', 'financials', 'stockBrief', 'inventory', 'planning', 'purchasing'];
+export const BRAND_PAGES: Page[] = ['today', 'kb', 'leaks', 'targets', 'profit', 'rescue', 'brands', 'analytics', 'insights', 'financials', 'stockBrief', 'inventory', 'planning', 'purchasing'];
 
 /**
  * Whether this person is offered (and may open) a page. Management read-only sees every page but the

@@ -2,18 +2,21 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CornerDownLeft, Search } from 'lucide-react';
+import { BookOpenText, CornerDownLeft, Search } from 'lucide-react';
 import { allowed, NAV, type Me } from './nav';
 import { useLive } from './live';
 
 type Hit = { id: string; kind: 'order' | 'return'; number: string; channel: string; stage: string; tint?: string; customer: string };
 
-export function CommandPalette({ me }: { me: Me }) {
+/** A Playbook article as the palette finds it: its title, and the words it is found by. */
+export type KbHit = { slug: string; title: string; words: string };
+
+export function CommandPalette({ me, kb = [] }: { me: Me; kb?: KbHit[] }) {
   const { paletteOpen } = useLive();
-  return paletteOpen ? <Palette me={me} /> : null;
+  return paletteOpen ? <Palette me={me} kb={kb} /> : null;
 }
 
-function Palette({ me }: { me: Me }) {
+function Palette({ me, kb }: { me: Me; kb: KbHit[] }) {
   const { closePalette } = useLive();
   const router = useRouter();
   const [q, setQ] = useState('');
@@ -42,6 +45,13 @@ function Palette({ me }: { me: Me }) {
     return s ? all.filter((p) => p.label.toLowerCase().includes(s)) : all;
   }, [q, me]);
 
+  // the Playbook's articles whose title or tags hold every word typed, the best five
+  const guides = useMemo(() => {
+    const words = q.trim().toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+    if (!words.length) return [];
+    return kb.filter((a) => words.every((w) => a.words.includes(w))).slice(0, 5);
+  }, [q, kb]);
+
   const rows: { key: string; go: () => void; node: React.ReactNode }[] = [
     ...hits.map((h) => ({
       key: `${h.kind}-${h.id}`,
@@ -57,6 +67,17 @@ function Palette({ me }: { me: Me }) {
               {h.stage}
             </span>
           </span>
+        </>
+      ),
+    })),
+    ...guides.map((a) => ({
+      key: `kb-${a.slug}`,
+      go: () => router.push(`/kb/${a.slug}`),
+      node: (
+        <>
+          <BookOpenText className="size-4 text-ink-3" strokeWidth={1.7} />
+          <span className="truncate">{a.title}</span>
+          <span className="ml-auto text-xs text-ink-4">Playbook</span>
         </>
       ),
     })),

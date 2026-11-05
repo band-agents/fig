@@ -1,4 +1,4 @@
-import { Activity, ArrowDownUp, BadgeCheck, Droplets, Goal, LifeBuoy, ListChecks, PiggyBank, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart } from 'lucide-react';
+import { Activity, ArrowDownUp, BadgeCheck, Droplets, Goal, LifeBuoy, ListChecks, PiggyBank, BrainCircuit, CalendarRange, Factory, Gauge, GitCompareArrows, Megaphone, Package, ShoppingCart, Warehouse, ArrowLeftRight, Banknote, Boxes, ChartNoAxesColumn, KanbanSquare, LayoutGrid, Layers, Settings2, Landmark, ListOrdered, PlugZap, SlidersHorizontal, Truck, Undo2, Users, type LucideIcon, Tags, Rabbit, Scale, FileBarChart, BookOpenText } from 'lucide-react';
 import { canSee, type Page, type Role, type Scopes } from '@/lib/domain/perms';
 import type { Badges } from '@/lib/queries';
 
@@ -24,6 +24,7 @@ export const NAV: { group: string | null; items: NavItem[] }[] = [
       { href: '/', label: 'Command centre', icon: Activity, page: 'home', hint: 'Today at a glance: sales, late work, what needs you' },
       { href: '/orders', label: 'Orders', icon: ListOrdered, page: 'orders', hint: 'Every order: search, filter, export' },
       { href: '/pipeline', label: 'Pipeline', icon: KanbanSquare, page: 'pipeline', hint: 'Every open order by stage, on one board' },
+      { href: '/kb', label: 'Playbook', icon: BookOpenText, page: 'kb', hint: 'Every SOP, policy, decision and ready reply', tint: 'violet' },
     ],
   },
   {
