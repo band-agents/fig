@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bostaCity, bostaCod, bostaCollected, BostaError, buildDelivery, classifyBosta, egyptPhone, mapBostaTrack, pickDistrict, readBostaAnswer, trackingFrom, type BostaCityDistricts, type BostaOrder } from '../bosta-map';
+import { bostaCity, bostaCod, bostaCollected, BostaError, buildDelivery, buildReturnPickup, classifyBosta, classifyBostaReturn, egyptPhone, mapBostaTrack, pickDistrict, readBostaAnswer, trackingFrom, type BostaCityDistricts, type BostaOrder } from '../bosta-map';
 
 const order: BostaOrder = {
   number: '#1290',
@@ -148,5 +148,27 @@ describe('mapBostaTrack', () => {
     expect(t.type).toBe('SEND');
     expect(t.updates.map((u) => u.code)).toEqual(['10', '21', '47']);
     expect(t.updates.at(-1)?.comment).toBe('Customer is not answering.');
+  });
+});
+
+describe('return pickups (CRP)', () => {
+  it('collects from the customer, takes no cash and carries the RMA', () => {
+    const b = buildReturnPickup({ number: 'RMA-4120', order, lines: [{ title: 'Benetton Tank Top', quantity: 1 }] }, { businessLocationId: 'loc1' });
+    expect(b.type).toBe(25);
+    expect(b.pickupAddress.city).toBe('Cairo');
+    expect(b.pickupAddress.firstLine).toContain('Abbas El Akkad');
+    expect('dropOffAddress' in b).toBe(false);
+    expect('cod' in b).toBe(false);
+    expect(b.businessReference).toBe('FIG-RMA-4120');
+    expect(b.specs.packageDetails).toEqual({ itemsCount: 1, description: 'Benetton Tank Top' });
+    expect(b.receiver.phone).toBe('01001234567');
+    expect(b.businessLocationId).toBe('loc1');
+  });
+  it('reads the pickup states', () => {
+    expect(classifyBostaReturn(22)).toBe('awaiting');
+    expect(classifyBostaReturn(23)).toBe('collected');
+    expect(classifyBostaReturn(46)).toBe('received');
+    expect(classifyBostaReturn(48)).toBe('cancelled');
+    expect(classifyBostaReturn(103)).toBe('exception');
   });
 });

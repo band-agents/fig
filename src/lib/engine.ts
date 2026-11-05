@@ -627,6 +627,11 @@ export async function openReturn(
      exist would send someone out for nothing. */
   const branch = findBranch(channel?.brand ?? 'FIG', channel?.country ?? 'EG', input.branch);
 
+  const method = site ? (input.method ?? 'store') : policy.storeOnly ? 'store' : (input.method ?? 'pickup');
+  /* A return the customer brings to a shop needs nobody's approval (Dan, 5 Nov 2026): it opens as
+     approved, with what they chose, and waits for the shop to have it. Only a courier pickup is reviewed. */
+  const stage: ReturnStage = method === 'store' ? 'approved' : 'requested';
+
   const number = await nextRmaNumber();
   const targets = await slaTargets();
   const [ret] = await db
@@ -637,13 +642,14 @@ export async function openReturn(
       channelId: o.channelId,
       customerId: o.customerId,
       requestedAt: now,
-      stage: 'requested',
+      stage,
       stageAt: now,
-      dueAt: dueFor('returns', 'requested', now, targets),
+      // a shop return waits as long as the customer takes to come in, inside the return window
+      dueAt: stage === 'approved' ? null : dueFor('returns', stage, now, targets),
       reason: input.reason,
       reasonNote: input.note ?? null,
       resolution: input.resolution ?? resolutionFor(refund.method),
-      method: site ? (input.method ?? 'store') : policy.storeOnly ? 'store' : (input.method ?? 'pickup'),
+      method,
       refundMethod: refund.method,
       currency: o.currency,
       /* What the customer receives, bonus included, so finance never has to recompute it. */
@@ -657,10 +663,11 @@ export async function openReturn(
   await db.insert(schema.returnItems).values(picked.map((p) => ({ returnId: ret.id, orderItemId: p.orderItemId, quantity: p.quantity, reason: input.reason })));
   const via = input.openedVia === 'portal' ? ' · opened by the customer' : input.openedVia === 'app' ? ' · opened in the app' : '';
   const paid = refund.bonus > 0 ? ` · ${refund.method.replace(/_/g, ' ')} +${money(refund.bonus, o.currency)} bonus` : ` · ${refund.method.replace(/_/g, ' ')}`;
-  const msg = `Return ${number} opened · ${picked.length} item${picked.length > 1 ? 's' : ''}${paid}${via}${site ? ' · from the website' : ''}${overriding ? ' · policy overridden' : ''}`;
-  await record({ orderId, returnId: ret.id, at: now, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'stage', toStage: 'requested', message: msg, data: input.note ? { note: input.note } : undefined });
+  const shop = method === 'store' ? ` · brought to ${branch?.name ?? 'a shop'}, no approval needed` : ' · courier pickup';
+  const msg = `Return ${number} opened · ${picked.length} item${picked.length > 1 ? 's' : ''}${paid}${shop}${via}${site ? ' · from the website' : ''}${overriding ? ' · policy overridden' : ''}`;
+  await record({ orderId, returnId: ret.id, at: now, actorId: actor.id, actorName: actor.name, dept: actor.dept, kind: 'stage', toStage: stage, message: msg, data: input.note ? { note: input.note } : undefined });
   await refreshCustomer(o.customerId);
-  if (!opts.quiet) publish({ kind: 'return', id: ret.id, number, channelId: o.channelId, stage: 'requested', actor: actor.name, message: msg });
+  if (!opts.quiet) publish({ kind: 'return', id: ret.id, number, channelId: o.channelId, stage, actor: actor.name, message: msg });
   /* A copy for the Labesny app's admin; sent after the return is saved, and never in the way of it. */
   if (!opts.quiet) void mirrorReturn(ret.id);
   if (!opts.quiet && ret.method === 'pickup') courierFollowsReturn(ret.id, 'requested');
@@ -692,12 +699,14 @@ export async function moveReturn(
     review = cleanReview(wanted!, r, { id: actor.id ?? "", name: actor.name }, opts.at ?? new Date());
     if (to === 'rejected') input = { ...input, reason: review.reason };
   }
+  if (to === 'refunded' && r.stage === 'approved' && r.method !== 'store') throw invalid('A courier pickup is completed once the parcel is back with us.');
   if (t.needs?.includes('reason') && !input.reason?.trim()) throw invalid('Give a reason.');
-  // a Kuwait home pickup carries its UPS waybill already, or gets one booked here; any other courier is typed in
+  // a home pickup carries its waybill already, or gets one booked here (UPS in Kuwait, Bosta in Egypt); any other courier is typed in
   if (to === 'pickup' && !input.tracking?.trim()) {
-    const ups = await import('./gmtc-returns');
+    const [ups, bosta] = await Promise.all([import('./gmtc-returns'), import('./bosta-returns')]);
     if (r.tracking) input = { ...input, tracking: r.tracking };
     else if (ups.upsCollects(r) && !opts.quiet) input = { ...input, tracking: await ups.bookReturnPickup(actor, r.id) };
+    else if (bosta.bostaCollects(r) && !opts.quiet) input = { ...input, tracking: await bosta.bookBostaReturn(actor, r.id) };
   }
   if (t.needs?.includes('tracking') && !input.tracking?.trim()) throw invalid('Add the pickup waybill.');
   if (t.needs?.includes('note') && !input.note?.trim()) throw invalid('Add a note.');
@@ -753,9 +762,10 @@ export async function moveReturn(
   if (!opts.quiet && (to === 'approved' || to === 'rejected')) courierFollowsReturn(r.id, to);
 }
 
-/** Kuwait home pickups: UPS is booked, moved on and cancelled with the return. Lazy and never awaited, like the orders' courier. */
+/** Home pickups: UPS (Kuwait) or Bosta (Egypt) is booked, moved on and cancelled with the return. Lazy and never awaited, like the orders' courier. */
 function courierFollowsReturn(returnId: string, to: ReturnStage) {
   keepAlive(import('./gmtc-returns').then((m) => m.courierFollowsReturn(returnId, to)).catch(() => {}));
+  keepAlive(import('./bosta-returns').then((m) => m.bostaFollowsReturn(returnId, to)).catch(() => {}));
 }
 
 // ── Lookups used by several screens ─────────────────────────────────────────────────────────────
