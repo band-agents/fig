@@ -3,6 +3,7 @@
 import type { ChannelDef } from '../channels';
 import type { IncomingItem, IncomingOrder } from './types';
 import { address, date, fullName, minor, num, SIZE_NAME, str } from './map-util';
+import { APP_TRAFFIC } from '../domain/traffic';
 
 /** Order numbers staff say out loud for app orders: FIGAPP-1042, LBAPP-88. */
 export const APP_PREFIX: Record<string, string> = { 'fig-app': 'FIGAPP', 'labesny-app': 'LBAPP' };
@@ -200,6 +201,7 @@ export function mapMedusaOrder(c: ChannelDef, o: MedusaOrder): IncomingOrder {
     externalId: o.id,
     number: appOrderNumber(c.id, o.display_id, o.id),
     source: 'medusa',
+    traffic: APP_TRAFFIC,
     placedAt,
     customerName: fullName(ship.first_name, ship.last_name) ?? fullName(cust.first_name, cust.last_name) ?? str(o.email) ?? str(cust.email) ?? 'App customer',
     phone: str(ship.phone) ?? str(cust.phone),
