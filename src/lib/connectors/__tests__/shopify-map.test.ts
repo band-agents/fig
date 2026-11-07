@@ -224,6 +224,22 @@ describe('Shopify GraphQL order mapping', () => {
   });
 });
 
+describe('where the order came from', () => {
+  it('reads the customer journey, and asks for it', () => {
+    expect(orderSelection(5, true)).toContain('customerJourneySummary');
+    const o = mapShopifyOrder(labesnyWeb, { ...labesnyNode, customerJourneySummary: { lastVisit: { source: 'Instagram', referrerUrl: 'https://l.instagram.com/' } } });
+    expect(o.traffic).toMatchObject({ kind: 'social', label: 'Instagram' });
+    expect(mapShopifyOrder(labesnyWeb, labesnyNode).traffic).toBeNull();
+  });
+
+  it('reads the webhook landing page, and calls app orders App', () => {
+    const o = mapShopifyRestOrder(labesnyWeb, { ...figRest, landing_site: '/?utm_source=facebook&utm_medium=paid&utm_campaign=AW26', referring_site: 'https://m.facebook.com/' })!;
+    expect(o.traffic).toMatchObject({ kind: 'meta_ad', campaign: 'AW26', rough: true });
+    const app = mapShopifyOrder(labesnyWeb, { ...labesnyNode, customAttributes: [{ key: 'medusa_order_id', value: 'order_1' }] });
+    expect(app.traffic).toEqual({ kind: 'app', label: 'App' });
+  });
+});
+
 describe('app orders pushed into Shopify', () => {
   const pushed: ShopifyOrderNode = {
     ...labesnyNode,
@@ -366,7 +382,7 @@ describe('query shape and scopes', () => {
     for (const requested of [1, 5, 10, 25, 50, 100]) {
       const { first, lines } = pagePlan(requested);
       expect(first).toBeLessThanOrEqual(requested);
-      expect(first * (30 + lines * 8)).toBeLessThanOrEqual(1000);
+      expect(first * (34 + lines * 8)).toBeLessThanOrEqual(1000);
       expect(lines).toBeGreaterThanOrEqual(5);
     }
     expect(pagePlan(10)).toEqual({ first: 10, lines: 7 });
