@@ -6,7 +6,7 @@ import { MailTest } from '@/components/channels/mail-test';
 import { requireUser, sendHome } from '@/lib/auth/session';
 import { getDb, schema } from '@/lib/db';
 import { CHANNELS, channelConfigured, warehouseLabel } from '@/lib/channels';
-import { aramexConfigured, bostaConfigured, bostaEnv, gmtcConfigured, gmtcEnv, lucidaConfigured } from '@/lib/connectors';
+import { aramexBookingConfigured, aramexConfigured, aramexEnv, bostaConfigured, bostaEnv, gmtcConfigured, gmtcEnv, lucidaConfigured } from '@/lib/connectors';
 import { can, canSee } from '@/lib/domain/perms';
 import { writeBackEnabled, writeBackMode } from '@/lib/writeback';
 import { ago } from '@/lib/format';
@@ -34,7 +34,7 @@ export default async function ChannelsPage() {
   const live = CHANNELS.filter((c) => channelConfigured(c)).length;
 
   const extras = [
-    { icon: Truck, name: 'Aramex', on: aramexConfigured(), what: 'Live tracking: shipped → out for delivery → delivered or refused, every few minutes.', env: ['ARAMEX_USERNAME', 'ARAMEX_PASSWORD', 'ARAMEX_ACCOUNT_NUMBER', 'ARAMEX_ACCOUNT_PIN', 'ARAMEX_ACCOUNT_ENTITY', 'ARAMEX_ACCOUNT_COUNTRY_CODE', 'a country with its own account: ARAMEX_JO_* (same names)'] },
+    { icon: Truck, name: `Aramex${aramexConfigured() && aramexEnv() === 'uat' ? ' · test server' : ''}`, on: aramexConfigured(), what: `Live tracking: shipped → out for delivery → delivered or refused, every few minutes. FIG in Egypt: ${aramexBookingConfigured('EG') ? 'booking is on' : 'booking is off'}, beside Bosta: Book Aramex in Shipping, the label from the courier desk, collected parcels move to shipped; EG_AUTO_COURIER=aramex makes it book by itself at Ready instead of Bosta. A cancelled order cancels its waybill once ARAMEX_CLIENT_ID/SECRET are in; without them the order says it is still open.`, env: ['ARAMEX_USERNAME', 'ARAMEX_PASSWORD', 'ARAMEX_ACCOUNT_NUMBER', 'ARAMEX_ACCOUNT_PIN', 'ARAMEX_ACCOUNT_ENTITY', 'ARAMEX_ACCOUNT_COUNTRY_CODE', 'ARAMEX_ENABLED=true (FIG booking)', 'ARAMEX_ENV=uat|live', 'ARAMEX_CREATE_AT=ready|packed|manual', 'EG_AUTO_COURIER=bosta|aramex', 'ARAMEX_CLIENT_ID + ARAMEX_CLIENT_SECRET (cancel)', 'a country with its own account: ARAMEX_JO_* (same names)'] },
     { icon: Truck, name: `UPS Kuwait (GMTC)${gmtcConfigured() && gmtcEnv() === 'staging' ? ' · test account' : ''}`, on: gmtcConfigured(), what: 'Labesny parcels in Kuwait: booked by itself when an order is ready to pick, label from the courier desk, cancelled with the order, and the courier scans move it to shipped, out for delivery, delivered or refused.', env: ['GMTC_ENABLED=true', 'GMTC_API_KEY', 'GMTC_CUSTOMER_CODE', 'GMTC_ENV=staging|live', 'GMTC_CREATE_AT=ready|packed|manual'] },
     { icon: Truck, name: `Bosta (Egypt)${bostaConfigured() && bostaEnv() === 'staging' ? ' · test account' : ''}`, on: bostaConfigured(), what: 'FIG parcels in Egypt: booked by itself when an order is ready to pick, air waybill from the courier desk, cancelled with the order, and the Bosta scans move it to shipped (Shopify emails the tracking link), out for delivery, delivered or refused.', env: ['BOSTA_ENABLED=true', 'BOSTA_API_KEY', 'BOSTA_ENV=staging|live', 'BOSTA_CREATE_AT=ready|packed|manual', 'BOSTA_CHANNELS=fig-web,fig-app'] },
     { icon: Boxes, name: 'Lucida ERP', on: lucidaConfigured(), what: 'Stock on hand by barcode at pick time, so a missing piece is caught before the picker walks the aisle.', env: ['LUCIDA_ACCOUNTS (JSON: [{username,password}, …])'] },
