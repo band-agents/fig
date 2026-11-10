@@ -75,15 +75,16 @@ export async function checkChannel(c: ChannelDef): Promise<ConnectionCheck> {
 
 /** Every courier in one pass: Aramex for its parcels, UPS (GMTC) for Kuwait's parcels and return pickups, Bosta for FIG's in Egypt. */
 export async function trackCouriers() {
-  const [{ trackUps }, { trackUpsReturns }, { trackBosta }, { trackBostaReturns }] = await Promise.all([import('./gmtc-shipments'), import('./gmtc-returns'), import('./bosta-shipments'), import('./bosta-returns')]);
-  const [aramex, ups, upsReturns, bosta, bostaReturns] = await Promise.all([
+  const [{ trackUps }, { trackUpsReturns }, { trackBosta }, { trackBostaReturns }, { trackUpsIntlOrders }] = await Promise.all([import('./gmtc-shipments'), import('./gmtc-returns'), import('./bosta-shipments'), import('./bosta-returns'), import('./ups-intl-shipments')]);
+  const [aramex, ups, upsReturns, bosta, bostaReturns, upsIntl] = await Promise.all([
     trackAramex().catch((e) => ({ ok: false, note: `Aramex: ${e instanceof Error ? e.message : e}` })),
     trackUps().catch((e) => ({ ok: false, note: `UPS: ${e instanceof Error ? e.message : e}` })),
     trackUpsReturns().catch((e) => ({ ok: false, note: `UPS returns: ${e instanceof Error ? e.message : e}` })),
     trackBosta().catch((e) => ({ ok: false, note: `Bosta: ${e instanceof Error ? e.message : e}` })),
     trackBostaReturns().catch((e) => ({ ok: false, note: `Bosta returns: ${e instanceof Error ? e.message : e}` })),
+    trackUpsIntlOrders().catch((e) => ({ ok: false, note: `UPS abroad: ${e instanceof Error ? e.message : e}` })),
   ]);
-  return { ok: aramex.ok || ups.ok || bosta.ok, note: [aramex.note, ups.note, upsReturns.note, bosta.note, bostaReturns.note].join(' · ') };
+  return { ok: aramex.ok || ups.ok || bosta.ok || upsIntl.ok, note: [aramex.note, ups.note, upsReturns.note, bosta.note, bostaReturns.note, upsIntl.note].join(' · ') };
 }
 
 /** Asks Aramex about every live parcel still on the road and moves orders when the courier says so. */

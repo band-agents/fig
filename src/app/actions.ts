@@ -145,6 +145,22 @@ export async function bookUpsAction(orderId: string, service?: 'NEXT DAY' | 'SAM
   });
 }
 
+/** Books a Labesny order going abroad with UPS international now: the 1Z number and label come back from UPS. */
+export async function bookUpsIntlAction(orderId: string) {
+  return run(async () => {
+    const u = await me();
+    const { createUpsIntlOrderShipment } = await import('@/lib/ups-intl-shipments');
+    const { UpsIntlError } = await import('@/lib/connectors');
+    try {
+      const tracking = await createUpsIntlOrderShipment(actorFor(u), orderId);
+      return `Booked with UPS: ${tracking}`;
+    } catch (e) {
+      if (e instanceof UpsIntlError) throw new RelayError('invalid', e.message);
+      throw e;
+    }
+  });
+}
+
 /** Books a FIG order in Egypt with Bosta now: the tracking number comes back from Bosta, nobody types it. */
 export async function bookBostaAction(orderId: string) {
   return run(async () => {
