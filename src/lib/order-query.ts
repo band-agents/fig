@@ -90,6 +90,8 @@ export type OrderRow = {
   placedAt: Date;
   customer: string;
   city: string | null;
+  /** The address's country code (KW, LB…): not personal, so it is shown even when the city is not. */
+  country: string | null;
   phone: string | null;
   currency: string;
   total: number | null;
@@ -137,7 +139,7 @@ export async function listOrders(p: Principal, f: OrderFilters) {
   const seesMoney = can(p, 'money', 1);
   const out: OrderRow[] = rows.rows.map((r) => {
     const lines = (typeof r.lines === 'string' ? JSON.parse(r.lines) : r.lines) as OrderRow['lines'];
-    const address = r.address as { city?: string } | null;
+    const address = r.address as { city?: string; country?: string } | null;
     return {
       id: r.id as string,
       number: r.number as string,
@@ -145,6 +147,7 @@ export async function listOrders(p: Principal, f: OrderFilters) {
       placedAt: new Date(r.placed_at as string),
       customer: pii ? (r.customer_name as string) : maskName(r.customer_name as string),
       city: pii ? (address?.city ?? null) : null,
+      country: address?.country?.trim().toUpperCase() || null,
       phone: contact ? ((r.phone as string) ?? null) : null,
       currency: r.currency as string,
       total: seesMoney ? Number(r.total) : null,

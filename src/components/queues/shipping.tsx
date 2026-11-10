@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ExternalLink, MessageCircle, PackageCheck, PackageOpen, Printer, RotateCcw, Truck, TriangleAlert } from 'lucide-react';
-import { bookBostaAction, bookUpsAction } from '@/app/actions';
+import { bookBostaAction, bookUpsAction, bookUpsIntlAction } from '@/app/actions';
 import { fmt, recommend } from '@/lib/domain/courier-rates';
 import { gmtcArea } from '@/lib/connectors/kuwait-areas';
 import { toast } from '@/components/ui/toast';
@@ -21,7 +21,7 @@ import { OrderLink, ReasonModal, Spin, useMover } from './shared';
 
 type View = 'handover' | 'road' | 'exceptions' | 'rto' | 'pickups';
 
-export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, scopes, ups = null, bosta = null }: { view: View; packed: OrderRow[]; road: OrderRow[]; exceptions: OrderRow[]; rto: OrderRow[]; pickups: ReturnRow[]; scopes: Scopes; ups?: 'staging' | 'live' | null; bosta?: { env: 'staging' | 'live'; channels: string[] } | null }) {
+export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, scopes, ups = null, upsIntl = null, bosta = null }: { view: View; packed: OrderRow[]; road: OrderRow[]; exceptions: OrderRow[]; rto: OrderRow[]; pickups: ReturnRow[]; scopes: Scopes; ups?: 'staging' | 'live' | null; upsIntl?: 'test' | 'live' | null; bosta?: { env: 'staging' | 'live'; channels: string[] } | null }) {
   const m = useMover();
   const [booking, startBooking] = useTransition();
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -43,6 +43,17 @@ export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, sc
       else toast(r.error, { tone: 'error' });
     });
   };
+  const bookUpsIntl = (id: string) => {
+    setBookingId(id);
+    startBooking(async () => {
+      const r = await bookUpsIntlAction(id);
+      setBookingId(null);
+      if (r.ok) toast(r.message ?? 'Booked with UPS');
+      else toast(r.error, { tone: 'error' });
+    });
+  };
+  // a Labesny order to an address outside Kuwait: UPS international, never UPS Kuwait (GMTC)
+  const abroad = (o: OrderRow) => CHANNEL[o.channelId]?.country === 'KW' && Boolean(o.country) && o.country !== 'KW';
   const bostaFor = (o: OrderRow) => Boolean(bosta?.channels.includes(o.channelId)) && !o.tracking && (!o.courier || o.courier === CHANNEL[o.channelId]?.carrier || o.courier === 'Bosta');
   const ships = (scopes.shipping ?? 0) >= 2;
   const desk = (scopes.returns ?? 0) >= 2;
@@ -77,7 +88,7 @@ export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, sc
                 {o.total != null && o.paymentMethod === 'cod' && <span className="font-mono text-[12px]">collect {money(o.total, o.currency)}</span>}
                 {CHANNEL[o.channelId]?.country === 'KW' && !o.tracking && o.total != null && <CheapestCourier area={gmtcArea(o.city, { within: true })} pieces={o.items} cod={o.paymentMethod === 'cod' ? o.total : 0} ups={Boolean(ups)} />}
                 <SlaChip due={o.dueAt} since={o.stageAt} held={o.onHold} />
-                {ships && (o.courier === 'UPS Kuwait' || o.courier === 'Bosta') && o.tracking ? (
+                {ships && (o.courier === 'UPS Kuwait' || o.courier === 'Bosta' || (o.courier === 'UPS' && abroad(o))) && o.tracking ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-[12px] text-ink-2">{o.courier === 'Bosta' ? 'Bosta' : 'UPS'} {o.tracking}</span>
                     <a href={`/orders/${o.id}/label`} target="_blank" rel="noreferrer" className="btn btn-quiet btn-sm">
@@ -90,10 +101,16 @@ export function ShippingQueue({ view, packed, road, exceptions, rto, pickups, sc
                   </div>
                 ) : ships && (
                   <div className="flex flex-wrap items-center gap-2">
-                  {ups && CHANNEL[o.channelId]?.country === 'KW' && !o.tracking && (!o.courier || o.courier === CHANNEL[o.channelId]?.carrier || o.courier === 'UPS Kuwait') && (
+                  {ups && CHANNEL[o.channelId]?.country === 'KW' && !abroad(o) && !o.tracking && (!o.courier || o.courier === CHANNEL[o.channelId]?.carrier || o.courier === 'UPS Kuwait') && (
                     <button onClick={() => bookUps(o.id)} disabled={booking} className="btn btn-primary btn-sm" title={ups === 'staging' ? 'GMTC test account: no real pickup is booked' : undefined}>
                       <Spin on={booking && bookingId === o.id} />
                       <Truck className="size-3.5" /> Book UPS{ups === 'staging' ? ' (test)' : ''}
+                    </button>
+                  )}
+                  {upsIntl && abroad(o) && !o.tracking && (!o.courier || o.courier === CHANNEL[o.channelId]?.carrier || o.courier === 'UPS') && (
+                    <button onClick={() => bookUpsIntl(o.id)} disabled={booking} className="btn btn-primary btn-sm" title={upsIntl === 'test' ? 'UPS test system: nothing is collected or billed' : `Ships to ${o.country} with UPS (account 2C0G62)`}>
+                      <Spin on={booking && bookingId === o.id} />
+                      <Truck className="size-3.5" /> Book UPS to {o.country}{upsIntl === 'test' ? ' (test)' : ''}
                     </button>
                   )}
                   {bostaFor(o) && (

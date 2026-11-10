@@ -28,3 +28,4 @@ export { lucidaConfigured, stockByBarcode } from './lucida';
 export type { StockFigure } from './lucida';
 export { ConnectorError } from './http';
 export type * from './types';
+export { checkDestination, classifyUpsIntl, createUpsIntlShipment, trackUpsIntl, UPS_INTL_COURIER, UPS_INTL_SERVICES, upsCollectedAt, upsIntlConfigured, upsIntlCreateAt, upsIntlEnv, UpsIntlError, upsTrackingUrl, voidUpsIntlShipment } from './ups-intl';

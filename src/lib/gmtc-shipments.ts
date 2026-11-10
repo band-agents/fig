@@ -16,7 +16,8 @@ const UPS: Actor = { id: null, name: 'UPS (GMTC)', dept: null };
 
 type OrderRow = typeof schema.orders.$inferSelect;
 
-const kuwait = (o: Pick<OrderRow, 'channelId'>) => CHANNEL[o.channelId]?.country === 'KW';
+// a Kuwait store's order to an address in Kuwait (or with no country): an address abroad goes with UPS international
+const kuwait = (o: Pick<OrderRow, 'channelId' | 'address'>) => CHANNEL[o.channelId]?.country === 'KW' && (!o.address?.country || o.address.country.trim().toUpperCase() === 'KW');
 const isUps = (o: Pick<OrderRow, 'courier' | 'tracking'>) => o.courier === GMTC_COURIER && Boolean(o.tracking);
 const label = (service: string) => service.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -26,7 +27,7 @@ export async function createUpsShipment(actor: Actor, orderId: string, opts: { s
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
   if (!o) throw notFound('Order not found.');
   if (actor.principal && (!seesChannel(actor.principal, o.channelId) || !can(actor.principal, 'shipping', 2))) throw forbidden('Booking a courier needs Shipping access.');
-  if (!kuwait(o)) throw invalid('UPS (GMTC) only ships inside Kuwait.');
+  if (!kuwait(o)) throw invalid('UPS (GMTC) only ships inside Kuwait: this address is abroad, book UPS international.');
   if (!gmtcConfigured('KW')) throw invalid('UPS (GMTC) is not set up yet.');
   if (o.source === 'demo') throw invalid('Demo orders are never booked with a real courier.');
   if (['cancelled', 'settled', 'rto', 'rto_closed', 'delivered'].includes(o.stage)) throw invalid('This order is closed.');

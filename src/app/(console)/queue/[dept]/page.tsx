@@ -11,7 +11,7 @@ import { CancelledRefunds } from '@/components/queues/cancelled-refunds';
 import { PickQueue } from '@/components/queues/pick';
 import { ShippingQueue } from '@/components/queues/shipping';
 import { num } from '@/lib/format';
-import { bostaConfigured, bostaEnv, gmtcConfigured, gmtcEnv } from '@/lib/connectors';
+import { bostaConfigured, bostaEnv, gmtcConfigured, gmtcEnv, upsIntlConfigured, upsIntlEnv } from '@/lib/connectors';
 import { bostaChannels } from '@/lib/bosta-shipments';
 
 const COPY = {
@@ -89,7 +89,7 @@ export default async function QueuePage(props: PageProps<'/queue/[dept]'>) {
           />
         }
       />
-      <ShippingQueue view={v as 'handover'} packed={packed.rows} road={road} exceptions={exceptions} rto={rto.rows} pickups={pickups.rows} scopes={me.scopes} ups={gmtcConfigured('KW') ? gmtcEnv() : null} bosta={bostaConfigured('EG') ? { env: bostaEnv(), channels: bostaChannels() } : null} />
+      <ShippingQueue view={v as 'handover'} packed={packed.rows} road={road} exceptions={exceptions} rto={rto.rows} pickups={pickups.rows} scopes={me.scopes} ups={gmtcConfigured('KW') ? gmtcEnv() : null} upsIntl={upsIntlConfigured() ? upsIntlEnv() : null} bosta={bostaConfigured('EG') ? { env: bostaEnv(), channels: bostaChannels() } : null} />
     </div>
   );
 }

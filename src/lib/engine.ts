@@ -402,6 +402,10 @@ async function setStage(
   if (o.source !== 'demo' && (to === 'cancelled' || to === 'ready' || to === 'packed') && CHANNEL[o.channelId]?.country === 'KW') {
     keepAlive(import('./gmtc-shipments').then((m) => m.courierFollowsOrder(o.id, to)).catch(() => {}));
   }
+  // Labesny parcels to an address outside Kuwait: UPS international (the GMTC hook above skips them)
+  if (o.source !== 'demo' && (to === 'cancelled' || to === 'ready' || to === 'packed') && CHANNEL[o.channelId]?.country === 'KW') {
+    keepAlive(import('./ups-intl-shipments').then((m) => m.upsIntlFollowsOrder(o.id, to)).catch(() => {}));
+  }
   // FIG parcels in Egypt: Bosta, the same way
   if (o.source !== 'demo' && (to === 'cancelled' || to === 'ready' || to === 'packed') && CHANNEL[o.channelId]?.country === 'EG') {
     keepAlive(import('./bosta-shipments').then((m) => m.bostaFollowsOrder(o.id, to)).catch(() => {}));
