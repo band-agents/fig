@@ -18,8 +18,27 @@ const PUBLIC = ['/login', '/join', '/welcome', '/api/auth/google', '/api/webhook
  */
 const isPublic = (pathname: string) => PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
+/*
+ * Who may put the customer pages in a frame: each shop embeds /return, /track and /concierge in one of
+ * its own pages. Set here, per request, from RETURNS_EMBED_ORIGINS ("https://labesny.com https://figeg.com"),
+ * not in next.config: config headers are fixed when the image is built, and the server's settings are
+ * only read when it runs, so the live console was sending frame-ancestors 'self' and the shops' frames
+ * stayed blank. With nothing set, only the console itself may frame them.
+ */
+const EMBEDDED = ['/return', '/track', '/concierge'];
+const isEmbedded = (pathname: string) => EMBEDDED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+export const frameAncestors = (origins = process.env.RETURNS_EMBED_ORIGINS ?? '') => {
+  const list = origins.trim().split(/\s+/).filter((o) => /^https?:\/\/[^\s;,'"]+$/.test(o));
+  return list.length ? `frame-ancestors 'self' ${list.join(' ')}` : "frame-ancestors 'self'";
+};
+
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  if (isEmbedded(pathname)) {
+    const res = NextResponse.next();
+    res.headers.set('Content-Security-Policy', frameAncestors());
+    return res;
+  }
   if (isPublic(pathname)) return NextResponse.next();
   if (!req.cookies.get('relay_session')?.value) {
     if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'signed_out' }, { status: 401 });
