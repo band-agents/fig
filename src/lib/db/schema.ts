@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { bigint, boolean, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 import type { ReturnReview } from '../domain/return-review';
+import type { OrderTraffic } from '../domain/traffic';
 import type { Costs, Inspection, Payment, Step } from '../domain/production';
 import type { Scopes } from '../domain/perms';
 import type { ChannelDef } from '../channels';
@@ -97,6 +98,7 @@ export const customers = pgTable(
 
 export type Address = { name?: string; line1: string; line2?: string; area?: string; city: string; region?: string; country: string; notes?: string; phone?: string };
 export type RiskReason = { code: string; label: string; weight: number };
+export type { OrderTraffic };
 
 export const orders = pgTable(
   'orders',
@@ -138,6 +140,7 @@ export const orders = pgTable(
     attempts: integer('attempts').notNull().default(0),
     settlementId: text('settlement_id'),
     note: text('note'), // the customer's own order note
+    traffic: jsonb('traffic').$type<OrderTraffic>(), // where the order came from (Shopify customer journey)
     confirmedAt: ts('confirmed_at'),
     approvedAt: ts('approved_at'),
     packedAt: ts('packed_at'),

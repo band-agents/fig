@@ -7,7 +7,7 @@ import type { OrderRow } from '@/lib/order-query';
 import { mayTake, ORDER_FLOW, ORDER_STAGE, type OrderStage } from '@/lib/domain/stages';
 import type { Scopes } from '@/lib/domain/perms';
 import { money, when } from '@/lib/format';
-import { ChannelChip, Payment, PayBadge, RiskBadge, StagePill, Thumbs } from '@/components/ui/bits';
+import { ChannelChip, Payment, PayBadge, RiskBadge, StagePill, Thumbs, TrafficChip } from '@/components/ui/bits';
 import { SlaChip } from '@/components/ui/sla';
 import { bulkMoveAction } from '@/app/actions';
 import { toast } from '@/components/ui/toast';
@@ -92,6 +92,11 @@ export function OrdersTable({ rows, seesMoney, scopes, compact = false }: { rows
                     <ChannelChip id={r.channelId} compact />
                     <span className="text-[11px] text-ink-4" suppressHydrationWarning>{when(r.placedAt)}</span>
                   </div>
+                  {r.traffic && (
+                    <div className="mt-0.5">
+                      <TrafficChip traffic={r.traffic} />
+                    </div>
+                  )}
                 </td>
                 <td className="max-w-[220px]">
                   <div className="flex items-center gap-1.5 truncate">

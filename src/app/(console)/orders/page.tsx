@@ -18,7 +18,7 @@ export default async function OrdersPage(props: PageProps<'/orders'>) {
   if (!canSee(me, 'orders')) sendHome(me);
   const sp = await props.searchParams;
   const str = (k: string) => (typeof sp[k] === 'string' ? (sp[k] as string) : undefined);
-  const f: OrderFilters = { view: str('view') ?? 'open', q: str('q'), channel: str('channel'), stage: str('stage'), pay: str('pay'), risk: str('risk'), sla: str('sla'), sort: str('sort'), page: Number(str('page') ?? 1) };
+  const f: OrderFilters = { view: str('view') ?? 'open', q: str('q'), channel: str('channel'), stage: str('stage'), pay: str('pay'), came: str('came'), risk: str('risk'), sla: str('sla'), sort: str('sort'), page: Number(str('page') ?? 1) };
   const [data, counts] = await Promise.all([listOrders(me, f), viewCounts(me)]);
   const qs = (patch: Record<string, string | undefined>) => {
     const next = new URLSearchParams();

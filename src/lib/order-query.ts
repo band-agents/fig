@@ -13,6 +13,7 @@ export type OrderFilters = {
   risk?: string;
   sla?: string;
   from?: string; // the branch it ships from, or "none" for not decided
+  came?: string; // where the order came from: a TrafficKind, or "unknown"
   sort?: string; // new | old | due | value | risk
   page?: number;
   limit?: number;
@@ -61,6 +62,7 @@ export function filterSql(p: Principal, f: OrderFilters): SQL {
   if (f.from) parts.push(f.from === 'none' ? sql`o.ship_from is null` : sql`o.ship_from = ${f.from}`);
   if (f.stage) parts.push(sql`o.stage = ${f.stage}`);
   if (f.pay) parts.push(sql`o.payment_method = ${f.pay}`);
+  if (f.came) parts.push(f.came === 'unknown' ? sql`o.traffic is null` : sql`o.traffic->>'kind' = ${f.came}`);
   if (f.risk) parts.push(sql`o.risk_level = ${f.risk}`);
   if (f.sla === 'late') parts.push(sql`not o.on_hold and o.due_at < now()`);
   if (f.q?.trim()) {
@@ -97,6 +99,8 @@ export type OrderRow = {
   total: number | null;
   paymentMethod: string;
   paymentStatus: string;
+  /** where the customer came from: "Instagram", "Meta ad", "Google (search)"; null when the store did not say */
+  traffic: { kind: string; label: string; campaign?: string | null } | null;
   stage: string;
   stageAt: Date;
   dueAt: Date | null;
@@ -153,6 +157,7 @@ export async function listOrders(p: Principal, f: OrderFilters) {
       total: seesMoney ? Number(r.total) : null,
       paymentMethod: r.payment_method as string,
       paymentStatus: r.payment_status as string,
+      traffic: r.traffic ? (({ kind, label, campaign }) => ({ kind, label, campaign: campaign ?? null }))(r.traffic as NonNullable<OrderRow['traffic']>) : null,
       stage: r.stage as string,
       stageAt: new Date(r.stage_at as string),
       dueAt: r.due_at ? new Date(r.due_at as string) : null,
