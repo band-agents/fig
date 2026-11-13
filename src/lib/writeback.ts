@@ -6,6 +6,7 @@ import { CHANNEL, channelConfigured, storeWriteBack } from './channels';
 import type { WriteBackChange } from './connectors/types';
 import type { Order } from './db/schema';
 import { changesForStage, type StageInput } from './domain/store-changes';
+import { trackLink } from './track-link';
 
 export { changesForStage };
 
@@ -40,7 +41,12 @@ const doneKey = (c: WriteBackChange) => onceKey(c) ?? (c.kind === 'stage_tag' ? 
 
 /** After a stage move made in the console (or by Autopilot): the stage's changes. */
 export function queueWriteBack(orderId: string, stage: string, input: StageInput) {
-  queue(orderId, (o, carrier) => changesForStage(o, stage, input, carrier));
+  queue(orderId, (o, carrier) => {
+    /* The shipping email's "Track" button goes to our own tracking page (it shows the courier's scans and
+       links to the courier's site where there is one). UPS Kuwait has no public page at all. */
+    const page = stage === 'shipped' ? trackLink(o) : null;
+    return changesForStage(o, stage, page ? { ...input, trackingUrl: page } : input, carrier);
+  });
 }
 
 /** Any other change: a hold, a release, a refund. */

@@ -1,0 +1,312 @@
+/* The tracking page: the returns portal's paper-and-ink storefront, with a delivery rail and a scan log. */
+
+.sf .tr {
+  display: grid;
+  gap: 0;
+}
+.sf .tr-find .sf-display,
+.sf .tr-head {
+  margin-top: 14px;
+}
+.sf .tr-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 32px;
+}
+.sf .tr-alert {
+  margin: 24px 0 0;
+  padding: 12px 14px;
+  border-left: 2px solid var(--accent);
+  background: var(--accent-soft);
+  font-size: 14px;
+}
+
+.sf .tr-eta {
+  margin: 18px 0 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.sf .tr-note {
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  background: var(--stone);
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.sf .tr-card[data-status='delivered'] .tr-head {
+  color: var(--ok);
+}
+.sf .tr-card[data-status='problem'] .tr-head,
+.sf .tr-card[data-status='returned'] .tr-head {
+  color: var(--accent);
+}
+
+/* ── delivery rail ───────────────────────────────── */
+.sf .tr-rail {
+  list-style: none;
+  margin: 40px 0 8px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.sf .tr-rail li {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  padding-top: 22px;
+  padding-right: 6px;
+}
+/* the line from this dot to the next */
+.sf .tr-rail li::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line-2);
+}
+.sf .tr-rail li:last-child::before {
+  right: auto;
+  width: 11px;
+}
+.sf .tr-rail li[data-done]::before {
+  background: var(--ink);
+}
+.sf .tr-rail li[data-current]::before {
+  background: linear-gradient(90deg, var(--ink) 0 11px, var(--line-2) 11px);
+}
+.sf .tr-rail i {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: var(--paper);
+}
+.sf .tr-rail li[data-done] i {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+.sf .tr-rail li[data-current] i {
+  box-shadow: 0 0 0 5px var(--accent-soft);
+}
+.sf .tr-card[data-status='delivered'] .tr-rail li[data-done] i,
+.sf .tr-card[data-status='delivered'] .tr-rail li[data-done]::before {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.sf .tr-rail-label {
+  font-size: 10px;
+  line-height: 1.35;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.sf .tr-rail li[data-done] .tr-rail-label {
+  color: var(--ink);
+}
+.sf .tr-rail-at {
+  font-size: 12px;
+  color: var(--grey);
+  min-height: 1em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── courier ─────────────────────────────────────── */
+.sf .tr-courier {
+  margin-top: 36px;
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px 40px;
+}
+.sf .tr-k {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--grey);
+  margin-bottom: 6px;
+}
+.sf .tr-v {
+  font-size: 16px;
+  letter-spacing: 0.02em;
+}
+.sf .tr-copy {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+}
+.sf .tr-copy small {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.sf .tr-copy:hover small {
+  color: var(--ink);
+}
+.sf .tr-out {
+  margin-left: auto;
+  text-decoration: none;
+}
+
+/* ── scan log ────────────────────────────────────── */
+.sf .tr-log,
+.sf .tr-items {
+  margin-top: 40px;
+}
+.sf .tr-log h2,
+.sf .tr-items h2 {
+  margin: 0 0 18px;
+  font-weight: 400;
+}
+.sf .tr-log ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sf .tr-log li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 16px;
+  padding: 0 0 20px 22px;
+}
+.sf .tr-log li::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 7px;
+  bottom: -7px;
+  width: 1px;
+  background: var(--line);
+}
+.sf .tr-log li:last-child::before {
+  display: none;
+}
+.sf .tr-log li::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+.sf .tr-log li[data-first]::after {
+  background: var(--ink);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.sf .tr-log time {
+  font-size: 12px;
+  color: var(--grey);
+  font-variant-numeric: tabular-nums;
+}
+.sf .tr-log time b {
+  display: block;
+  font-weight: 500;
+  color: var(--ink);
+}
+.sf .tr-log li > span {
+  font-size: 14px;
+}
+.sf .tr-log li:not([data-first]) > span {
+  color: var(--ink-2);
+}
+.sf .tr-log em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--grey);
+  margin-top: 2px;
+}
+.sf .tr-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--grey);
+}
+
+/* ── items ───────────────────────────────────────── */
+.sf .tr-items ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.sf .tr-items li {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+.sf .tr-items img,
+.sf .tr-ph {
+  width: 56px;
+  height: 72px;
+  object-fit: cover;
+  background: var(--stone);
+  display: block;
+}
+.sf .tr-items b {
+  display: block;
+  font-weight: 400;
+  font-size: 14px;
+}
+.sf .tr-items small {
+  display: block;
+  font-size: 12px;
+  color: var(--grey);
+  margin-top: 2px;
+}
+.sf .tr-qty {
+  font-size: 13px;
+  color: var(--grey);
+  font-variant-numeric: tabular-nums;
+}
+
+.sf .tr-again {
+  margin-top: 40px;
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--grey);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+@media (max-width: 520px) {
+  .sf .tr-rail-label {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+  }
+  .sf .tr-out {
+    margin-left: 0;
+    width: 100%;
+    text-align: center;
+  }
+  .sf .tr-log li {
+    grid-template-columns: 70px 1fr;
+    gap: 12px;
+  }
+}

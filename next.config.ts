@@ -35,6 +35,11 @@ const nextConfig: NextConfig = {
         source: '/concierge',
         headers: [{ key: 'Content-Security-Policy', value: frameAncestors }],
       },
+      /* The tracking page, framed on each shop's /pages/track. */
+      {
+        source: '/track',
+        headers: [{ key: 'Content-Security-Policy', value: frameAncestors }],
+      },
     ];
   },
   images: {

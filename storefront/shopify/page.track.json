@@ -1,0 +1,12 @@
+{
+  "sections": {
+    "main": {
+      "type": "fig-track",
+      "settings": {
+        "portal_url": "https://console.dagher-hinnawi.com",
+        "store_id": "REPLACE-WITH-THIS-STORE-S-CHANNEL-ID"
+      }
+    }
+  },
+  "order": ["main"]
+}
