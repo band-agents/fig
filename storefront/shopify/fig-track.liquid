@@ -1,0 +1,88 @@
+{%- comment -%}
+  "Track your order": the tracking page served by Relay, the order console, in a frame.
+
+  The console reads every courier's scans (UPS Kuwait, UPS, Aramex, Bosta), so one page shows them
+  all in the shop's own look. The shipping email links to this page with ?o=…&t=… (a signed link to
+  one order); those, and ?number=…, are passed through to the frame. Without them the customer types
+  the order number and the email or phone they ordered with.
+
+  Settings:
+    Portal address — where Relay is served, e.g. https://console.dagher-hinnawi.com (no trailing slash)
+    Store          — this storefront's channel id in Relay: fig-web, labesny-web, …
+{%- endcomment -%}
+
+{%- liquid
+  assign base = section.settings.portal_url | strip | remove_last: '/'
+  assign store = section.settings.store_id | strip
+  assign src = base | append: '/track?embed=1&store=' | append: store
+-%}
+
+<div class="wrap page-body">
+  {%- if base == blank or store == blank -%}
+    <p class="rte">
+      The tracking page is not connected yet. Open this section in the theme editor and fill in the
+      portal address and the store.
+    </p>
+  {%- else -%}
+    <iframe
+      id="track-portal"
+      class="track-portal"
+      title="Track your order"
+      data-src="{{ src }}"
+      height="720"
+      loading="eager"
+      referrerpolicy="strict-origin"
+    ></iframe>
+    <noscript>
+      <p class="rte"><a class="link" href="{{ src | replace: '?embed=1&', '?' }}">Track your order</a></p>
+    </noscript>
+  {%- endif -%}
+</div>
+
+<style>
+  .track-portal {
+    display: block;
+    width: 100%;
+    border: 0;
+    margin: 8px 0 64px;
+    min-height: 620px;
+    transition: height 0.2s;
+  }
+</style>
+
+<script>
+  (function () {
+    var frame = document.getElementById('track-portal');
+    if (!frame) return;
+    /* Hand the email's link (o, t) or an order number on to the frame. Nothing else is passed. */
+    var here = new URLSearchParams(window.location.search);
+    var url = new URL(frame.getAttribute('data-src'), window.location.href);
+    ['o', 't', 'number'].forEach(function (k) {
+      var v = here.get(k);
+      if (v) url.searchParams.set(k, v);
+    });
+    frame.src = url.toString();
+    var origin = url.origin;
+    window.addEventListener('message', function (e) {
+      if (e.origin !== origin || e.source !== frame.contentWindow) return;
+      var m = e.data;
+      if (!m || m.type !== 'relay:returns:height') return;
+      var h = Number(m.height);
+      if (h > 0 && h < 20000) {
+        frame.style.minHeight = '0';
+        frame.style.height = h + 'px';
+      }
+    });
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Order tracking",
+  "settings": [
+    { "type": "text", "id": "portal_url", "label": "Portal address", "default": "https://console.dagher-hinnawi.com" },
+    { "type": "text", "id": "store_id", "label": "Store", "info": "This storefront's id in Relay: fig-web, labesny-web, …" }
+  ],
+  "presets": [{ "name": "Order tracking" }]
+}
+{% endschema %}

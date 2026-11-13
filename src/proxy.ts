@@ -9,7 +9,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 // `/merch` and `/api/merch` are the website placements the shops load: read-only product cards, and
 // a per-day counter of views and clicks, both rate limited. `/welcome` is the landing page and
 // `/api/auth/google` the Google sign-in round trip (it only ever signs in an existing teammate).
-const PUBLIC = ['/login', '/join', '/welcome', '/api/auth/google', '/api/webhooks', '/api/health', '/api/cron', '/return', '/api/returns', '/concierge', '/api/concierge', '/merch', '/api/merch'];
+const PUBLIC = ['/login', '/join', '/welcome', '/api/auth/google', '/api/webhooks', '/api/health', '/api/cron', '/return', '/api/returns', '/concierge', '/api/concierge', '/merch', '/api/merch', '/track', '/api/track'];
 
 /**
  * A public path is the path itself or something beneath it — never merely something that starts
