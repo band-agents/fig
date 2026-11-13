@@ -14,7 +14,15 @@
 {%- endcomment -%}
 
 {%- liquid
-  assign base = section.settings.portal_url | strip | remove_last: '/'
+  assign base = section.settings.portal_url | strip
+  comment
+    remove_last: '/' would also take the slash out of "https://" when there is no trailing slash.
+  endcomment
+  assign tail = base | slice: -1
+  if tail == '/'
+    assign cut = base.size | minus: 1
+    assign base = base | slice: 0, cut
+  endif
   assign store = section.settings.store_id | strip
   assign src = base | append: '/return?embed=1&store=' | append: store
 -%}
