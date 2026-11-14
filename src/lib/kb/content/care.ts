@@ -758,7 +758,7 @@ export const ARTICLES: Article[] = [
     purpose: 'Quick, correct answers to everyday order questions.',
     when: ['A customer asks about delivery fees or times', 'A customer asks about cancelling or paying'],
     steps: [
-      { title: 'How much is delivery? (FIG)', detail: 'EGP 100 for most of Egypt; EGP 150 for Red Sea, South Sinai, Matrouh, New Valley and North Sinai. Free from EGP 2,000.' },
+      { title: 'How much is delivery? (FIG)', detail: 'EGP 100 for most of Egypt; EGP 150 for Red Sea, South Sinai, Matrouh, New Valley and North Sinai. Free from EGP 3,000.' },
       { title: 'When is delivery free? (Labesny)', detail: 'Free delivery in Kuwait from 20 KWD.' },
       { title: 'Does free delivery work with offers and codes?', detail: 'Yes, free delivery combines with offers and welcome codes on both stores.' },
       { title: 'How long does delivery take?', detail: 'Labesny: 48 to 72 hours in Kuwait. FIG: check the tracking; there is no fixed delivery time.' },
