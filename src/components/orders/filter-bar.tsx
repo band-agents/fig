@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { Loader2, Search, X } from 'lucide-react';
 import type { OrderFilters } from '@/lib/order-query';
+import { TRAFFIC_KINDS } from '@/lib/domain/traffic';
 
 export function FilterBar({ filters, channels, stages }: { filters: OrderFilters; channels: { id: string; label: string }[]; stages: { id: string; label: string }[] }) {
   const router = useRouter();
@@ -30,7 +31,7 @@ export function FilterBar({ filters, channels, stages }: { filters: OrderFilters
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  const active = [filters.channel, filters.stage, filters.pay, filters.risk, filters.q].filter(Boolean).length;
+  const active = [filters.channel, filters.stage, filters.pay, filters.came, filters.risk, filters.q].filter(Boolean).length;
   const sel = 'field !h-9 !w-auto shrink-0 !pr-8 text-[12.5px] lg:min-w-0 lg:shrink';
   return (
     <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
@@ -64,6 +65,15 @@ export function FilterBar({ filters, channels, stages }: { filters: OrderFilters
           <option value="wallet">Wallet</option>
           <option value="instapay">InstaPay</option>
         </select>
+        <select className={sel} value={filters.came ?? ''} onChange={(e) => set({ came: e.target.value || undefined })} aria-label="Came from">
+          <option value="">Any source</option>
+          {TRAFFIC_KINDS.map((t) => (
+            <option key={t.kind} value={t.kind}>
+              {t.label}
+            </option>
+          ))}
+          <option value="unknown">Not known</option>
+        </select>
         <select className={sel} value={filters.risk ?? ''} onChange={(e) => set({ risk: e.target.value || undefined })} aria-label="Risk">
           <option value="">Any risk</option>
           <option value="high">High risk</option>
@@ -81,7 +91,7 @@ export function FilterBar({ filters, channels, stages }: { filters: OrderFilters
           <button
             onClick={() => {
               setQ('');
-              set({ channel: undefined, stage: undefined, pay: undefined, risk: undefined, q: undefined });
+              set({ channel: undefined, stage: undefined, pay: undefined, came: undefined, risk: undefined, q: undefined });
             }}
             className="btn btn-ghost btn-sm !h-9 shrink-0"
           >

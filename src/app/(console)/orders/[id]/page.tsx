@@ -8,7 +8,7 @@ import { ORDER_STAGE, type OrderStage } from '@/lib/domain/stages';
 import { can, READ_ONLY_ROLES } from '@/lib/domain/perms';
 import { money, when } from '@/lib/format';
 import { aramexTrackingUrl } from '@/lib/connectors/aramex-map';
-import { ChannelChip, Payment, ReturnPill, StagePill } from '@/components/ui/bits';
+import { ChannelChip, Payment, ReturnPill, StagePill, TrafficChip } from '@/components/ui/bits';
 import { SlaChip } from '@/components/ui/sla';
 import { StageTracker } from '@/components/order/tracker';
 import { Timeline } from '@/components/order/timeline';
@@ -60,6 +60,7 @@ export default async function OrderPage(props: PageProps<'/orders/[id]'>) {
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-ink-3">
               <ChannelChip id={o.channelId} />
               <span>Placed {when(o.placedAt)}</span>
+              {o.traffic && <span>Came from <TrafficChip traffic={o.traffic} />{o.traffic.campaign ? <span className="text-ink-4"> · {o.traffic.campaign}</span> : null}{o.traffic.first ? <span className="text-ink-4"> · first from {o.traffic.first}</span> : null}</span>}
               <span>{meta?.verb}</span>
               {o.source !== 'demo' && <span className="text-good">● synced {o.syncedAt ? when(o.syncedAt) : ''}</span>}
             </div>

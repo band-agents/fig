@@ -475,7 +475,11 @@ export const shopify: Connector = {
     const gid = str(p.admin_graphql_api_id) ?? `gid://shopify/Order/${str(p.id)}`;
     try {
       const node = await fetchOrder(c, gid, { tries: 1, timeoutMs: 3000 });
-      if (node) return mapShopifyOrder(c, node);
+      if (node) {
+        const full = mapShopifyOrder(c, node);
+        // the journey is often not ready when the order is created; the webhook's landing page still is
+        return full.traffic ? full : { ...full, traffic: fromPayload.traffic };
+      }
     } catch {
       // The payload alone is a complete order; the next pull fills in the rest.
     }

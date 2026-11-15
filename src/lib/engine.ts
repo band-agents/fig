@@ -180,6 +180,8 @@ export async function ingestOrder(inc: IncomingOrder, opts: Opts & { autopilot?:
       patch.paymentMethod = inc.paymentMethod;
       await record({ orderId: existing.id, at, actorName: channelLabel(inc.channelId), kind: 'payment', message: `Paying by ${inc.paymentMethod === 'cod' ? 'cash on delivery' : inc.paymentMethod} on ${channelLabel(inc.channelId)} (was ${existing.paymentMethod})` });
     }
+    // Shopify fills the customer journey in a little after the order: take it once it is there
+    if (inc.traffic && !(inc.traffic.rough && existing.traffic && !existing.traffic.rough) && JSON.stringify(inc.traffic) !== JSON.stringify(existing.traffic)) patch.traffic = inc.traffic;
     if (Object.keys(patch).length > 2) await db.update(schema.orders).set(patch).where(eq(schema.orders.id, existing.id));
     await applyPlatformFacts(existing.id, inc);
     if (!opts.quiet) publish({ kind: 'order', id: existing.id, number: existing.number, channelId: existing.channelId, message: 'updated' });
@@ -242,6 +244,7 @@ export async function ingestOrder(inc: IncomingOrder, opts: Opts & { autopilot?:
       items: inc.items.reduce((s, i) => s + i.quantity, 0),
       courier: channel?.carrier ?? null,
       note: inc.note ?? null,
+      traffic: inc.traffic ?? null,
       syncedAt: at,
       createdAt: at,
       updatedAt: at,

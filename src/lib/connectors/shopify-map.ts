@@ -4,12 +4,13 @@ import type { ChannelDef, Country } from '../channels';
 import type { IncomingItem, IncomingOrder } from './types';
 import { appOrderNumber } from './medusa-map';
 import { address, date, fullName, hmacBase64Matches, minor, num, SIZE_NAME, str } from './map-util';
+import { journeyTraffic, sitesTraffic, APP_TRAFFIC, type JourneySummary } from '../domain/traffic';
 
 // ── Query shapes ───────────────────────────────────────────────────────────────────────────────
 
 /** Shopify refuses any single query whose requested cost exceeds 1000 points. */
 const MAX_COST = 900;
-const ORDER_COST = 30; // the order, four money bags, customer, address, attributes, five fulfillments, connection overhead
+const ORDER_COST = 34; // the order, four money bags, customer, address, attributes, customer journey, five fulfillments, connection overhead
 const LINE_COST = 8; // line, image, price bag, variant, options, product
 
 /** How many orders per page and lines per order fit under the cost ceiling. Lines beyond that are fetched per order. */
@@ -26,6 +27,8 @@ export const LINE_FIELDS =
 const moneyField = (f: string) => `${f} { shopMoney { amount currencyCode } }`;
 
 /** The order selection. `customer` is left out when the token lacks read_customers, which would fail the whole query. */
+const JOURNEY_VISIT = 'source sourceType referrerUrl landingPage utmParameters { source medium campaign }';
+
 export function orderSelection(lines: number, withCustomer: boolean) {
   return [
     'id name createdAt processedAt updatedAt cancelledAt cancelReason displayFinancialStatus displayFulfillmentStatus',
@@ -37,6 +40,7 @@ export function orderSelection(lines: number, withCustomer: boolean) {
     withCustomer ? 'customer { id firstName lastName email phone numberOfOrders }' : '',
     'shippingAddress { name firstName lastName phone address1 address2 city province zip country countryCodeV2 }',
     'customAttributes { key value }',
+    `customerJourneySummary { firstVisit { ${JOURNEY_VISIT} } lastVisit { ${JOURNEY_VISIT} } }`,
     `lineItems(first: ${lines}) { pageInfo { hasNextPage endCursor } nodes { ${LINE_FIELDS} } }`,
     'fulfillments(first: 5) { status displayStatus createdAt deliveredAt trackingInfo { number company url } }',
   ]
@@ -97,6 +101,7 @@ export type ShopifyOrderNode = {
     countryCodeV2?: string | null;
   } | null;
   customAttributes?: { key: string; value?: string | null }[] | null;
+  customerJourneySummary?: JourneySummary;
   lineItems?: { nodes: ShopifyLineNode[]; pageInfo?: { hasNextPage: boolean; endCursor?: string | null } } | null;
   fulfillments?: {
     status?: string | null;
@@ -132,6 +137,8 @@ export type ShopifyRestOrder = {
   financial_status?: string | null;
   payment_gateway_names?: string[];
   source_name?: string | null;
+  landing_site?: string | null;
+  referring_site?: string | null;
   tags?: string | null;
   note?: string | null;
   note_attributes?: { name: string; value?: string | null }[];
@@ -339,6 +346,7 @@ export function mapShopifyOrder(c: ChannelDef, n: ShopifyOrderNode): IncomingOrd
     items,
     note: str(n.note),
     tags: n.tags ?? [],
+    traffic: origin ? APP_TRAFFIC : journeyTraffic(n.customerJourneySummary, c.domain),
     ...(Object.keys(platform).length ? { platform } : {}),
   };
 }
@@ -419,6 +427,7 @@ export function mapShopifyRestOrder(c: ChannelDef, p: ShopifyRestOrder): Incomin
     items,
     note: str(p.note),
     tags,
+    traffic: origin ? APP_TRAFFIC : sitesTraffic(p.landing_site, p.referring_site, c.domain),
     ...(Object.keys(platform).length ? { platform } : {}),
   };
 }

@@ -1,5 +1,5 @@
 import type { ChannelDef } from '../channels';
-import type { Address, Order, OrderItem } from '../db/schema';
+import type { Address, Order, OrderItem, OrderTraffic } from '../db/schema';
 
 /** What every connector hands the engine: one order, normalised, money in minor units. */
 export type IncomingOrder = {
@@ -22,6 +22,8 @@ export type IncomingOrder = {
   items: IncomingItem[];
   note?: string | null;
   tags?: string[];
+  /** Where the customer came from; null when the store does not know yet. */
+  traffic?: OrderTraffic | null;
   /** Facts the platform already knows that can move Relay forward (never backwards). */
   platform?: {
     cancelled?: { at: Date; reason?: string | null };

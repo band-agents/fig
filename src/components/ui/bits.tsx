@@ -46,6 +46,26 @@ export function ChannelChip({ id, compact = false }: { id: string; compact?: boo
   );
 }
 
+const TRAFFIC_TONE: Record<string, string> = {
+  meta_ad: 'var(--t-blue)',
+  google_ad: 'var(--t-amber)',
+  social: 'var(--t-rose)',
+  search: 'var(--good)',
+  ai: 'var(--t-violet)',
+};
+
+/** Where the order came from: "Instagram", "Meta ad", "Google (search)". */
+export function TrafficChip({ traffic }: { traffic: { kind: string; label: string; campaign?: string | null; first?: string | null } | null | undefined }) {
+  if (!traffic) return null;
+  const tip = [traffic.campaign && `Campaign: ${traffic.campaign}`, traffic.first && `First came from ${traffic.first}`].filter(Boolean).join(' · ');
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] text-ink-3" title={tip || `Came from ${traffic.label}`}>
+      <span className="size-1.5 rounded-full" style={{ background: TRAFFIC_TONE[traffic.kind] ?? 'var(--ink-4)' }} />
+      {traffic.label}
+    </span>
+  );
+}
+
 export function RiskBadge({ level, score, compact = false }: { level: string; score: number; compact?: boolean }) {
   if (level === 'low') {
     return compact ? (
